@@ -1,0 +1,32 @@
+[
+  {
+    "from": "scout",
+    "to": "orchestrator",
+    "type": "status",
+    "content": "Task \"Khám phá codebase\" completed",
+    "task_id": "t-mn191sbu-1",
+    "id": "msg-mn192n1l-5s9q",
+    "timestamp": 1774153309737,
+    "read": false
+  },
+  {
+    "from": "planner",
+    "to": "orchestrator",
+    "type": "status",
+    "content": "Task \"Lên kế hoạch\" completed",
+    "task_id": "t-mn191sbw-2",
+    "id": "msg-mn194ryn-d0yn",
+    "timestamp": 1774153409423,
+    "read": false
+  },
+  {
+    "from": "worker",
+    "to": "orchestrator",
+    "type": "status",
+    "content": "Task \"Implement\" completed",
+    "task_id": "t-mn191sbw-3",
+    "id": "msg-mn19g7bk-lqoa",
+    "timestamp": 1774153942544,
+    "read": false
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "name": "@pi/web-tools",
+  "version": "2.0.0",
+  "description": "Web search, fetch, and tool discovery for Pi",
+  "type": "module"
+}

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landing Page - Email Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 2rem;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        button.danger {
+            background: #ef4444;
+        }
+        
+        button.danger:hover {
+            background: #dc2626;
+        }
+        
+        .email-list {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .email-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .email-info {
+            flex: 1;
+        }
+        
+        .email-address {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+        
+        .email-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+        
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .csv-output {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            margin-top: 2rem;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .csv-output.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 Email Dashboard</h1>
+        <p class="subtitle">View emails collected from landing page (stored in browser localStorage)</p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-emails">0</div>
+                <div class="stat-label">Total Emails</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="page-views">0</div>
+                <div class="stat-label">Page Views</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="conversion-rate">0%</div>
+                <div class="stat-label">Conversion Rate</div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button onclick="refreshData()">🔄 Refresh</button>
+            <button onclick="exportCSV()">📥 Export CSV</button>
+            <button onclick="copyEmails()">📋 Copy Emails</button>
+            <button class="danger" onclick="clearData()">🗑️ Clear All Data</button>
+        </div>
+        
+        <div class="email-list" id="email-list">
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <p>No emails collected yet</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">
+                    Submit the form on your landing page to see emails here
+                </p>
+            </div>
+        </div>
+        
+        <div class="csv-output" id="csv-output"></div>
+    </div>
+    
+    <script>
+        function loadData() {
+            const emails = JSON.parse(localStorage.getItem('landing_page_emails') || '[]');
+            const pageViews = parseInt(localStorage.getItem('landing_page_views') || '0');
+            
+            // Update stats
+            document.getElementById('total-emails').textContent = emails.length;
+            document.getElementById('page-views').textContent = pageViews.toLocaleString();
+            
+            const conversionRate = pageViews > 0 ? ((emails.length / pageViews) * 100).toFixed(2) : 0;
+            document.getElementById('conversion-rate').textContent = conversionRate + '%';
+            
+            // Display emails
+            const listEl = document.getElementById('email-list');
+            
+            if (emails.length === 0) {
+                listEl.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <p>No emails collected yet</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">
+                            Submit the form on your landing page to see emails here
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+            
+            listEl.innerHTML = emails
+                .reverse()
+                .map((item, index) => {
+                    const date = new Date(item.timestamp);
+                    const formattedDate = date.toLocaleDateString('vi-VN', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    return `
+                        <div class="email-item">
+                            <div class="email-info">
+                                <div class="email-address">${item.email}</div>
+                                <div class="email-meta">
+                                    🕐 ${formattedDate}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                })
+                .join('');
+        }
+        
+        function refreshData() {
+            loadData();
+            document.getElementById('csv-output').classList.remove('show');
+            
+            // Show feedback
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Refreshed';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 1000);
+        }
+        
+        function exportCSV() {
+            const emails = JSON.parse(localStorage.getItem('landing_page_emails') || '[]');
+            
+            if (emails.length === 0) {
+                alert('No emails to export');
+                return;
+            }
+            
+            // Generate CSV
+            const csv = [
+                'Email,Timestamp,User Agent',
+                ...emails.map(item => 
+                    `"${item.email}","${item.timestamp}","${item.userAgent || 'N/A'}"`
+                )
+            ].join('\n');
+            
+            // Show in output
+            const outputEl = document.getElementById('csv-output');
+            outputEl.textContent = csv;
+            outputEl.classList.add('show');
+            
+            // Download file
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `landing-page-emails-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        function copyEmails() {
+            const emails = JSON.parse(localStorage.getItem('landing_page_emails') || '[]');
+            
+            if (emails.length === 0) {
+                alert('No emails to copy');
+                return;
+            }
+            
+            const emailList = emails.map(item => item.email).join('\n');
+            
+            navigator.clipboard.writeText(emailList).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+        
+        function clearData() {
+            if (!confirm('Are you sure? This will delete all collected emails and page view data.')) {
+                return;
+            }
+            
+            localStorage.removeItem('landing_page_emails');
+            localStorage.removeItem('landing_page_views');
+            loadData();
+            document.getElementById('csv-output').classList.remove('show');
+            
+            alert('✓ All data cleared');
+        }
+        
+        // Initial load
+        loadData();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>

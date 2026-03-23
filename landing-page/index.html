@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>ShopPro - Giải Pháp Bán Hàng Chuyên Nghiệp</title>
+    <meta name="description" content="Nền tảng bán hàng toàn diện giúp doanh nghiệp tăng trưởng doanh số và quản lý hiệu quả. Dùng thử miễn phí 14 ngày.">
+    
+    <!-- Open Graph Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="ShopPro - Giải Pháp Bán Hàng Chuyên Nghiệp">
+    <meta property="og:description" content="Nền tảng bán hàng toàn diện giúp doanh nghiệp tăng trưởng doanh số và quản lý hiệu quả.">
+    <meta property="og:url" content="https://yoursite.com">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Google Analytics (Uncomment and add your ID in production) -->
+    <!-- 
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX', {
+            'page_title': 'ShopPro Landing Page',
+            'send_page_view': true
+        });
+    </script>
+    -->
+    
+    <!-- Alternative: Simple page view counter (works without GA account) -->
+    <script>
+        // Track page views in localStorage (development mode)
+        if (typeof(Storage) !== "undefined") {
+            let pageViews = parseInt(localStorage.getItem('landing_page_views') || '0');
+            pageViews++;
+            localStorage.setItem('landing_page_views', pageViews);
+            console.log('📊 Page views:', pageViews);
+        }
+    </script>
+</head>
+<body>
+    <!-- Header & Navigation -->
+    <header class="header" id="header">
+        <nav class="nav container">
+            <div class="nav__logo">
+                <i class="fas fa-shopping-bag"></i>
+                <span>ShopPro</span>
+            </div>
+            
+            <div class="nav__menu" id="nav-menu">
+                <ul class="nav__list">
+                    <li class="nav__item"><a href="#home" class="nav__link active">Trang chủ</a></li>
+                    <li class="nav__item"><a href="#features" class="nav__link">Tính năng</a></li>
+                    <li class="nav__item"><a href="#pricing" class="nav__link">Bảng giá</a></li>
+                    <li class="nav__item"><a href="#testimonials" class="nav__link">Đánh giá</a></li>
+                    <li class="nav__item"><a href="#cta" class="nav__link nav__cta">Dùng thử miễn phí</a></li>
+                </ul>
+            </div>
+            
+            <button class="nav__toggle" id="nav-toggle" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero section" id="home">
+        <div class="hero__container container">
+            <div class="hero__content">
+                <div class="hero__badge">
+                    <i class="fas fa-star"></i>
+                    <span>Được tin dùng bởi 10,000+ doanh nghiệp</span>
+                </div>
+                
+                <h1 class="hero__title">
+                    Bán Hàng Thông Minh<br>
+                    <span class="gradient-text">Tăng Trưởng Vượt Bậc</span>
+                </h1>
+                
+                <p class="hero__description">
+                    Nền tảng quản lý bán hàng all-in-one giúp bạn kiểm soát kho, đơn hàng, 
+                    khách hàng và doanh số trong một hệ thống duy nhất. Tăng 300% hiệu suất bán hàng.
+                </p>
+                
+                <div class="hero__buttons">
+                    <a href="#cta" class="btn btn--primary">
+                        Dùng thử 14 ngày miễn phí
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                    <a href="#features" class="btn btn--secondary">
+                        <i class="fas fa-play-circle"></i>
+                        Xem demo
+                    </a>
+                </div>
+                
+                <div class="hero__stats">
+                    <div class="stat">
+                        <span class="stat__number">10K+</span>
+                        <span class="stat__label">Khách hàng</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat__number">99.9%</span>
+                        <span class="stat__label">Uptime</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat__number">24/7</span>
+                        <span class="stat__label">Hỗ trợ</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hero__image">
+                <div class="hero__card hero__card--1">
+                    <i class="fas fa-chart-line"></i>
+                    <div>
+                        <p class="card__label">Doanh số tháng này</p>
+                        <p class="card__value">+142%</p>
+                    </div>
+                </div>
+                
+                <div class="hero__card hero__card--2">
+                    <i class="fas fa-users"></i>
+                    <div>
+                        <p class="card__label">Khách hàng mới</p>
+                        <p class="card__value">+1,234</p>
+                    </div>
+                </div>
+                
+                <div class="hero__card hero__card--3">
+                    <i class="fas fa-box"></i>
+                    <div>
+                        <p class="card__label">Đơn hàng</p>
+                        <p class="card__value">2,456</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features section" id="features">
+        <div class="container">
+            <div class="section__header">
+                <span class="section__tag">Tính năng nổi bật</span>
+                <h2 class="section__title">Mọi Công Cụ Bạn Cần<br>Trong Một Nền Tảng</h2>
+                <p class="section__description">
+                    Được thiết kế để tối ưu quy trình bán hàng từ A-Z
+                </p>
+            </div>
+            
+            <div class="features__grid">
+                <!-- CUSTOMIZE THIS: Add your specific features -->
+                <div class="feature__card">
+                    <div class="feature__icon">
+                        <i class="fas fa-warehouse"></i>
+                    </div>
+                    <h3 class="feature__title">Quản Lý Kho Thông Minh</h3>
+                    <p class="feature__text">
+                        Theo dõi tồn kho real-time, cảnh báo sắp hết hàng, 
+                        tự động nhập xuất với báo cáo chi tiết.
+                    </p>
+                </div>
+                
+                <div class="feature__card feature__card--highlight">
+                    <div class="feature__icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3 class="feature__title">Báo Cáo & Phân Tích</h3>
+                    <p class="feature__text">
+                        Dashboard trực quan với insights về doanh thu, 
+                        sản phẩm bán chạy, xu hướng khách hàng.
+                    </p>
+                    <span class="feature__badge">Phổ biến nhất</span>
+                </div>
+                
+                <div class="feature__card">
+                    <div class="feature__icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h3 class="feature__title">Bán Hàng Đa Kênh</h3>
+                    <p class="feature__text">
+                        Tích hợp Facebook, Instagram, TikTok Shop, 
+                        Shopee, Lazada - quản lý tất cả từ một nơi.
+                    </p>
+                </div>
+                
+                <div class="feature__card">
+                    <div class="feature__icon">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
+                    <h3 class="feature__title">CRM Khách Hàng</h3>
+                    <p class="feature__text">
+                        Lưu trữ thông tin, lịch sử mua hàng, 
+                        tạo chương trình khách hàng thân thiết.
+                    </p>
+                </div>
+                
+                <div class="feature__card">
+                    <div class="feature__icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="feature__title">Bảo Mật Cao</h3>
+                    <p class="feature__text">
+                        Mã hóa dữ liệu SSL 256-bit, backup tự động, 
+                        tuân thủ GDPR và chuẩn PCI DSS.
+                    </p>
+                </div>
+                
+                <div class="feature__card">
+                    <div class="feature__icon">
+                        <i class="fas fa-headset"></i>
+                    </div>
+                    <h3 class="feature__title">Hỗ Trợ 24/7</h3>
+                    <p class="feature__text">
+                        Đội ngũ support chuyên nghiệp luôn sẵn sàng, 
+                        thời gian phản hồi trung bình < 5 phút.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing section" id="pricing">
+        <div class="container">
+            <div class="section__header">
+                <span class="section__tag">Bảng giá</span>
+                <h2 class="section__title">Chọn Gói Phù Hợp<br>Với Quy Mô Của Bạn</h2>
+                <p class="section__description">
+                    Minh bạch, không phí ẩn. Hủy bất cứ lúc nào.
+                </p>
+            </div>
+            
+            <div class="pricing__grid">
+                <!-- CUSTOMIZE THIS: Adjust pricing tiers -->
+                <div class="pricing__card">
+                    <div class="pricing__header">
+                        <h3 class="pricing__name">Starter</h3>
+                        <p class="pricing__description">Cho cửa hàng mới</p>
+                    </div>
+                    <div class="pricing__price">
+                        <span class="price__currency">đ</span>
+                        <span class="price__amount">299K</span>
+                        <span class="price__period">/tháng</span>
+                    </div>
+                    <ul class="pricing__features">
+                        <li><i class="fas fa-check"></i> 100 sản phẩm</li>
+                        <li><i class="fas fa-check"></i> 500 đơn hàng/tháng</li>
+                        <li><i class="fas fa-check"></i> 1 kênh bán hàng</li>
+                        <li><i class="fas fa-check"></i> Báo cáo cơ bản</li>
+                        <li><i class="fas fa-check"></i> Hỗ trợ email</li>
+                    </ul>
+                    <button class="btn btn--outline">Bắt đầu miễn phí</button>
+                </div>
+                
+                <div class="pricing__card pricing__card--popular">
+                    <div class="pricing__badge">Phổ biến nhất</div>
+                    <div class="pricing__header">
+                        <h3 class="pricing__name">Business</h3>
+                        <p class="pricing__description">Cho doanh nghiệp vừa</p>
+                    </div>
+                    <div class="pricing__price">
+                        <span class="price__currency">đ</span>
+                        <span class="price__amount">799K</span>
+                        <span class="price__period">/tháng</span>
+                    </div>
+                    <ul class="pricing__features">
+                        <li><i class="fas fa-check"></i> Sản phẩm không giới hạn</li>
+                        <li><i class="fas fa-check"></i> 5,000 đơn hàng/tháng</li>
+                        <li><i class="fas fa-check"></i> Đa kênh không giới hạn</li>
+                        <li><i class="fas fa-check"></i> Báo cáo nâng cao</li>
+                        <li><i class="fas fa-check"></i> Hỗ trợ ưu tiên 24/7</li>
+                        <li><i class="fas fa-check"></i> Tích hợp API</li>
+                    </ul>
+                    <button class="btn btn--primary">Bắt đầu miễn phí</button>
+                </div>
+                
+                <div class="pricing__card">
+                    <div class="pricing__header">
+                        <h3 class="pricing__name">Enterprise</h3>
+                        <p class="pricing__description">Cho tập đoàn lớn</p>
+                    </div>
+                    <div class="pricing__price">
+                        <span class="price__amount">Custom</span>
+                    </div>
+                    <ul class="pricing__features">
+                        <li><i class="fas fa-check"></i> Tất cả tính năng Business</li>
+                        <li><i class="fas fa-check"></i> Không giới hạn đơn hàng</li>
+                        <li><i class="fas fa-check"></i> Custom integration</li>
+                        <li><i class="fas fa-check"></i> Dedicated account manager</li>
+                        <li><i class="fas fa-check"></i> SLA 99.99%</li>
+                        <li><i class="fas fa-check"></i> White-label option</li>
+                    </ul>
+                    <button class="btn btn--outline">Liên hệ sales</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials section" id="testimonials">
+        <div class="container">
+            <div class="section__header">
+                <span class="section__tag">Khách hàng nói gì</span>
+                <h2 class="section__title">Được Tin Dùng Bởi<br>Các Doanh Nghiệp Hàng Đầu</h2>
+            </div>
+            
+            <div class="testimonials__grid">
+                <!-- CUSTOMIZE THIS: Add real testimonials -->
+                <div class="testimonial__card">
+                    <div class="testimonial__rating">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial__text">
+                        "ShopPro giúp chúng tôi tăng doanh số 240% trong 6 tháng. 
+                        Giao diện trực quan, dễ sử dụng ngay cả với nhân viên mới."
+                    </p>
+                    <div class="testimonial__author">
+                        <div class="author__avatar">
+                            <img src="https://i.pravatar.cc/150?img=12" alt="Nguyễn Văn A" loading="lazy">
+                        </div>
+                        <div class="author__info">
+                            <p class="author__name">Nguyễn Văn A</p>
+                            <p class="author__role">CEO, Fashion Store XYZ</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial__card">
+                    <div class="testimonial__rating">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial__text">
+                        "Tích hợp đa kênh của ShopPro giúp tôi quản lý 5 sàn TMĐT 
+                        chỉ trong một dashboard. Tiết kiệm 15 giờ/tuần!"
+                    </p>
+                    <div class="testimonial__author">
+                        <div class="author__avatar">
+                            <img src="https://i.pravatar.cc/150?img=47" alt="Trần Thị B" loading="lazy">
+                        </div>
+                        <div class="author__info">
+                            <p class="author__name">Trần Thị B</p>
+                            <p class="author__role">Owner, Organic Beauty Shop</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial__card">
+                    <div class="testimonial__rating">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial__text">
+                        "Báo cáo chi tiết và insights từ ShopPro giúp chúng tôi 
+                        ra quyết định kinh doanh thông minh hơn. ROI tăng 180%!"
+                    </p>
+                    <div class="testimonial__author">
+                        <div class="author__avatar">
+                            <img src="https://i.pravatar.cc/150?img=33" alt="Lê Minh C" loading="lazy">
+                        </div>
+                        <div class="author__info">
+                            <p class="author__name">Lê Minh C</p>
+                            <p class="author__role">Marketing Director, Tech Hub</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta section" id="cta">
+        <div class="container">
+            <div class="cta__container">
+                <div class="cta__content">
+                    <h2 class="cta__title">
+                        Sẵn Sàng Tăng Trưởng<br>
+                        Doanh Số Của Bạn?
+                    </h2>
+                    <p class="cta__description">
+                        Bắt đầu dùng thử miễn phí 14 ngày. Không cần thẻ tín dụng.
+                    </p>
+                    
+                    <form class="cta__form" id="cta-form">
+                        <div class="form__group">
+                            <input 
+                                type="email" 
+                                id="email" 
+                                class="form__input" 
+                                placeholder="email@ctyban.com" 
+                                required
+                                aria-label="Email address"
+                            >
+                            <button type="submit" class="btn btn--primary">
+                                Dùng thử miễn phí
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                        <p class="form__note">
+                            <i class="fas fa-lock"></i>
+                            Bảo mật tuyệt đối. Không spam.
+                        </p>
+                    </form>
+                    
+                    <div class="cta__trust">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Miễn phí 14 ngày</span>
+                        
+                        <i class="fas fa-check-circle"></i>
+                        <span>Không cần thẻ</span>
+                        
+                        <i class="fas fa-check-circle"></i>
+                        <span>Hủy bất cứ lúc nào</span>
+                    </div>
+                </div>
+                
+                <div class="cta__stats">
+                    <div class="stat__item">
+                        <i class="fas fa-rocket"></i>
+                        <div>
+                            <p class="stat__value">10,000+</p>
+                            <p class="stat__label">Doanh nghiệp tin dùng</p>
+                        </div>
+                    </div>
+                    <div class="stat__item">
+                        <i class="fas fa-trophy"></i>
+                        <div>
+                            <p class="stat__value">4.9/5</p>
+                            <p class="stat__label">Đánh giá trung bình</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer__grid">
+                <div class="footer__col">
+                    <div class="footer__logo">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span>ShopPro</span>
+                    </div>
+                    <p class="footer__description">
+                        Nền tảng quản lý bán hàng #1 Việt Nam. 
+                        Giúp doanh nghiệp tăng trưởng bền vững.
+                    </p>
+                    <div class="footer__social">
+                        <a href="#" aria-label="Facebook"><i class="fab fa-facebook"></i></a>
+                        <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                        <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                        <a href="#" aria-label="YouTube"><i class="fab fa-youtube"></i></a>
+                    </div>
+                </div>
+                
+                <div class="footer__col">
+                    <h4 class="footer__title">Sản phẩm</h4>
+                    <ul class="footer__links">
+                        <li><a href="#features">Tính năng</a></li>
+                        <li><a href="#pricing">Bảng giá</a></li>
+                        <li><a href="#">Tích hợp</a></li>
+                        <li><a href="#">API</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer__col">
+                    <h4 class="footer__title">Công ty</h4>
+                    <ul class="footer__links">
+                        <li><a href="#">Về chúng tôi</a></li>
+                        <li><a href="#">Blog</a></li>
+                        <li><a href="#">Careers</a></li>
+                        <li><a href="#">Press Kit</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer__col">
+                    <h4 class="footer__title">Hỗ trợ</h4>
+                    <ul class="footer__links">
+                        <li><a href="#">Trung tâm trợ giúp</a></li>
+                        <li><a href="#">Liên hệ</a></li>
+                        <li><a href="#">Tình trạng hệ thống</a></li>
+                        <li><a href="#">Điều khoản dịch vụ</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer__bottom">
+                <p>&copy; 2026 ShopPro. All rights reserved.</p>
+                <div class="footer__legal">
+                    <a href="#">Chính sách bảo mật</a>
+                    <a href="#">Điều khoản sử dụng</a>
+                    <a href="#">Cookie Policy</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scroll to Top Button -->
+    <button class="scroll-top" id="scroll-top" aria-label="Scroll to top">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- CUSTOMIZE: Add chat widget here (Intercom, Drift, etc.) -->
+    <!-- <script>
+        // Chat widget code
+    </script> -->
+
+    <!-- Main JavaScript -->
+    <script src="js/main.js"></script>
+</body>
+</html>
