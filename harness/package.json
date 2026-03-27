@@ -1,0 +1,27 @@
+{
+  "name": "@pi/agent-harness",
+  "version": "1.0.0",
+  "description": "Multi-agent harness with Beads task tracking for Pi — scout, planner, worker, reviewer pipeline",
+  "keywords": ["pi-package"],
+  "author": "hieptran",
+  "license": "MIT",
+  "type": "module",
+
+  "pi": {
+    "extensions": [
+      "./extensions/harness-state",
+      "./extensions/harness-subagent",
+      "./extensions/harness-verify",
+      "./extensions/aurora-ui.ts"
+    ],
+    "prompts": ["./prompts"],
+    "skills": ["./skills"],
+    "themes": ["./themes"]
+  },
+
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  }
+}

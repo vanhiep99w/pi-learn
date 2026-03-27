@@ -21,7 +21,7 @@
 - [11. Customization](#11-customization)
   - [11.1 Prompt Templates](#111-prompt-templates)
   - [11.2 Skills](#112-skills)
-  - [11.3 Extensions](#113-extensions)
+  - [11.3 Extensions](#113-extensions--tính-năng-mạnh-nhất)
   - [11.4 Themes](#114-themes)
   - [11.5 Pi Packages](#115-pi-packages)
 - [12. SDK](#12-sdk)
@@ -68,7 +68,7 @@ Các tools bổ sung có thể bật: `grep`, `find`, `ls`.
 
 ## 2. Kiến Trúc Monorepo
 
-```
+```text
 pi-mono/
 ├── packages/
 │   ├── ai/            → @mariozechner/pi-ai (Unified multi-provider LLM API)
@@ -215,6 +215,7 @@ Ngoài ra còn có **SDK mode** để nhúng vào app Node.js/TypeScript.
 ```
 
 Key hỗ trợ 3 format:
+
 - **Shell command**: `"!security find-generic-password -ws 'anthropic'"`
 - **Env variable**: `"MY_API_KEY"`
 - **Literal**: `"sk-ant-..."`
@@ -311,7 +312,7 @@ File reload mỗi khi mở `/model`, không cần restart.
 
 ### 6.1 Giao Diện
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │ Startup header (shortcuts, AGENTS.md, etc.) │
 ├─────────────────────────────────────────────┤
@@ -382,6 +383,148 @@ Gửi messages **trong khi agent đang chạy**:
 | Escape | Abort | Khôi phục queued messages vào editor |
 | Alt+Up | Lấy lại | Đưa queued messages về editor |
 
+### 6.6 Slash Command Resolution — `/` Trigger Gì?
+
+Khi gõ `/` trong editor, Pi hiện **autocomplete gộp từ 4 nguồn**:
+
+| # | Loại | Ví Dụ | Nguồn |
+|---|------|-------|-------|
+| 1 | **Built-in commands** | `/model`, `/settings`, `/tree`, `/compact`, `/new`, `/resume` | Hard-coded trong interactive mode |
+| 2 | **Extension commands** | `/stats`, `/deploy`, `/hello` | `pi.registerCommand()` từ extensions |
+| 3 | **Prompt templates** | `/review`, `/component` | File `.md` trong `prompts/` folders |
+| 4 | **Skill commands** | `/skill:brave-search`, `/skill:pdf-tools` | File `SKILL.md` trong `skills/` folders |
+
+#### Cách Pi phân biệt
+
+Pi dùng **command registry thống nhất** với field `source`:
+
+```typescript
+{
+  name: string;          // Tên command (VD: "review", "skill:brave-search")
+  description?: string;
+  source: "extension" | "prompt" | "skill";
+  sourceInfo: {
+    path: string;        // Đường dẫn file gốc
+    source: string;
+    scope: "user" | "project" | "temporary";
+    origin: "package" | "top-level";
+  };
+}
+```
+
+> Built-in commands (`/model`, `/settings`...) **không nằm trong registry** — chúng xử lý riêng trong InteractiveMode nên extension/prompt **không thể ghi đè**.
+
+#### Quy tắc phân biệt
+
+| Quy Tắc | Mô Tả |
+|---------|--------|
+| **Skill dùng prefix `skill:`** | `/skill:name` — không bao giờ trùng extension hay prompt |
+| **Prompt dùng filename** | `review.md` → `/review` |
+| **Extension trùng tên → suffix số** | 2 extension cùng register `/review` → `/review:1` và `/review:2` |
+| **Thứ tự autocomplete** | Extensions → Prompts → Skills |
+
+#### Flow resolve khi gõ `/name`
+
+```text
+User gõ "/" trong editor
+        │
+        ▼
+┌───────────────────────────┐
+│  Autocomplete dropdown    │
+│  gộp 4 nguồn:            │
+│   • Built-in commands     │
+│   • Extension commands    │
+│   • Prompt templates      │
+│   • Skill commands        │
+└───────────┬───────────────┘
+            │
+      User chọn/gõ
+            │
+            ▼
+   ┌─ Built-in? ──► Handler riêng (chỉ interactive mode)
+   │
+   ├─ Extension? ──► handler(args, ctx) chạy logic
+   │
+   ├─ Prompt? ──► Expand .md content vào editor
+   │                (hỗ trợ $1, $@, ${@:N} arguments)
+   │
+   └─ Skill? ──► Load SKILL.md + args → gửi cho LLM
+```
+
+### 6.7 Slash Commands vs Tools — Ai Trigger Gì?
+
+> ⚠️ **Dễ nhầm lẫn**: Slash commands (`/`) và Tools là **hai hệ thống hoàn toàn khác nhau**.
+
+**Slash commands** = User gõ `/` trong editor → chạy logic  
+**Tools** = LLM tự gọi mỗi turn → `read()`, `write()`, `bash()`...
+
+```text
+╔══════════════════════════════════════════╗
+║  USER gõ trong editor                    ║
+║                                          ║
+║  "/"  → Slash commands (4 nguồn)         ║
+║  text → Gửi prompt cho LLM              ║
+╠══════════════════════════════════════════╣
+║  LLM tự quyết định                      ║
+║                                          ║
+║  Tools → read(), write(), bash()...      ║
+║          + custom tools từ extensions    ║
+║  Skills → LLM tự read() SKILL.md        ║
+╚══════════════════════════════════════════╝
+```
+
+#### Bảng so sánh
+
+| Khái niệm | Ai trigger | Cần `/`? | Ví dụ |
+|-----------|-----------|---------|-------|
+| **Tool** (built-in + custom) | **LLM** tự gọi | ❌ | `read("src/main.ts")`, `bash("npm test")` |
+| **Slash Command** (built-in) | **User** gõ | ✅ | `/model`, `/tree`, `/compact` |
+| **Slash Command** (extension) | **User** gõ | ✅ | `/deploy`, `/stats` |
+| **Prompt Template** | **User** gõ | ✅ | `/review`, `/component Button` |
+| **Skill** | **Cả hai** | ⚠️ Tùy | User: `/skill:name` hoặc LLM tự `read()` |
+| **Event Hook** | **Tự động** lifecycle | ❌ | `session_start`, `tool_call` |
+
+#### Extension là container cho cả hai
+
+Một extension có thể đăng ký **cả tools lẫn commands**:
+
+```typescript
+export default function (pi: ExtensionAPI) {
+  // Tool → LLM tự gọi, KHÔNG cần "/"
+  pi.registerTool({
+    name: "subagent",
+    execute(id, params) { ... }
+  });
+
+  // Command → User gõ "/deploy", CẦN "/"
+  pi.registerCommand("deploy", {
+    handler(args, ctx) { ... }
+  });
+
+  // Event hook → Tự fire theo lifecycle
+  pi.on("tool_call", (event) => { ... });
+}
+```
+
+#### Skills — Cầu nối cả hai thế giới
+
+Skills đặc biệt vì hoạt động ở **cả hai hệ thống**:
+
+1. **Như slash command**: User gõ `/skill:brave-search` → load SKILL.md làm prompt
+2. **Như tool target**: LLM tự nhận ra cần skill (từ descriptions trong system prompt) → gọi `read()` để load SKILL.md → follow instructions
+
+```text
+Startup: Pi inject skill descriptions vào system prompt:
+  <skills>
+    <skill name="brave-search">Web search via Brave API...</skill>
+  </skills>
+
+Khi chạy:
+  User: "Search the web for Pi docs"
+  LLM nhận ra match "brave-search" → tự gọi read("skills/brave-search/SKILL.md")
+  LLM đọc → follow instructions → gọi tools theo hướng dẫn
+```
+
 ---
 
 ## 7. Sessions
@@ -390,7 +533,7 @@ Gửi messages **trong khi agent đang chạy**:
 
 Sessions lưu dạng **JSONL** (JSON Lines) với **cấu trúc cây**:
 
-```
+```text
 ~/.pi/agent/sessions/--<path>--/<timestamp>_<uuid>.jsonl
 ```
 
@@ -419,7 +562,7 @@ pi --session <path>    # Dùng session cụ thể
 
 #### `/tree` — Navigate In-Place
 
-```
+```text
 ├─ user: "Hello..."
 │  └─ assistant: "Of course..."
 │     ├─ user: "Try approach A..."
@@ -508,7 +651,7 @@ LLM có context window giới hạn. Khi conversation quá dài, Pi **tự độ
 
 #### Khi nào trigger
 
-```
+```text
 contextTokens > contextWindow - reserveTokens (mặc định 16384)
 ```
 
@@ -516,7 +659,7 @@ Hoặc thủ công: `/compact [instructions]`
 
 #### Cách hoạt động
 
-```
+```text
 Trước compaction:
   [hdr] [usr] [ass] [tool] [usr] [ass] [tool] [tool] [ass] [tool]
          └────summarize────┘ └──────────kept──────────────┘
@@ -547,7 +690,7 @@ Sau compaction:
 
 Khi dùng `/tree` chuyển branch, Pi có thể tạo summary cho branch bạn rời đi:
 
-```
+```text
 Trước navigation:
      ┌─ B ─ C ─ D (old leaf)
 A ───┤
@@ -557,6 +700,7 @@ Summarize: B, C, D
 ```
 
 3 lựa chọn:
+
 1. **No summary** — Chuyển ngay
 2. **Summarize** — Summary mặc định
 3. **Custom prompt** — Summary với hướng dẫn riêng
@@ -615,10 +759,10 @@ pi.on("session_before_compact", async (event, ctx) => {
 
 ### 9.1 Locations
 
-| File | Scope |
-|------|-------|
+| File                        | Scope                     |
+|-----------------------------|--------------------------|
 | `~/.pi/agent/settings.json` | Global (tất cả projects) |
-| `.pi/settings.json` | Project (override global) |
+| `.pi/settings.json`         | Project (override global) |
 
 Hoặc dùng `/settings` trong interactive mode.
 
@@ -726,6 +870,7 @@ Dùng để đặt project instructions, conventions, common commands.
 Markdown snippets tái sử dụng. Gõ `/name` để expand.
 
 **Locations:**
+
 - `~/.pi/agent/prompts/*.md` (global)
 - `.pi/prompts/*.md` (project)
 - Pi packages
@@ -764,6 +909,7 @@ Hỗ trợ: `$1`, `$2`, `$@`, `${@:N}`, `${@:N:L}`
 On-demand capability packages theo chuẩn [Agent Skills](https://agentskills.io).
 
 **Locations:**
+
 - `~/.pi/agent/skills/` (global)
 - `~/.agents/skills/` (global)
 - `.pi/skills/` (project)
@@ -771,7 +917,7 @@ On-demand capability packages theo chuẩn [Agent Skills](https://agentskills.io
 
 **Cấu trúc:**
 
-```
+```text
 brave-search/
 ├── SKILL.md           # Required
 ├── search.js
@@ -780,7 +926,7 @@ brave-search/
 
 **SKILL.md:**
 
-```markdown
+````markdown
 ---
 name: brave-search
 description: Web search via Brave Search API. Use for searching docs, facts, or web content.
@@ -798,9 +944,10 @@ cd /path/to/brave-search && npm install
 ./search.js "query"
 ./search.js "query" --content
 ```
-```
+````
 
 **Cách hoạt động:**
+
 1. Startup: Pi scan skills, trích names & descriptions
 2. System prompt: Liệt kê available skills dạng XML
 3. Khi cần: Agent dùng `read` để load full SKILL.md
@@ -817,6 +964,7 @@ cd /path/to/brave-search && npm install
 | `disable-model-invocation` | No | Ẩn khỏi system prompt |
 
 **Skill repositories:**
+
 - [Anthropic Skills](https://github.com/anthropics/skills)
 - [Pi Skills](https://github.com/badlogic/pi-skills)
 
@@ -885,7 +1033,7 @@ Test: `pi -e ./my-extension.ts`
 
 #### Event Lifecycle
 
-```
+```text
 pi starts
   └─► session_start
 

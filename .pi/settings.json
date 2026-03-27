@@ -1,3 +1,8 @@
 {
-  "theme": "midnight-aurora"
+  "theme": "midnight-aurora",
+  "tools": {
+    "grep": true,
+    "find": true,
+    "ls": true
+  }
 }

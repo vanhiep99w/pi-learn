@@ -1,0 +1,6 @@
+{
+  "name": "@pi/harness-verify",
+  "version": "1.0.0",
+  "description": "Back-pressure verification hooks for Agent Harness",
+  "type": "module"
+}

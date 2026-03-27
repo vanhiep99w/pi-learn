@@ -213,7 +213,8 @@ class BorderedEditor extends CustomEditor {
     if (w < 20) return t.fg(bc, "╭" + "─".repeat(Math.max(0, w - 2)) + "╮");
 
     // ── Left badge: context usage ──
-    const usage = this.ctxRef.getContextUsage();
+    let usage: ReturnType<typeof this.ctxRef.getContextUsage> | null = null;
+    try { usage = this.ctxRef.getContextUsage(); } catch { /* ignore token estimation errors */ }
     let lRaw = "";
     let lStyled = "";
     if (usage) {
