@@ -1,0 +1,6 @@
+{
+  "name": "@pi-learn/ask-user",
+  "version": "1.0.0",
+  "description": "AskUserQuestion tool — cho phép agent hỏi user câu hỏi clarification",
+  "main": "index.ts"
+}

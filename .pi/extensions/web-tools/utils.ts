@@ -39,7 +39,7 @@ interface CacheEntry<T> {
 
 const searchCache = new Map<string, CacheEntry<any>>();
 const fetchCache = new Map<string, CacheEntry<any>>();
-const CACHE_TTL = 5 * 60_000; // 5 minutes
+const CACHE_TTL = 15 * 60_000; // 15 minutes
 
 export function getCached<T>(
   cache: Map<string, CacheEntry<T>>,
@@ -124,6 +124,56 @@ export function isBinaryContent(content: string): boolean {
       return code < 32 && code !== 10 && code !== 13 && code !== 9;
     }).length;
   return nonPrintable > 50;
+}
+
+// ── URL Validation ──
+
+const MAX_URL_LENGTH = 2000;
+
+export function validateUrl(url: string): { valid: boolean; error?: string } {
+  if (url.length > MAX_URL_LENGTH) {
+    return { valid: false, error: `URL too long (${url.length} chars, max ${MAX_URL_LENGTH}).` };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { valid: false, error: `Invalid URL: "${url}" could not be parsed.` };
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { valid: false, error: "Only http:// and https:// URLs are supported." };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { valid: false, error: "URLs with embedded credentials are not supported." };
+  }
+
+  const parts = parsed.hostname.split(".");
+  if (parts.length < 2) {
+    return { valid: false, error: `Invalid hostname: "${parsed.hostname}" (need at least 2 domain parts).` };
+  }
+
+  return { valid: true };
+}
+
+// ── Redirect Safety ──
+
+export function isPermittedRedirect(originalUrl: string, redirectUrl: string): boolean {
+  try {
+    const orig = new URL(originalUrl);
+    const redir = new URL(redirectUrl);
+
+    if (redir.protocol !== orig.protocol) return false;
+    if (redir.port !== orig.port) return false;
+    if (redir.username || redir.password) return false;
+
+    const stripWww = (h: string) => h.replace(/^www\./, "");
+    return stripWww(orig.hostname) === stripWww(redir.hostname);
+  } catch {
+    return false;
+  }
 }
 
 // ── Formatting ──

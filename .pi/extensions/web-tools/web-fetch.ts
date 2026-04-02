@@ -3,6 +3,8 @@ import { Text } from "@mariozechner/pi-tui";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   normalizeUrl,
+  validateUrl,
+  isPermittedRedirect,
   isBinaryContent,
   getCached,
   setCache,
@@ -54,17 +56,15 @@ export function registerWebFetch(pi: ExtensionAPI) {
     async execute(toolCallId: any, params: any, signal: any, onUpdate: any) {
       let { url, max_length = 10000, start_index = 0, raw = false } = params;
 
-      // Validate URL
-      if (!/^https?:\/\//i.test(url)) {
+      // ── URL Validation ──
+      const validation = validateUrl(url);
+      if (!validation.valid) {
         return {
-          content: [
-            {
-              type: "text",
-              text: `Invalid URL: only http:// and https:// URLs are supported.`,
-            },
-          ],
+          content: [{ type: "text", text: `⚠️ ${validation.error}` }],
         };
       }
+
+      const startTime = performance.now();
 
       // Normalize: HTTP→HTTPS, GitHub blob→raw
       const originalUrl = url;
@@ -88,17 +88,17 @@ export function registerWebFetch(pi: ExtensionAPI) {
         await rateLimit();
 
         try {
-          // First attempt with browser-like UA
+          // First attempt — no auto-redirect, handle manually
           let result = await pi.exec(
             "curl",
             [
-              "-sL",
+              "-s",
               "-m",
               "20",
               "--max-filesize",
               "5242880",
               "-w",
-              "\n%{http_code}\n%{url_effective}",
+              "\n%{http_code}\n%{redirect_url}",
               "-A",
               "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
               "-H",
@@ -118,14 +118,130 @@ export function registerWebFetch(pi: ExtensionAPI) {
             };
           }
 
-          // Extract HTTP status code and final URL from -w output
+          // Extract HTTP status code and redirect URL from -w output
           let body = result.stdout;
-          const lines = body.split("\n");
-          const finalUrl = lines.pop()?.trim() || url;
+          let lines = body.split("\n");
+          const redirectUrl = lines.pop()?.trim() || "";
           const statusCode = lines.pop()?.trim() || "";
           body = lines.join("\n");
 
-          // Cloudflare bypass: retry with honest UA on 403
+          // ── Smart Redirect Handling ──
+          if (["301", "302", "307", "308"].includes(statusCode) && redirectUrl) {
+            if (isPermittedRedirect(url, redirectUrl)) {
+              // Same-host redirect → follow automatically
+              onUpdate?.({
+                content: [{ type: "text", text: `🔄 Following redirect → ${redirectUrl}` }],
+              });
+              result = await pi.exec(
+                "curl",
+                [
+                  "-sL",
+                  "-m",
+                  "20",
+                  "--max-filesize",
+                  "5242880",
+                  "-w",
+                  "\n%{http_code}\n%{url_effective}",
+                  "-A",
+                  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  "-H",
+                  "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                  redirectUrl,
+                ],
+                { signal, timeout: 25000 }
+              );
+              if (result.code !== 0) {
+                return {
+                  content: [{ type: "text", text: `Redirect fetch failed: ${result.stderr}` }],
+                };
+              }
+              body = result.stdout;
+              lines = body.split("\n");
+              lines.pop(); // url_effective
+              lines.pop(); // http_code
+              body = lines.join("\n");
+            } else {
+              // Cross-host redirect → inform agent, don't follow
+              const statusText = statusCode === "301" ? "Moved Permanently"
+                : statusCode === "308" ? "Permanent Redirect"
+                : statusCode === "307" ? "Temporary Redirect"
+                : "Found";
+              const durationMs = Math.round(performance.now() - startTime);
+              return {
+                content: [{
+                  type: "text",
+                  text: `REDIRECT DETECTED: The URL redirects to a different host.\n\nOriginal URL: ${url}\nRedirect URL: ${redirectUrl}\nStatus: ${statusCode} ${statusText}\n\nTo fetch the redirected content, call web_fetch again with url: "${redirectUrl}"`,
+                }],
+                details: {
+                  url,
+                  redirectUrl,
+                  statusCode: Number(statusCode),
+                  crossHost: true,
+                  durationMs,
+                },
+              };
+            }
+          } else {
+            // Not a redirect — follow any remaining redirects with -L for the body
+            if (statusCode === "200") {
+              // Already have the body, no need to re-fetch
+            } else {
+              // Re-fetch with -L for other status codes
+              result = await pi.exec(
+                "curl",
+                [
+                  "-sL",
+                  "-m",
+                  "20",
+                  "--max-filesize",
+                  "5242880",
+                  "-w",
+                  "\n%{http_code}\n%{url_effective}",
+                  "-A",
+                  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  "-H",
+                  "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                  url,
+                ],
+                { signal, timeout: 25000 }
+              );
+              if (result.code === 0) {
+                body = result.stdout;
+                lines = body.split("\n");
+                lines.pop(); // url_effective
+                const newStatus = lines.pop()?.trim() || "";
+                body = lines.join("\n");
+
+                // Cloudflare bypass: retry with honest UA on 403
+                if (newStatus === "403") {
+                  onUpdate?.({
+                    content: [{ type: "text", text: `🔄 Retrying (Cloudflare)…` }],
+                  });
+                  result = await pi.exec(
+                    "curl",
+                    [
+                      "-sL",
+                      "-m",
+                      "20",
+                      "--max-filesize",
+                      "5242880",
+                      "-A",
+                      "opencode-pi/1.0",
+                      "-H",
+                      "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                      url,
+                    ],
+                    { signal, timeout: 25000 }
+                  );
+                  if (result.code === 0) {
+                    body = result.stdout;
+                  }
+                }
+              }
+            }
+          }
+
+          // Cloudflare bypass for initial 403 (non-redirect case)
           if (statusCode === "403") {
             onUpdate?.({
               content: [{ type: "text", text: `🔄 Retrying (Cloudflare)…` }],
@@ -153,7 +269,6 @@ export function registerWebFetch(pi: ExtensionAPI) {
 
           // Detect binary/PDF content
           if (isBinaryContent(body)) {
-            // Try pdftotext if available
             if (body.trimStart().startsWith("%PDF")) {
               const pdfResult = await pi.exec(
                 "bash",
@@ -189,11 +304,6 @@ export function registerWebFetch(pi: ExtensionAPI) {
             fullContent = body;
           }
 
-          // Add redirect info
-          if (finalUrl && finalUrl !== url) {
-            fullContent = `> Redirected to: ${finalUrl}\n\n${fullContent}`;
-          }
-
           // Cache the full content
           setCache(fetchCache, cacheKey, fullContent);
         } catch (e: any) {
@@ -207,6 +317,8 @@ export function registerWebFetch(pi: ExtensionAPI) {
           content: [{ type: "text", text: `⚡ Cache hit: ${url}` }],
         });
       }
+
+      const durationMs = Math.round(performance.now() - startTime);
 
       // ── Paginated output ──
       const totalLength = fullContent.length;
@@ -240,6 +352,7 @@ export function registerWebFetch(pi: ExtensionAPI) {
           truncated,
           remaining: truncated ? remaining : 0,
           cached: getCached(fetchCache, cacheKey) !== null,
+          durationMs,
         },
       };
     },
@@ -261,11 +374,22 @@ export function registerWebFetch(pi: ExtensionAPI) {
     renderResult(result: any, { expanded }: any, theme: any) {
       const d = result.details as any;
 
+      // Cross-host redirect
+      if (d?.crossHost) {
+        let text = theme.fg("warning", `↗ Redirect to different host`);
+        text += theme.fg("dim", ` → ${d.redirectUrl}`);
+        if (d.durationMs) text += theme.fg("dim", ` (${d.durationMs}ms)`);
+        return new Text(text, 0, 0);
+      }
+
       // Compact summary line
       let summaryText = "";
       if (d) {
+        const timeStr = d.durationMs >= 1000
+          ? `${(d.durationMs / 1000).toFixed(1)}s`
+          : `${d.durationMs}ms`;
         summaryText += theme.fg("success", "✓ Fetched ");
-        summaryText += theme.fg("dim", `(${formatChars(d.showing)})`);
+        summaryText += theme.fg("dim", `(${formatChars(d.showing)} in ${timeStr})`);
         if (d.truncated) {
           summaryText += theme.fg("warning", ` [${formatChars(d.remaining)} more]`);
         }

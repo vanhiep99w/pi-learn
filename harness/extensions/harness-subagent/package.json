@@ -1,6 +1,0 @@
-{
-  "name": "@pi/harness-subagent",
-  "version": "1.0.0",
-  "description": "Subagent orchestration tool for Agent Harness",
-  "type": "module"
-}

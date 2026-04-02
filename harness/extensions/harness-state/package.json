@@ -1,6 +1,0 @@
-{
-  "name": "@pi/harness-state",
-  "version": "1.0.0",
-  "description": "Beads context injection + session hooks for Agent Harness",
-  "type": "module"
-}
