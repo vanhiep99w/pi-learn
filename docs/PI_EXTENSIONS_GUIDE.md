@@ -278,33 +278,33 @@ npm dependencies cũng hoạt động — thêm `package.json` bên cạnh exten
 ### 6.1 Lifecycle Tổng Quan
 
 ```
-pi starts (CLI only)
+pi starts
   │
-  ├─► session_directory (CLI startup only, không có ctx)
-  └─► session_start
+  ├─► session_start { reason: "startup" }
+  └─► resources_discover { reason: "startup" }
       │
       ▼
 user sends prompt ─────────────────────────────────────────┐
   │                                                        │
-  ├─► (extension commands checked first)                   │
+  ├─► (extension commands checked first, bypass if found)  │
   ├─► input (can intercept, transform, or handle)          │
-  ├─► (skill/template expansion nếu chưa handled)         │
-  ├─► before_agent_start (inject message, modify system prompt)
+  ├─► (skill/template expansion if not handled)            │
+  ├─► before_agent_start (can inject message, modify system prompt)
   ├─► agent_start                                          │
   ├─► message_start / message_update / message_end         │
   │                                                        │
-  │   ┌─── turn (lặp lại khi LLM gọi tools) ────┐         │
+  │   ┌─── turn (lặp lại khi LLM gọi tools) ─────┐         │
   │   │                                          │         │
   │   ├─► turn_start                             │         │
   │   ├─► context (modify messages)              │         │
   │   ├─► before_provider_request                │         │
   │   │                                          │         │
-  │   │   LLM responds, có thể gọi tools:       │         │
-  │   │     ├─► tool_call (can block)            │         │
+  │   │   LLM responds, có thể gọi tools:        │         │
   │   │     ├─► tool_execution_start             │         │
+  │   │     ├─► tool_call (can block)            │         │
   │   │     ├─► tool_execution_update            │         │
-  │   │     ├─► tool_execution_end               │         │
-  │   │     └─► tool_result (can modify)         │         │
+  │   │     ├─► tool_result (can modify)         │         │
+  │   │     └─► tool_execution_end               │         │
   │   │                                          │         │
   │   └─► turn_end                               │         │
   │                                                        │
@@ -314,11 +314,15 @@ user sends another prompt ◄─────────────────
 
 /new hoặc /resume
   ├─► session_before_switch (can cancel)
-  └─► session_switch
+  ├─► session_shutdown
+  ├─► session_start { reason: "new" | "resume", previousSessionFile? }
+  └─► resources_discover { reason: "startup" }
 
 /fork
   ├─► session_before_fork (can cancel)
-  └─► session_fork
+  ├─► session_shutdown
+  ├─► session_start { reason: "fork", previousSessionFile }
+  └─► resources_discover { reason: "startup" }
 
 /compact hoặc auto-compaction
   ├─► session_before_compact (can cancel hoặc customize)
@@ -337,24 +341,30 @@ exit (Ctrl+C, Ctrl+D)
 
 ### 6.2 Session Events
 
-#### `session_directory`
+#### `resources_discover`
 
-Fired khi CLI startup, **trước khi** session manager được tạo. Chỉ CLI-only, không có `ctx`.
+Fired sau `session_start` để extensions có thể contribute thêm skill, prompt, theme paths.
 
 ```typescript
-pi.on("session_directory", async (event) => {
+pi.on("resources_discover", async (event, _ctx) => {
+  // event.cwd - current working directory
+  // event.reason - "startup" | "reload"
   return {
-    sessionDir: `/tmp/pi-sessions/${encodeURIComponent(event.cwd)}`,
+    skillPaths: ["/path/to/skills"],
+    promptPaths: ["/path/to/prompts"],
+    themePaths: ["/path/to/themes"],
   };
 });
 ```
 
 #### `session_start`
 
-Fired khi session load xong.
+Fired khi session started, loaded, hoặc reloaded.
 
 ```typescript
-pi.on("session_start", async (_event, ctx) => {
+pi.on("session_start", async (event, ctx) => {
+  // event.reason - "startup" | "reload" | "new" | "resume" | "fork"
+  // event.previousSessionFile - có khi "new", "resume", "fork"
   ctx.ui.notify(`Session: ${ctx.sessionManager.getSessionFile() ?? "ephemeral"}`, "info");
 });
 ```
@@ -374,10 +384,8 @@ pi.on("session_before_switch", async (event, ctx) => {
   }
 });
 
-pi.on("session_switch", async (event, ctx) => {
-  // event.reason - "new" hoặc "resume"
-  // event.previousSessionFile - session trước đó
-});
+// Sau switch thành công: session_shutdown → reload extensions → session_start { reason: "new" | "resume" }
+// Cleanup trong session_shutdown, reestablish state trong session_start.
 ```
 
 #### `session_before_fork` / `session_fork`
@@ -551,11 +559,13 @@ import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 pi.on("tool_call", async (event, ctx) => {
   // event.toolName - "bash", "read", "write", "edit", etc.
   // event.toolCallId
-  // event.input - tool parameters
+  // event.input - tool parameters (mutable — mutations affect execution)
 
   // Built-in tools: không cần type params
   if (isToolCallEventType("bash", event)) {
     // event.input là { command: string; timeout?: number }
+    event.input.command = `source ~/.profile\n${event.input.command}`;
+
     if (event.input.command.includes("rm -rf")) {
       return { block: true, reason: "Dangerous command" };
     }
@@ -599,12 +609,24 @@ pi.on("tool_result", async (event, ctx) => {
     // event.details typed là BashToolDetails
   }
 
+  // Dùng ctx.signal cho nested async work
+  const response = await fetch("https://example.com/summarize", {
+    method: "POST",
+    body: JSON.stringify({ content: event.content }),
+    signal: ctx.signal,
+  });
+
   // Modify result (partial patches — fields bỏ qua giữ nguyên):
   return { content: [...], details: {...}, isError: false };
 });
 ```
 
 #### `tool_execution_start` / `tool_execution_update` / `tool_execution_end`
+
+Trong parallel tool mode:
+- `tool_execution_start` emit theo thứ tự assistant source trong preflight phase
+- `tool_execution_update` có thể interleave giữa các tools
+- `tool_execution_end` emit theo thứ tự assistant source, match final tool result message order
 
 ```typescript
 pi.on("tool_execution_start", async (event, ctx) => {
@@ -744,6 +766,22 @@ ctx.sessionManager.getLeafId()        // Current leaf entry ID
 
 Access đến models và API keys.
 
+### ctx.signal
+
+Abort signal của agent turn hiện tại, hoặc `undefined` khi không có turn active. Dùng cho abort-aware nested work.
+
+```typescript
+pi.on("tool_result", async (event, ctx) => {
+  const response = await fetch("https://example.com/api", {
+    method: "POST",
+    body: JSON.stringify(event),
+    signal: ctx.signal,
+  });
+  const data = await response.json();
+  return { details: data };
+});
+```
+
 ### ctx.isIdle() / ctx.abort() / ctx.hasPendingMessages()
 
 Control flow helpers.
@@ -841,8 +879,20 @@ Navigate trong session tree.
 const result = await ctx.navigateTree("entry-id-456", {
   summarize: true,
   customInstructions: "Focus on error handling changes",
+  replaceInstructions: false,  // true = thay thế prompt mặc định hoàn toàn
   label: "review-checkpoint",
 });
+```
+
+### ctx.switchSession(sessionPath)
+
+Chuyển sang session file khác.
+
+```typescript
+const result = await ctx.switchSession("/path/to/session.jsonl");
+if (result.cancelled) {
+  // Extension đã cancel via session_before_switch
+}
 ```
 
 ### ctx.reload()
@@ -889,9 +939,9 @@ pi.sendMessage({
 ```
 
 **Delivery modes:**
-- `"steer"` (default) — Interrupts streaming, delivered sau tool hiện tại, skip tools còn lại
+- `"steer"` (default) — Queued khi streaming. Delivered sau khi tool calls hiện tại xong, trước LLM call tiếp
 - `"followUp"` — Chờ agent xong hết rồi mới gửi
-- `"nextTurn"` — Queued cho prompt tiếp theo
+- `"nextTurn"` — Queued cho prompt tiếp theo, không trigger gì
 
 ### pi.sendUserMessage(content, options?)
 
@@ -968,7 +1018,7 @@ Lấy danh sách slash commands (extensions, templates, skills).
 ```typescript
 const commands = pi.getCommands();
 const extCmds = commands.filter(c => c.source === "extension");
-// Mỗi entry: { name, description?, source, location?, path? }
+// Mỗi entry: { name, description?, source, sourceInfo: { path, source, scope, origin, baseDir? } }
 ```
 
 ### pi.registerMessageRenderer(customType, renderer)
@@ -1012,8 +1062,11 @@ const result = await pi.exec("git", ["status"], { signal, timeout: 5000 });
 ### pi.getActiveTools() / pi.getAllTools() / pi.setActiveTools(names)
 
 ```typescript
-const active = pi.getActiveTools();  // ["read", "bash", "edit", "write"]
+const active = pi.getActiveTools();
 const all = pi.getAllTools();
+// [{ name, description, parameters, sourceInfo: { path, source, scope, origin } }, ...]
+const builtinTools = all.filter(t => t.sourceInfo.source === "builtin");
+const extensionTools = all.filter(t => t.sourceInfo.source !== "builtin" && t.sourceInfo.source !== "sdk");
 pi.setActiveTools(["read", "bash"]); // Switch to read-only
 ```
 
@@ -1073,6 +1126,16 @@ pi.registerTool({
     text: Type.Optional(Type.String()),
   }),
 
+  // Optional: Chạy trước schema validation, fold legacy fields
+  prepareArguments(args) {
+    if (!args || typeof args !== "object") return args;
+    const input = args as { action?: string; oldAction?: string };
+    if (typeof input.oldAction === "string" && input.action === undefined) {
+      return { ...input, action: input.oldAction };
+    }
+    return args;
+  },
+
   async execute(toolCallId, params, signal, onUpdate, ctx) {
     // Check cancellation
     if (signal?.aborted) {
@@ -1096,8 +1159,8 @@ pi.registerTool({
   },
 
   // Optional: Custom rendering
-  renderCall(args, theme) { ... },
-  renderResult(result, options, theme) { ... },
+  renderCall(args, theme, context) { ... },
+  renderResult(result, options, theme, context) { ... },
 });
 ```
 
@@ -1115,6 +1178,27 @@ async execute(toolCallId, params) {
 ```
 
 > **Path normalization:** Một số models thêm `@` prefix vào path arguments. Built-in tools strip leading `@`. Custom tools nên normalize tương tự.
+
+> **File mutation queue:** Nếu custom tool mutates files, dùng `withFileMutationQueue()` để nó tham gia cùng queue với built-in `edit`/`write`. Điều này quan trọng vì tool calls chạy parallel mặc định:
+
+```typescript
+import { withFileMutationQueue } from "@mariozechner/pi-coding-agent";
+import { resolve } from "node:path";
+
+async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+  const absolutePath = resolve(ctx.cwd, params.path);
+
+  return withFileMutationQueue(absolutePath, async () => {
+    const current = await readFile(absolutePath, "utf8");
+    const next = current.replace(params.oldText, params.newText);
+    await writeFile(absolutePath, next, "utf8");
+    return {
+      content: [{ type: "text", text: `Updated ${params.path}` }],
+      details: {},
+    };
+  });
+}
+```
 
 ### 10.2 Override Built-in Tools
 
@@ -1244,20 +1328,22 @@ export default function (pi: ExtensionAPI) {
 ```typescript
 import { Text } from "@mariozechner/pi-tui";
 
-renderCall(args, theme) {
-  let text = theme.fg("toolTitle", theme.bold("my_tool "));
-  text += theme.fg("muted", args.action);
+renderCall(args, theme, context) {
+  const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+  let content = theme.fg("toolTitle", theme.bold("my_tool "));
+  content += theme.fg("muted", args.action);
   if (args.text) {
-    text += " " + theme.fg("dim", `"${args.text}"`);
+    content += " " + theme.fg("dim", `"${args.text}"`);
   }
-  return new Text(text, 0, 0);  // 0,0 padding — Box handles it
+  text.setText(content);
+  return text;
 }
 ```
 
 #### renderResult — Hiển thị kết quả
 
 ```typescript
-renderResult(result, { expanded, isPartial }, theme) {
+renderResult(result, { expanded, isPartial }, theme, context) {
   // Streaming
   if (isPartial) {
     return new Text(theme.fg("warning", "Processing..."), 0, 0);
@@ -1287,7 +1373,7 @@ import { keyHint } from "@mariozechner/pi-coding-agent";
 renderResult(result, { expanded }, theme) {
   let text = theme.fg("success", "✓ Done");
   if (!expanded) {
-    text += ` (${keyHint("expandTools", "to expand")})`;
+    text += ` (${keyHint("app.tools.expand", "to expand")})`;
   }
   return new Text(text, 0, 0);
 }

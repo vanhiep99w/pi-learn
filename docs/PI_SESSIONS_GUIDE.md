@@ -305,10 +305,10 @@ Pi dùng `trash` CLI nếu available để tránh xóa vĩnh viễn.
 **Hiển thị:**
 - Chiều cao: nửa terminal
 - `← active` đánh dấu leaf hiện tại
-- `[label-name]` hiện inline
-- `⊟` / `⊞` cho foldable/folded branches
-- `•` đánh dấu active path
-- Children sort theo timestamp (cũ nhất trước)
+- `[label-name]` hiện inline; `Shift+T` hiện timestamp thay đổi label gần nhất bên cạnh
+- `⊟` ở connector cho foldable branch start; `⊞` cho folded branch
+- `•` (active path marker) hiện sau fold indicator khi applicable
+- Tại mỗi branch point, active subtree hiển thị trước; các sibling branches khác sort theo timestamp (cũ nhất trước)
 
 ### 6.2 Controls
 
@@ -316,12 +316,21 @@ Pi dùng `trash` CLI nếu available để tránh xóa vĩnh viễn.
 |-----|--------|
 | `↑` / `↓` | Navigate (depth-first order) |
 | `←` / `→` | Page up/down |
-| `Ctrl+←` / `Alt+←` | Fold node / jump lên branch trước |
-| `Ctrl+→` / `Alt+→` | Unfold node / jump xuống branch tiếp |
+| `Ctrl+←` / `Alt+←` | Fold node / jump lên branch segment trước |
+| `Ctrl+→` / `Alt+→` | Unfold node / jump xuống branch segment tiếp |
+| `Shift+L` | Đặt hoặc xóa label trên node đang chọn |
+| `Shift+T` | Toggle hiện timestamp của label |
 | `Enter` | Select node |
 | `Escape` / `Ctrl+C` | Cancel |
 | `Ctrl+U` | Toggle: chỉ user messages |
-| `Ctrl+O` | Toggle: show all (custom/label entries) |
+| `Ctrl+O` | Toggle: show all (bao gồm custom/label entries) |
+
+**Chi tiết fold/unfold:**
+
+- `Ctrl+←` hoặc `Alt+←` fold node hiện tại nếu node đó foldable. Foldable nodes là root và branch segment starts có visible children. Nếu node không foldable hoặc đã folded, selection nhảy lên branch segment start trước đó.
+- `Ctrl+→` hoặc `Alt+→` unfold node hiện tại nếu đang folded. Nếu không, selection nhảy xuống branch segment start tiếp theo, hoặc đến branch end nếu không còn branch point nào.
+- Search và filter thay đổi sẽ reset tất cả folds.
+- Filter mặc định ẩn `label` và `custom` entries (hiện khi bật `Ctrl+O`).
 
 ### 6.3 Selection Behavior
 
@@ -359,7 +368,7 @@ Khi chuyển branch, Pi hỏi 3 lựa chọn:
 
 1. **No summary** — Chuyển ngay, không summarize
 2. **Summarize** — Generate summary với default prompt
-3. **Summarize with custom prompt** — Mở editor nhập hướng dẫn riêng
+3. **Summarize with custom prompt** — Mở editor nhập focus instructions bổ sung, được **append vào** default summarization prompt (không thay thế)
 
 #### Cái gì được summarize?
 
@@ -639,6 +648,18 @@ sm.getLabel(id)                         // Label của entry
 sm.branch(entryId)                      // Di chuyển leaf
 sm.resetLeaf()                          // Reset leaf về null
 sm.branchWithSummary(id, summary)       // Branch + summary
+sm.navigateTree(entryId, options?)      // Navigate tree với options
+```
+
+**`navigateTree` options:**
+
+```typescript
+sm.navigateTree(entryId, {
+  summarize: true,                    // Generate summary cho branch bị bỏ
+  customInstructions: "Focus on...",  // Instructions cho summarizer
+  replaceInstructions: false,         // true: thay thế default prompt; false (default): append
+  label: "checkpoint-v1",             // Label gắn vào branch summary entry (hoặc target entry nếu không summarize)
+});
 ```
 
 ### Context & Info
@@ -685,12 +706,25 @@ pi.on("session_switch", async (event, ctx) => { ... });
 ```typescript
 pi.on("session_before_tree", async (event, ctx) => {
   const { preparation, signal } = event;
-  // preparation.targetId, oldLeafId, commonAncestorId
-  // preparation.entriesToSummarize, userWantsSummary
+  // TreePreparation fields:
+  // preparation.targetId          - Node đích
+  // preparation.oldLeafId         - Leaf hiện tại
+  // preparation.commonAncestorId  - Ancestor chung
+  // preparation.entriesToSummarize - Entries trên branch bị bỏ
+  // preparation.userWantsSummary  - User chọn summarize?
+  // preparation.customInstructions - Custom instructions từ user
+  // preparation.replaceInstructions - true: thay thế default prompt
 
   return { cancel: true };  // Cancel navigation
   // HOẶC custom summary:
   return { summary: { summary: "...", details: {} } };
+  // HOẶC override label:
+  return { label: "my-label" };
+  // HOẶC override summarization behavior:
+  return {
+    summary: { summary: "...", details: {} },
+    label: "my-label",
+  };
 });
 
 pi.on("session_tree", async (event, ctx) => {
