@@ -8,17 +8,19 @@ Repo GitHub:
 https://github.com/vanhiep99w/pi-learn
 ```
 
-Install package từ root repo:
+Install package từ root repo. Khuyến nghị dùng branch `main` để update bằng `pi update`:
 
 ```bash
-pi install git:github.com/vanhiep99w/pi-learn@v1.0.1
+pi install git:github.com/vanhiep99w/pi-learn@main
 ```
 
 Test tạm:
 
 ```bash
-pi -e git:github.com/vanhiep99w/pi-learn@v1.0.1
+pi -e git:github.com/vanhiep99w/pi-learn@main
 ```
+
+Nếu cần pin bản ổn định, dùng tag release như `@v1.0.1`.
 
 Root `package.json` đã khai báo:
 
