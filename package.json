@@ -1,0 +1,29 @@
+{
+  "name": "pi-learn",
+  "version": "1.0.0",
+  "description": "Pi Learn package: custom Pi Coding Agent extensions and Midnight Aurora theme.",
+  "type": "module",
+  "private": false,
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent"
+  ],
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./packages/pi-learn-extensions/extensions"
+    ],
+    "themes": [
+      "./packages/pi-learn-extensions/themes"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.0"
+  }
+}
