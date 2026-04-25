@@ -187,7 +187,8 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
-      onUpdate?.({ content: [{ type: "text", text: `Running: ${rtkCommand} ${args.join(" ")}` }] });
+      const displayCommand = `${rtkCommand} ${args.join(" ")}`;
+      onUpdate?.({ content: [{ type: "text", text: `Running: ${displayCommand}` }] });
 
       const result = await pi.exec(rtkCommand, args, {
         signal,
@@ -195,8 +196,9 @@ export default function (pi: ExtensionAPI) {
       });
 
       const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
+      const finalOutput = output || `(exit ${result.code}, no output)`;
       return {
-        content: [{ type: "text", text: output || `(exit ${result.code}, no output)` }],
+        content: [{ type: "text", text: `Running: ${displayCommand}\n\n${finalOutput}` }],
         details: {
           command: [rtkCommand, ...args],
           exitCode: result.code,
