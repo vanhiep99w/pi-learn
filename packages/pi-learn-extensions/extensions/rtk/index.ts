@@ -87,7 +87,8 @@ export default function (pi: ExtensionAPI) {
   let rtkCommand: string | undefined;
 
   function updateStatus(ctx: { ui?: any }) {
-    ctx.ui?.setStatus?.("rtk", rtkCommand ? (autoRewrite ? "rtk:auto" : "rtk:manual") : "rtk:missing");
+    // Keep the footer clean; RTK state is only surfaced via commands/notifications.
+    ctx.ui?.setStatus?.("rtk", undefined);
   }
 
   pi.on("session_start", async (_event, ctx) => {
