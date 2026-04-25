@@ -792,6 +792,18 @@ ctx.ui.setWidget("my-widget", (_tui, theme) => {
 ctx.ui.setWidget("my-widget", undefined);
 ```
 
+### Pattern 5b: Working Message
+
+Hiển thị status message khi extension đang xử lý (hiện bên dưới spinner):
+
+```typescript
+// Set working message
+ctx.ui.setWorkingMessage("Đang tìm kiếm...");
+
+// Clear khi xong
+ctx.ui.setWorkingMessage(undefined);
+```
+
 ### Pattern 6: Custom Footer
 
 ```typescript
@@ -953,15 +965,19 @@ pi.sendMessage({
 
 ## 15. Keybindings
 
+> Config file dùng namespaced keybinding IDs (e.g., `tui.editor.cursorUp`, `app.tools.expand`). Configs cũ với IDs không namespace (e.g., `cursorUp`) được auto-migrate khi startup.
+>
+> Sau khi sửa `keybindings.json`, chạy `/reload` để apply mà không cần restart.
+
 ### Customization
 
 Tạo `~/.pi/agent/keybindings.json`:
 
 ```json
 {
-  "cursorUp": ["up", "ctrl+p"],
-  "cursorDown": ["down", "ctrl+n"],
-  "deleteWordBackward": ["ctrl+w", "alt+backspace"]
+  "tui.editor.cursorUp": ["up", "ctrl+p"],
+  "tui.editor.cursorDown": ["down", "ctrl+n"],
+  "tui.editor.deleteWordBackward": ["ctrl+w", "alt+backspace"]
 }
 ```
 
@@ -969,67 +985,104 @@ Tạo `~/.pi/agent/keybindings.json`:
 
 **Cursor Movement:**
 
-| Action | Default | Mô tả |
+| Keybinding ID | Default | Mô tả |
 |--------|---------|--------|
-| `cursorUp` | `up` | Di chuyển lên |
-| `cursorDown` | `down` | Di chuyển xuống |
-| `cursorLeft` | `left`, `ctrl+b` | Di chuyển trái |
-| `cursorRight` | `right`, `ctrl+f` | Di chuyển phải |
-| `cursorWordLeft` | `alt+left`, `ctrl+left`, `alt+b` | Nhảy word trái |
-| `cursorWordRight` | `alt+right`, `ctrl+right`, `alt+f` | Nhảy word phải |
-| `cursorLineStart` | `home`, `ctrl+a` | Đầu dòng |
-| `cursorLineEnd` | `end`, `ctrl+e` | Cuối dòng |
+| `tui.editor.cursorUp` | `up` | Di chuyển lên |
+| `tui.editor.cursorDown` | `down` | Di chuyển xuống |
+| `tui.editor.cursorLeft` | `left`, `ctrl+b` | Di chuyển trái |
+| `tui.editor.cursorRight` | `right`, `ctrl+f` | Di chuyển phải |
+| `tui.editor.cursorWordLeft` | `alt+left`, `ctrl+left`, `alt+b` | Nhảy word trái |
+| `tui.editor.cursorWordRight` | `alt+right`, `ctrl+right`, `alt+f` | Nhảy word phải |
+| `tui.editor.cursorLineStart` | `home`, `ctrl+a` | Đầu dòng |
+| `tui.editor.cursorLineEnd` | `end`, `ctrl+e` | Cuối dòng |
+| `tui.editor.jumpForward` | `ctrl+]` | Nhảy tới ký tự |
+| `tui.editor.jumpBackward` | `ctrl+alt+]` | Nhảy lùi ký tự |
+| `tui.editor.pageUp` | `pageUp` | Cuộn lên trang |
+| `tui.editor.pageDown` | `pageDown` | Cuộn xuống trang |
 
 **Deletion:**
 
-| Action | Default | Mô tả |
+| Keybinding ID | Default | Mô tả |
 |--------|---------|--------|
-| `deleteCharBackward` | `backspace` | Xóa char trước |
-| `deleteCharForward` | `delete`, `ctrl+d` | Xóa char sau |
-| `deleteWordBackward` | `ctrl+w`, `alt+backspace` | Xóa word trước |
-| `deleteWordForward` | `alt+d`, `alt+delete` | Xóa word sau |
-| `deleteToLineStart` | `ctrl+u` | Xóa đến đầu dòng |
-| `deleteToLineEnd` | `ctrl+k` | Xóa đến cuối dòng |
+| `tui.editor.deleteCharBackward` | `backspace` | Xóa char trước |
+| `tui.editor.deleteCharForward` | `delete`, `ctrl+d` | Xóa char sau |
+| `tui.editor.deleteWordBackward` | `ctrl+w`, `alt+backspace` | Xóa word trước |
+| `tui.editor.deleteWordForward` | `alt+d`, `alt+delete` | Xóa word sau |
+| `tui.editor.deleteToLineStart` | `ctrl+u` | Xóa đến đầu dòng |
+| `tui.editor.deleteToLineEnd` | `ctrl+k` | Xóa đến cuối dòng |
 
 **Application:**
 
-| Action | Default | Mô tả |
+| Keybinding ID | Default | Mô tả |
 |--------|---------|--------|
-| `submit` | `enter` | Gửi input |
-| `newLine` | `shift+enter` | Dòng mới |
-| `interrupt` | `escape` | Cancel/abort |
-| `clear` | `ctrl+c` | Clear editor |
-| `exit` | `ctrl+d` | Thoát |
-| `externalEditor` | `ctrl+g` | Mở external editor |
+| `tui.input.submit` | `enter` | Gửi input |
+| `tui.input.newLine` | `shift+enter` | Dòng mới |
+| `app.interrupt` | `escape` | Cancel/abort |
+| `app.clear` | `ctrl+c` | Clear editor |
+| `app.exit` | `ctrl+d` | Thoát |
+| `app.suspend` | `ctrl+z` | Tạm dừng (background) |
+| `app.editor.external` | `ctrl+g` | Mở external editor |
+| `app.clipboard.pasteImage` | `ctrl+v` | Paste ảnh từ clipboard |
 
 **Models:**
 
-| Action | Default | Mô tả |
+| Keybinding ID | Default | Mô tả |
 |--------|---------|--------|
-| `selectModel` | `ctrl+l` | Chọn model |
-| `cycleModelForward` | `ctrl+p` | Cycle model tiếp |
-| `cycleModelBackward` | `shift+ctrl+p` | Cycle model trước |
-| `cycleThinkingLevel` | `shift+tab` | Cycle thinking level |
+| `app.model.select` | `ctrl+l` | Chọn model |
+| `app.model.cycleForward` | `ctrl+p` | Cycle model tiếp |
+| `app.model.cycleBackward` | `shift+ctrl+p` | Cycle model trước |
+| `app.thinking.cycle` | `shift+tab` | Cycle thinking level |
+| `app.thinking.toggle` | `ctrl+t` | Thu gọn/mở rộng thinking blocks |
 
 **Display:**
 
-| Action | Default | Mô tả |
+| Keybinding ID | Default | Mô tả |
 |--------|---------|--------|
-| `expandTools` | `ctrl+o` | Toggle tool output |
-| `toggleThinking` | `ctrl+t` | Toggle thinking blocks |
-| `followUp` | `alt+enter` | Queue follow-up message |
+| `app.tools.expand` | `ctrl+o` | Thu gọn/mở rộng tool output |
+| `app.message.followUp` | `alt+enter` | Queue follow-up message |
+| `app.message.dequeue` | `alt+up` | Khôi phục queued messages vào editor |
+
+**Kill Ring:**
+
+| Keybinding ID | Default | Mô tả |
+|--------|---------|--------|
+| `tui.editor.yank` | `ctrl+y` | Paste text vừa xóa |
+| `tui.editor.yankPop` | `alt+y` | Cycle qua text đã xóa sau yank |
+| `tui.editor.undo` | `ctrl+-` | Undo thay đổi cuối |
+
+**Sessions:**
+
+| Keybinding ID | Default | Mô tả |
+|--------|---------|--------|
+| `app.session.new` | *(none)* | Session mới (`/new`) |
+| `app.session.tree` | *(none)* | Mở tree navigator (`/tree`) |
+| `app.session.fork` | *(none)* | Fork session (`/fork`) |
+| `app.session.resume` | *(none)* | Mở session picker (`/resume`) |
+| `app.session.togglePath` | `ctrl+p` | Toggle path display |
+| `app.session.toggleSort` | `ctrl+s` | Toggle sort mode |
+| `app.session.rename` | `ctrl+r` | Đổi tên session |
+| `app.session.delete` | `ctrl+d` | Xóa session |
+
+**Tree Navigation:**
+
+| Keybinding ID | Default | Mô tả |
+|--------|---------|--------|
+| `app.tree.foldOrUp` | `ctrl+left`, `alt+left` | Fold branch hoặc nhảy lên segment trước |
+| `app.tree.unfoldOrDown` | `ctrl+right`, `alt+right` | Unfold branch hoặc nhảy xuống segment sau |
+| `app.tree.editLabel` | `shift+l` | Sửa label trên node |
+| `app.tree.toggleLabelTimestamp` | `shift+t` | Toggle timestamp trên labels |
 
 ### Emacs config
 
 ```json
 {
-  "cursorUp": ["up", "ctrl+p"],
-  "cursorDown": ["down", "ctrl+n"],
-  "cursorLeft": ["left", "ctrl+b"],
-  "cursorRight": ["right", "ctrl+f"],
-  "deleteCharForward": ["delete", "ctrl+d"],
-  "deleteCharBackward": ["backspace", "ctrl+h"],
-  "newLine": ["shift+enter", "ctrl+j"]
+  "tui.editor.cursorUp": ["up", "ctrl+p"],
+  "tui.editor.cursorDown": ["down", "ctrl+n"],
+  "tui.editor.cursorLeft": ["left", "ctrl+b"],
+  "tui.editor.cursorRight": ["right", "ctrl+f"],
+  "tui.editor.deleteCharForward": ["delete", "ctrl+d"],
+  "tui.editor.deleteCharBackward": ["backspace", "ctrl+h"],
+  "tui.input.newLine": ["shift+enter", "ctrl+j"]
 }
 ```
 
@@ -1037,10 +1090,12 @@ Tạo `~/.pi/agent/keybindings.json`:
 
 ```json
 {
-  "cursorUp": ["up", "alt+k"],
-  "cursorDown": ["down", "alt+j"],
-  "cursorLeft": ["left", "alt+h"],
-  "cursorRight": ["right", "alt+l"]
+  "tui.editor.cursorUp": ["up", "alt+k"],
+  "tui.editor.cursorDown": ["down", "alt+j"],
+  "tui.editor.cursorLeft": ["left", "alt+h"],
+  "tui.editor.cursorRight": ["right", "alt+l"],
+  "tui.editor.cursorWordLeft": ["alt+left", "alt+b"],
+  "tui.editor.cursorWordRight": ["alt+right", "alt+w"]
 }
 ```
 

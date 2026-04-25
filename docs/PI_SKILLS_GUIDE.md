@@ -959,6 +959,56 @@ Extensions cũng có thể load dynamic skills thông qua `dynamic-resources` pa
 
 ---
 
+## 12.1 Đăng Ký Skill Lúc Runtime
+
+Pi **không có** `pi.registerSkill()` API trực tiếp. Skills được discover từ filesystem locations khi startup. Tuy nhiên có hai cách để thêm skill động lúc runtime:
+
+### Cách 1 — `resources_discover` event (cách chính thức)
+
+Viết extension, hook vào event `resources_discover` để inject skills động:
+
+```typescript
+export default function (pi: ExtensionAPI) {
+  pi.on("resources_discover", async (event, ctx) => {
+    // Trả về danh sách skills động tại đây
+    // Xem pattern đầy đủ: examples/extensions/dynamic-resources/
+  });
+}
+```
+
+### Cách 2 — `registerTool()` (nếu chỉ cần thêm capability)
+
+Nếu mục tiêu là thêm **capability cho LLM gọi** (không cần SKILL.md + scripts), dùng `pi.registerTool()` — hoạt động bất kỳ lúc nào, kể cả trong event handlers, không cần `/reload`:
+
+```typescript
+export default function (pi: ExtensionAPI) {
+  // Có thể gọi ngay khi load, hoặc trong bất kỳ event handler nào
+  pi.registerTool({
+    name: "my_tool",
+    description: "...",
+    parameters: Type.Object({ ... }),
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
+      return { content: [{ type: "text", text: "..." }], details: {} };
+    },
+  });
+}
+```
+
+Xem example: `examples/extensions/dynamic-tools.ts` — Register/unregister tools at runtime.
+
+### So sánh hai cách
+
+| | `resources_discover` | `registerTool()` |
+|---|---|---|
+| Kết quả | Skill SKILL.md-style (instructions + scripts) | Tool LLM gọi trực tiếp |
+| Độ phức tạp | Cao hơn | Đơn giản |
+| Hot-reload | Qua event | Ngay lập tức, không cần reload |
+| Example | `dynamic-resources/` | `dynamic-tools.ts` |
+
+> **Rule of thumb:** Cần workflow instructions + scripts → dùng `resources_discover`. Chỉ cần thêm function cho LLM gọi → dùng `registerTool()`.
+
+---
+
 ## 13. Chia Sẻ Qua Packages
 
 ### Tạo package chứa skills
