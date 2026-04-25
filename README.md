@@ -9,6 +9,7 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 - `ask-user` — tool để agent hỏi user khi cần clarification.
 - `web-tools` — `web_search`, `web_fetch`, `tool_search`.
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
+- `rtk` — tích hợp RTK: auto-rewrite Bash command + tools `rtk_run`, `rtk_gain`.
 - `aurora-ui` — custom input border + ChatGPT usage badge.
 - `midnight-aurora` — theme dark custom.
 
