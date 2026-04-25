@@ -1,6 +1,6 @@
 {
   "name": "pi-learn",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pi Learn package: custom Pi Coding Agent extensions and Midnight Aurora theme.",
   "type": "module",
   "private": false,

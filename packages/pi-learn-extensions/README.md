@@ -11,13 +11,13 @@ https://github.com/vanhiep99w/pi-learn
 Install package từ root repo:
 
 ```bash
-pi install git:github.com/vanhiep99w/pi-learn@v1.0.0
+pi install git:github.com/vanhiep99w/pi-learn@v1.0.1
 ```
 
 Test tạm:
 
 ```bash
-pi -e git:github.com/vanhiep99w/pi-learn@v1.0.0
+pi -e git:github.com/vanhiep99w/pi-learn@v1.0.1
 ```
 
 Root `package.json` đã khai báo:
@@ -44,6 +44,7 @@ extensions/
 ├── ask-user/
 ├── web-tools/
 ├── chatgpt-usage-status/
+├── rtk/                 # RTK auto-rewrite + rtk_run/rtk_gain tools
 └── aurora-ui.ts
 
 themes/

@@ -1,6 +1,6 @@
 {
   "name": "pi-learn-extensions",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pi Coding Agent extensions: ask-user, web tools, ChatGPT usage status, Aurora UI, and Midnight Aurora theme.",
   "type": "module",
   "keywords": [

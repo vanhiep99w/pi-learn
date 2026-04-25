@@ -30,33 +30,37 @@ Pi load package qua root `package.json`:
 Cài global cho mọi project:
 
 ```bash
-pi install git:github.com/vanhiep99w/pi-learn@v1.0.0
+pi install git:github.com/vanhiep99w/pi-learn@v1.0.1
 ```
 
 Cài vào project hiện tại (`.pi/settings.json`):
 
 ```bash
-pi install -l git:github.com/vanhiep99w/pi-learn@v1.0.0
+pi install -l git:github.com/vanhiep99w/pi-learn@v1.0.1
 ```
 
 Test tạm không ghi settings:
 
 ```bash
-pi -e git:github.com/vanhiep99w/pi-learn@v1.0.0
+pi -e git:github.com/vanhiep99w/pi-learn@v1.0.1
 ```
 
 ### Cài full bộ extension hay dùng
 
+Danh sách thêm ngoài package này:
+
+- `git:github.com/edxeth/pi-gpt-config` — config/GPT helpers. Local cache: `/home/hieptran/.pi/agent/git/github.com/edxeth/pi-gpt-config`
+
 Global:
 
 ```bash
-pi install git:github.com/vanhiep99w/pi-learn@v1.0.0 npm:pi-tool-display npm:pi-mcp-adapter npm:pi-markdown-preview npm:pi-mermaid npm:pi-image-preview
+pi install git:github.com/vanhiep99w/pi-learn@v1.0.1 git:github.com/edxeth/pi-gpt-config npm:pi-tool-display npm:pi-mcp-adapter npm:pi-markdown-preview npm:pi-mermaid npm:pi-image-preview
 ```
 
 Project-local:
 
 ```bash
-pi install -l git:github.com/vanhiep99w/pi-learn@v1.0.0 npm:pi-tool-display npm:pi-mcp-adapter npm:pi-markdown-preview npm:pi-mermaid npm:pi-image-preview
+pi install -l git:github.com/vanhiep99w/pi-learn@v1.0.1 git:github.com/edxeth/pi-gpt-config npm:pi-tool-display npm:pi-mcp-adapter npm:pi-markdown-preview npm:pi-mermaid npm:pi-image-preview
 ```
 
 Sau khi cài, restart Pi hoặc chạy:
@@ -81,7 +85,7 @@ Nếu project settings đã có package:
 {
   "theme": "midnight-aurora",
   "packages": [
-    "git:github.com/vanhiep99w/pi-learn@v1.0.0"
+    "git:github.com/vanhiep99w/pi-learn@v1.0.1"
   ]
 }
 ```
@@ -149,7 +153,7 @@ Update các package không pin version:
 pi update
 ```
 
-Vì package này thường cài theo tag `@v1.0.0`, muốn update thì cài tag mới:
+Vì package này thường cài theo tag `@v1.0.1`, muốn update thì cài tag mới:
 
 ```bash
 pi install git:github.com/vanhiep99w/pi-learn@v1.0.1
