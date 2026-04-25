@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import { createLocalBashOperations, isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import os from "node:os";
 
 const supportedTopLevelCommands = new Set([
   "ls",
@@ -56,32 +57,55 @@ function normalizeArgs(args: string[]) {
   return args.map((arg) => String(arg)).filter(Boolean);
 }
 
+const installHint = [
+  "RTK binary not found.",
+  "Install it first:",
+  "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh",
+  "Then ensure ~/.local/bin is in PATH, restart Pi, or run /reload.",
+].join("\n");
+
+async function findRtk(pi: ExtensionAPI) {
+  const candidates = ["rtk", `${os.homedir()}/.local/bin/rtk`];
+  for (const candidate of candidates) {
+    const result = await pi.exec(candidate, ["--version"], { timeout: 5000 });
+    if (result.code === 0) return candidate;
+  }
+  return undefined;
+}
+
 export default function (pi: ExtensionAPI) {
   let autoRewrite = true;
+  let rtkCommand: string | undefined;
+
+  function updateStatus(ctx: { ui?: any }) {
+    ctx.ui?.setStatus?.("rtk", rtkCommand ? (autoRewrite ? "rtk:auto" : "rtk:manual") : "rtk:missing");
+  }
 
   pi.on("session_start", async (_event, ctx) => {
-    ctx.ui?.setStatus?.("rtk", autoRewrite ? "rtk:auto" : "rtk:manual");
+    rtkCommand = await findRtk(pi);
+    updateStatus(ctx);
+    if (!rtkCommand) ctx.ui?.notify?.(installHint, "warning");
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    if (!autoRewrite) return;
+    if (!autoRewrite || !rtkCommand) return;
     if (!isToolCallEventType("bash", event)) return;
 
     const command = event.input.command;
     if (typeof command !== "string" || !shouldRewrite(command)) return;
 
-    event.input.command = `rtk ${command.trim()}`;
+    event.input.command = `${rtkCommand} ${command.trim()}`;
     ctx.ui?.notify?.(`RTK: ${command.trim()} → ${event.input.command}`, "info");
   });
 
   pi.on("user_bash", (event, ctx) => {
-    if (!autoRewrite || !shouldRewrite(event.command)) return;
+    if (!autoRewrite || !rtkCommand || !shouldRewrite(event.command)) return;
 
     const local = createLocalBashOperations();
     return {
       operations: {
         async exec(command, cwd, options) {
-          const rewritten = `rtk ${command.trim()}`;
+          const rewritten = `${rtkCommand} ${command.trim()}`;
           ctx.ui?.notify?.(`RTK: ${command.trim()} → ${rewritten}`, "info");
           return local.exec(rewritten, cwd, options);
         },
@@ -100,16 +124,27 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui?.setStatus?.("rtk", autoRewrite ? "rtk:auto" : "rtk:manual");
-      ctx.ui?.notify?.(`RTK auto-rewrite: ${autoRewrite ? "on" : "off"}`, "info");
+      if (!rtkCommand) rtkCommand = await findRtk(pi);
+      updateStatus(ctx);
+      ctx.ui?.notify?.(
+        rtkCommand ? `RTK auto-rewrite: ${autoRewrite ? "on" : "off"}` : installHint,
+        rtkCommand ? "info" : "warning",
+      );
     },
   });
 
   pi.registerCommand("rtk-status", {
     description: "Show RTK version and token saving stats",
     handler: async (_args, ctx) => {
-      const version = await pi.exec("rtk", ["--version"], { timeout: 5000 });
-      const gain = await pi.exec("rtk", ["gain"], { timeout: 10000 });
+      rtkCommand = await findRtk(pi);
+      updateStatus(ctx);
+      if (!rtkCommand) {
+        ctx.ui?.notify?.(installHint, "warning");
+        return;
+      }
+
+      const version = await pi.exec(rtkCommand, ["--version"], { timeout: 5000 });
+      const gain = await pi.exec(rtkCommand, ["gain"], { timeout: 10000 });
       const text = [version.stdout || version.stderr, gain.stdout || gain.stderr].filter(Boolean).join("\n");
       ctx.ui?.notify?.(text || "rtk produced no output", version.code === 0 ? "info" : "warning");
     },
@@ -133,9 +168,18 @@ export default function (pi: ExtensionAPI) {
     }),
     async execute(_toolCallId, params, signal, onUpdate) {
       const args = normalizeArgs(params.args);
-      onUpdate?.({ content: [{ type: "text", text: `Running: rtk ${args.join(" ")}` }] });
+      if (!rtkCommand) rtkCommand = await findRtk(pi);
+      if (!rtkCommand) {
+        return {
+          content: [{ type: "text", text: installHint }],
+          details: { command: ["rtk", ...args], exitCode: 127 },
+          isError: true,
+        };
+      }
 
-      const result = await pi.exec("rtk", args, {
+      onUpdate?.({ content: [{ type: "text", text: `Running: ${rtkCommand} ${args.join(" ")}` }] });
+
+      const result = await pi.exec(rtkCommand, args, {
         signal,
         timeout: params.timeout ?? 30000,
       });
@@ -144,7 +188,7 @@ export default function (pi: ExtensionAPI) {
       return {
         content: [{ type: "text", text: output || `(exit ${result.code}, no output)` }],
         details: {
-          command: ["rtk", ...args],
+          command: [rtkCommand, ...args],
           exitCode: result.code,
           killed: result.killed,
         },
@@ -173,11 +217,20 @@ export default function (pi: ExtensionAPI) {
       if (params.all) args.push("--all");
       if (params.json) args.push("--format", "json");
 
-      const result = await pi.exec("rtk", args, { signal, timeout: 10000 });
+      if (!rtkCommand) rtkCommand = await findRtk(pi);
+      if (!rtkCommand) {
+        return {
+          content: [{ type: "text", text: installHint }],
+          details: { command: ["rtk", ...args], exitCode: 127 },
+          isError: true,
+        };
+      }
+
+      const result = await pi.exec(rtkCommand, args, { signal, timeout: 10000 });
       const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
       return {
         content: [{ type: "text", text: output || `(exit ${result.code}, no output)` }],
-        details: { command: ["rtk", ...args], exitCode: result.code, killed: result.killed },
+        details: { command: [rtkCommand, ...args], exitCode: result.code, killed: result.killed },
         isError: result.code !== 0,
       };
     },
