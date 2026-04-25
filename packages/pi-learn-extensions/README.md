@@ -46,7 +46,6 @@ extensions/
 ├── ask-user/
 ├── web-tools/
 ├── chatgpt-usage-status/
-├── rtk/                 # RTK auto-rewrite + rtk_run/rtk_gain tools
 └── aurora-ui.ts
 
 themes/
