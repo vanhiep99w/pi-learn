@@ -135,6 +135,8 @@ Commands:
 /chatgpt-usage-refresh
 /chatgpt-accounts
 /chatgpt-switch
+/chatgpt-delete    # xoá một/tất cả account đã lưu
+/chatgpt-logout    # alias của /chatgpt-delete
 ```
 
 Credential lưu local, không commit:

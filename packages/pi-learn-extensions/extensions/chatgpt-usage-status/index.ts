@@ -174,6 +174,22 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  pi.registerCommand("chatgpt-delete", {
+    description: "Xoá một hoặc tất cả tài khoản ChatGPT đã lưu",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return;
+      await deleteChatGptAccount(ctx);
+    },
+  });
+
+  pi.registerCommand("chatgpt-logout", {
+    description: "Alias của /chatgpt-delete",
+    handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return;
+      await deleteChatGptAccount(ctx);
+    },
+  });
+
   function ensureTimer() {
     if (timer) return;
     timer = setInterval(() => {
@@ -368,9 +384,75 @@ async function showChatGptAccounts(ctx: any) {
     const marker = account.accountId === activeId ? "●" : "○";
     lines.push(`${ctx.ui.theme.fg(account.accountId === activeId ? "success" : "muted", marker)} ${index + 1}. ${accountDisplayName(account)}`);
   });
-  lines.push(ctx.ui.theme.fg("dim", "Dùng /chatgpt-switch để chuyển sang account tiếp theo."));
+  lines.push(ctx.ui.theme.fg("dim", "Dùng /chatgpt-switch để chuyển account, /chatgpt-delete để xoá account."));
   ctx.ui.setWidget(STATUS_ID, lines, { placement: "belowEditor" });
   setTimeout(() => ctx.ui?.setWidget(STATUS_ID, undefined), 12_000);
+}
+
+async function deleteChatGptAccount(ctx: any) {
+  await importCurrentAuthIntoAccounts(ctx);
+  const store = await loadAccountsStore();
+  const active = accountFromCredential(ctx.modelRegistry.authStorage.get("openai-codex") as Partial<AuthRecord> | undefined);
+  const activeId = active?.accountId || store.activeAccountId;
+
+  if (store.accounts.length === 0) {
+    ctx.ui.notify("Chưa có account nào để xoá.", "info");
+    return;
+  }
+
+  const allChoice = "Xoá tất cả accounts";
+  const choices = [
+    ...store.accounts.map((account, index) => {
+      const marker = account.accountId === activeId ? "●" : "○";
+      return `${marker} ${index + 1}. ${accountDisplayName(account)}`;
+    }),
+    allChoice,
+  ];
+
+  const chosen = await ctx.ui.select("Chọn ChatGPT account cần xoá:", choices);
+  if (!chosen) return;
+
+  const confirm = await ctx.ui.select(
+    chosen === allChoice ? "Xác nhận xoá tất cả ChatGPT accounts đã lưu?" : `Xác nhận xoá ${chosen}?`,
+    ["Không", "Có"],
+  );
+  if (confirm !== "Có") return;
+
+  if (chosen === allChoice) {
+    await clearStoredAccounts();
+    removeProviderCredential(ctx, "openai-codex");
+    removeProviderCredential(ctx, "chatgpt");
+    cache = { kind: "idle", fetchedAt: 0 };
+    clearGlobalUsage();
+    ctx.ui?.setStatus(STATUS_ID, undefined);
+    ctx.ui?.setWidget(STATUS_ID, undefined);
+    ctx.ui.notify("✓ Đã xoá tất cả ChatGPT accounts đã lưu.", "info");
+    return;
+  }
+
+  const selectedIndex = choices.indexOf(chosen);
+  const selected = store.accounts[selectedIndex];
+  if (!selected) return;
+
+  const deletedWasActive = selected.accountId === activeId;
+  const remaining = await removeStoredAccount(selected.accountId);
+
+  if (deletedWasActive) {
+    const next = remaining.accounts[0];
+    if (next) {
+      await activateStoredAccount(ctx, next);
+      ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}. Active account mới: ${accountDisplayName(next)}.`, "info");
+    } else {
+      removeProviderCredential(ctx, "openai-codex");
+      removeProviderCredential(ctx, "chatgpt");
+      cache = { kind: "idle", fetchedAt: 0 };
+      clearGlobalUsage();
+      ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}. Không còn ChatGPT account nào đã lưu.`, "info");
+    }
+  } else {
+    cache = { kind: "idle", fetchedAt: 0 };
+    ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}.`, "info");
+  }
 }
 
 async function activateStoredAccount(ctx: any, account: StoredChatGptAccount) {
@@ -509,6 +591,33 @@ async function markActiveAccount(accountId: string) {
     const account = store.accounts.find((item) => item.accountId === accountId);
     if (account) account.lastUsedAt = Date.now();
   });
+}
+
+async function removeStoredAccount(accountId: string): Promise<StoredAccountsFile> {
+  let nextStore: StoredAccountsFile = { accounts: [] };
+  await updateAccountsStoreLocked((store) => {
+    store.accounts = store.accounts.filter((item) => item.accountId !== accountId);
+    if (store.activeAccountId === accountId) store.activeAccountId = store.accounts[0]?.accountId;
+    nextStore = {
+      activeAccountId: store.activeAccountId,
+      accounts: [...store.accounts],
+    };
+  });
+  return nextStore;
+}
+
+async function clearStoredAccounts() {
+  await updateAccountsStoreLocked((store) => {
+    store.activeAccountId = undefined;
+    store.accounts = [];
+  });
+}
+
+function removeProviderCredential(ctx: any, provider: string) {
+  const storage = ctx.modelRegistry?.authStorage;
+  if (!storage) return;
+  if (typeof storage.remove === "function") storage.remove(provider);
+  else if (typeof storage.logout === "function") storage.logout(provider);
 }
 
 async function ensureFreshStoredAccount(account: StoredChatGptAccount): Promise<StoredChatGptAccount> {
