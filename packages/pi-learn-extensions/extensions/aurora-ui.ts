@@ -13,8 +13,19 @@ import { visibleWidth } from "@mariozechner/pi-tui";
 //  • /aurora-themes, Ctrl+Shift+T
 // ═══════════════════════════════════════════════════════════════════════════════
 
+type GitWorkingTreeStats = {
+  added: number;
+  modified: number;
+  deleted: number;
+  renamed: number;
+  untracked: number;
+  conflicted: number;
+};
+
 export default function (pi: ExtensionAPI) {
   let gitBranch: string | null = null;
+  let gitStats: GitWorkingTreeStats | null = null;
+  let refreshingGitStats = false;
 
   // ╔══════════════════════════════════════════════════════════════╗
   // ║  SESSION START                                               ║
@@ -30,26 +41,50 @@ export default function (pi: ExtensionAPI) {
     // CustomEditor constructor: (tui, theme, keybindings, options?)
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       installStickyBottomViewport(tui);
-      return new BorderedEditor(tui, theme, keybindings, pi, ctx, () => gitBranch);
+      return new BorderedEditor(tui, theme, keybindings, pi, ctx, () => gitBranch, () => gitStats);
     });
 
-    // ── Minimal Footer (chỉ extension statuses) ────────────────
-    ctx.ui.setFooter((tui, theme, footerData) => ({
-      dispose: footerData.onBranchChange(() => {
-        gitBranch = footerData.getGitBranch();
-        tui.requestRender();
-      }),
-      invalidate() {},
-      render(_w: number): string[] {
-        // Cập nhật git branch mỗi lần render
-        gitBranch = footerData.getGitBranch();
+    let requestRender = () => {};
+    const refreshGitStats = async () => {
+      if (refreshingGitStats) return;
+      refreshingGitStats = true;
+      try {
+        gitStats = await readGitWorkingTreeStats(pi, ctx.cwd);
+        requestRender();
+      } finally {
+        refreshingGitStats = false;
+      }
+    };
 
-        // Chỉ hiển thị extension statuses (từ aurora-teams, etc.)
-        const parts: string[] = [];
-        for (const [, v] of footerData.getExtensionStatuses()) parts.push(v);
-        return parts.length > 0 ? [parts.join("  ")] : [];
-      },
-    }));
+    void refreshGitStats();
+    const gitStatsTimer = setInterval(refreshGitStats, 2500);
+
+    // ── Minimal Footer (chỉ extension statuses) ────────────────
+    ctx.ui.setFooter((tui, theme, footerData) => {
+      requestRender = () => tui.requestRender();
+      const branchDispose = footerData.onBranchChange(() => {
+        gitBranch = footerData.getGitBranch();
+        void refreshGitStats();
+        tui.requestRender();
+      });
+
+      return {
+        dispose: () => {
+          clearInterval(gitStatsTimer);
+          branchDispose();
+        },
+        invalidate() {},
+        render(_w: number): string[] {
+          // Cập nhật git branch mỗi lần render
+          gitBranch = footerData.getGitBranch();
+
+          // Chỉ hiển thị extension statuses (từ aurora-teams, etc.)
+          const parts: string[] = [];
+          for (const [, v] of footerData.getExtensionStatuses()) parts.push(v);
+          return parts.length > 0 ? [parts.join("  ")] : [];
+        },
+      };
+    });
   });
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -128,6 +163,7 @@ class BorderedEditor extends CustomEditor {
   private piRef: ExtensionAPI;
   private ctxRef: any;
   private getBranch: () => string | null;
+  private getGitStats: () => GitWorkingTreeStats | null;
 
   constructor(
     tui: any,
@@ -136,12 +172,14 @@ class BorderedEditor extends CustomEditor {
     pi: ExtensionAPI,
     ctx: any,
     getBranch: () => string | null,
+    getGitStats: () => GitWorkingTreeStats | null,
   ) {
     // CustomEditor constructor: (tui, theme, keybindings, options?)
     super(tui, theme, keybindings);
     this.piRef = pi;
     this.ctxRef = ctx;
     this.getBranch = getBranch;
+    this.getGitStats = getGitStats;
   }
 
   render(width: number): string[] {
@@ -233,9 +271,12 @@ class BorderedEditor extends CustomEditor {
 
     const cwd = this.ctxRef.cwd.replace(/\/home\/[^/]+/, "~");
     const branch = this.getBranch();
-    const cwdRaw = branch ? `${cwd} (${branch})` : cwd;
-    const cwdStyled = branch
-      ? t.fg("muted", cwd + " ") + t.fg("dim", "(") + t.fg("accent", branch) + t.fg("dim", ")")
+    const gitStats = this.getGitStats();
+    const gitBadge = formatGitStatsBadge(gitStats);
+    const branchRaw = branch ? [branch, gitBadge].filter(Boolean).join(" ") : undefined;
+    const cwdRaw = branchRaw ? `${cwd} (${branchRaw})` : cwd;
+    const cwdStyled = branchRaw
+      ? t.fg("muted", cwd + " ") + t.fg("dim", "(") + t.fg("accent", branch || "") + formatGitStatsStyled(t, gitStats) + t.fg("dim", ")")
       : t.fg("muted", cwd);
     lParts.push({ raw: cwdRaw, styled: cwdStyled });
 
@@ -358,6 +399,74 @@ function installStickyBottomViewport(tui: any) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
+
+async function readGitWorkingTreeStats(pi: ExtensionAPI, cwd: string): Promise<GitWorkingTreeStats | null> {
+  let result: Awaited<ReturnType<ExtensionAPI["exec"]>>;
+  try {
+    result = await pi.exec("git", ["-C", cwd, "status", "--porcelain=v1"], { timeout: 3000 });
+  } catch {
+    return null;
+  }
+  if (result.code !== 0) return null;
+
+  const stats: GitWorkingTreeStats = {
+    added: 0,
+    modified: 0,
+    deleted: 0,
+    renamed: 0,
+    untracked: 0,
+    conflicted: 0,
+  };
+
+  for (const line of result.stdout.split("\n")) {
+    if (!line) continue;
+    const x = line[0];
+    const y = line[1];
+
+    if (x === "?" && y === "?") {
+      stats.untracked++;
+      continue;
+    }
+
+    if (x === "U" || y === "U" || (x === "A" && y === "A") || (x === "D" && y === "D")) {
+      stats.conflicted++;
+      continue;
+    }
+
+    if (x === "A" || y === "A") stats.added++;
+    if (x === "M" || y === "M") stats.modified++;
+    if (x === "D" || y === "D") stats.deleted++;
+    if (x === "R" || y === "R") stats.renamed++;
+  }
+
+  return stats;
+}
+
+function formatGitStatsBadge(stats: GitWorkingTreeStats | null) {
+  if (!stats) return "";
+  const parts: string[] = [];
+  if (stats.added) parts.push(`+${stats.added}`);
+  if (stats.modified) parts.push(`~${stats.modified}`);
+  if (stats.deleted) parts.push(`-${stats.deleted}`);
+  if (stats.renamed) parts.push(`»${stats.renamed}`);
+  if (stats.untracked) parts.push(`?${stats.untracked}`);
+  if (stats.conflicted) parts.push(`!${stats.conflicted}`);
+  return parts.length ? parts.join(" ") : "✓";
+}
+
+function formatGitStatsStyled(t: any, stats: GitWorkingTreeStats | null) {
+  const badge = formatGitStatsBadge(stats);
+  if (!badge) return "";
+  if (badge === "✓") return t.fg("success", ` ${badge}`);
+  return t.fg("dim", " ") + badge.split(" ").map((part) => {
+    const color = part.startsWith("!") ? "error"
+      : part.startsWith("?") ? "warning"
+      : part.startsWith("-") ? "error"
+      : part.startsWith("+") ? "success"
+      : "accent";
+    return t.fg(color, part);
+  }).join(t.fg("dim", " "));
+}
 
 type ChatGptUsageWindow = {
   label: string;

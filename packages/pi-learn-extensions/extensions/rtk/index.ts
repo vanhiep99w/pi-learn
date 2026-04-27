@@ -82,6 +82,45 @@ async function findRtk(pi: ExtensionAPI) {
   return undefined;
 }
 
+async function getFullRtkCommandStats(pi: ExtensionAPI) {
+  const dbPath = `${os.homedir()}/.local/share/rtk/history.db`;
+  const script = String.raw`
+import os
+import sqlite3
+import sys
+
+path = sys.argv[1]
+if not os.path.exists(path):
+    sys.exit(0)
+
+con = sqlite3.connect(path)
+rows = con.execute("""
+    SELECT
+        rtk_cmd,
+        COUNT(*) AS count,
+        SUM(saved_tokens) AS saved,
+        AVG(savings_pct) AS avg_pct,
+        SUM(exec_time_ms) AS total_ms
+    FROM commands
+    GROUP BY rtk_cmd
+    ORDER BY saved DESC
+    LIMIT 20
+""").fetchall()
+
+if not rows:
+    sys.exit(0)
+
+print("Full Commands (top 20 by tokens saved)")
+print("-" * 72)
+for index, (cmd, count, saved, avg_pct, total_ms) in enumerate(rows, 1):
+    print(f"{index}. {cmd}")
+    print(f"   count={count} saved={saved or 0} avg={avg_pct or 0:.1f}% time={total_ms or 0}ms")
+`;
+
+  const result = await pi.exec("python3", ["-c", script, dbPath], { timeout: 10000 });
+  return [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
+}
+
 export default function (pi: ExtensionAPI) {
   let autoRewrite = true;
   let rtkCommand: string | undefined;
@@ -155,7 +194,8 @@ export default function (pi: ExtensionAPI) {
 
       const version = await pi.exec(rtkCommand, ["--version"], { timeout: 5000 });
       const gain = await pi.exec(rtkCommand, ["gain"], { timeout: 10000 });
-      const text = [version.stdout || version.stderr, gain.stdout || gain.stderr].filter(Boolean).join("\n");
+      const fullCommandStats = await getFullRtkCommandStats(pi);
+      const text = [version.stdout || version.stderr, gain.stdout || gain.stderr, fullCommandStats].filter(Boolean).join("\n\n");
       ctx.ui?.notify?.(text || "rtk produced no output", version.code === 0 ? "info" : "warning");
     },
   });
