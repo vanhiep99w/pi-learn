@@ -26,7 +26,6 @@ export function registerWebSearch(pi: ExtensionAPI) {
       "Follow up with `web_fetch` to read the full page content of relevant results.",
       "Prefer combining web_search + web_fetch over guessing when unsure.",
       `The current year is ${currentYear()}. Always include the year when searching for recent/current information.`,
-      'CRITICAL: After answering, you MUST include a "Sources:" section at the end with all relevant URLs as markdown hyperlinks: [Title](URL). Never skip sources.',
     ],
     parameters: Type.Object({
       query: Type.Optional(
