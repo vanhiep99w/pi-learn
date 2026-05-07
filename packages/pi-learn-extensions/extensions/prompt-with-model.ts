@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, basename } from "node:path";
-import type { Model } from "@mariozechner/pi-ai";
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import { complete, type Model, type UserMessage } from "@mariozechner/pi-ai";
+import { BorderedLoader, type ExtensionAPI, type ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Prompt With Model — Minimal Extension (học từ pi-prompt-template-model)
 //
-//  • Scan ~/.pi/agent/model-prompts/ và .pi/model-prompts/
+//  • Scan ~/.pi/agent/model-prompts/ và .pi/agent/model-prompts/
 //  • Mỗi .md file → 1 slash command
 //  • Frontmatter: model, thinking, description, argument-hint
 //  • Auto switch model → run → restore
@@ -185,6 +185,91 @@ Mục tiêu:
 Input: $@
 `;
 
+const PROMPT_AUTHOR_SYSTEM = `Bạn là chuyên gia thiết kế prompt template cho coding agent Pi.
+Nhiệm vụ: tạo prompt body production-grade bằng tiếng Việt, rõ vai trò, quy trình, ràng buộc output, và có placeholder $@.
+Chỉ trả về NỘI DUNG BODY của prompt Markdown, không frontmatter, không code fence, không giải thích.
+Yêu cầu bắt buộc:
+- Không để placeholder chung chung kiểu "Bạn là một trợ lý...", "Mục tiêu: ...".
+- Luôn có vai trò cụ thể theo nhu cầu người dùng.
+- Luôn có phần "Nhiệm vụ", "Quy trình", "Quy tắc đầu ra" nếu phù hợp.
+- Luôn dùng $@ đúng 1 lần ở phần input.
+- Nếu là prompt dịch thuật: tự phát hiện ngôn ngữ nguồn, bảo toàn markdown/code/path/tên riêng khi cần, output chỉ bản dịch.
+- Prompt phải ngắn gọn nhưng đủ dùng thực tế.`;
+
+function stripMarkdownFence(text: string): string {
+  return text.trim()
+    .replace(/^```(?:markdown|md)?\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+}
+
+async function aiGeneratePromptBody(
+  ctx: ExtensionCommandContext,
+  input: {
+    name: string;
+    description: string;
+    argumentHint?: string;
+    model?: string;
+    thinking?: ThinkingLevel;
+    extra?: string;
+    existingBody?: string;
+  },
+): Promise<string | undefined> {
+  if (!ctx.model) {
+    ctx.ui?.notify("Không có model active để AI generate prompt body.", "warning");
+    return undefined;
+  }
+
+  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+  if (!auth.ok || !auth.apiKey) {
+    ctx.ui?.notify(auth.ok ? `No API key for ${ctx.model.provider}` : auth.error, "warning");
+    return undefined;
+  }
+
+  const request = [
+    `Tên slash command: /${input.name}`,
+    `Mô tả/nguyện vọng người dùng: ${input.description}`,
+    input.argumentHint ? `Argument hint: ${input.argumentHint}` : undefined,
+    input.model ? `Model runtime dự kiến: ${input.model}` : undefined,
+    input.thinking ? `Thinking: ${input.thinking}` : undefined,
+    input.extra ? `Thông tin bổ sung từ người dùng:\n${input.extra}` : undefined,
+    input.existingBody ? `Prompt body hiện tại cần cải thiện:\n${input.existingBody}` : undefined,
+    "Hãy tạo body prompt hoàn chỉnh.",
+  ].filter(Boolean).join("\n\n");
+
+  const userMessage: UserMessage = {
+    role: "user",
+    content: [{ type: "text", text: request }],
+    timestamp: Date.now(),
+  };
+
+  const run = async (signal?: AbortSignal) => {
+    const response = await complete(
+      ctx.model!,
+      { systemPrompt: PROMPT_AUTHOR_SYSTEM, messages: [userMessage] },
+      { apiKey: auth.apiKey, headers: auth.headers, signal, maxTokens: 2400 },
+    );
+    if (response.stopReason === "aborted") return undefined;
+    const text = response.content
+      .filter((c): c is { type: "text"; text: string } => c.type === "text")
+      .map((c) => c.text)
+      .join("\n");
+    return stripMarkdownFence(text);
+  };
+
+  if (!ctx.hasUI) return run();
+
+  return await ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
+    const loader = new BorderedLoader(tui, theme, `AI đang viết prompt bằng ${ctx.model!.id}...`);
+    loader.onAbort = () => done(undefined);
+    run(loader.signal).then(done).catch((e) => {
+      ctx.ui?.notify(`AI generate lỗi: ${e instanceof Error ? e.message : String(e)}`, "warning");
+      done(undefined);
+    });
+    return loader;
+  });
+}
+
 async function pickModel(
   ctx: ExtensionCommandContext,
 ): Promise<string | undefined> {
@@ -243,14 +328,27 @@ async function runCreateWizard(ctx: ExtensionCommandContext) {
   if (!description?.trim()) return;
 
   const argumentHint = await ctx.ui?.input("🔤 Argument hint (Enter để bỏ):", "<text> hoặc [optional]");
+  const extra = await ctx.ui?.editor(
+    "🧠 Mô tả chi tiết prompt bạn muốn AI tạo (mục tiêu, format output, ví dụ, quy tắc...):",
+    description.trim(),
+  );
   const model = await pickModel(ctx);
   const thinking = await pickThinking(ctx);
   const scope = await pickScope(ctx);
   if (!scope) return;
 
+  const generatedBody = await aiGeneratePromptBody(ctx, {
+    name: safeName,
+    description: description.trim(),
+    argumentHint: argumentHint?.trim() || undefined,
+    model,
+    thinking,
+    extra: extra?.trim() || undefined,
+  });
+
   const body = await ctx.ui?.editor(
-    "📄 Nội dung prompt (dùng $@ để chèn user input):",
-    DEFAULT_BODY_TEMPLATE,
+    "📄 Nội dung prompt do AI tạo — kiểm tra/sửa trước khi lưu (dùng $@ để chèn user input):",
+    generatedBody || DEFAULT_BODY_TEMPLATE,
   );
   if (!body?.trim()) {
     ctx.ui?.notify("Hủy — nội dung trống", "warning");
@@ -294,8 +392,35 @@ async function runEditWizard(ctx: ExtensionCommandContext) {
   const dir = dirForScope(target.source);
   const filePath = join(dir, `${target.name}.md`);
   const current = readFileSync(filePath, "utf-8");
+  const { fm, body } = parseFrontmatter(current);
+  const useAi = await ctx.ui?.confirm("🤖 AI cải thiện prompt?", "Dùng AI viết lại body prompt dựa trên nội dung hiện tại trước khi mở editor?");
+  let initial = current;
+  if (useAi) {
+    const instruction = await ctx.ui?.editor(
+      "🧠 Bạn muốn AI chỉnh prompt theo hướng nào?",
+      "Cải thiện prompt cho rõ vai trò, quy trình, quy tắc output; giữ đúng mục tiêu ban đầu và placeholder $@.",
+    );
+    const generatedBody = await aiGeneratePromptBody(ctx, {
+      name: target.name,
+      description: fm.description || target.description,
+      argumentHint: fm["argument-hint"] || target.argumentHint,
+      model: fm.model || target.model,
+      thinking: (fm.thinking as ThinkingLevel) || target.thinking,
+      extra: instruction?.trim() || undefined,
+      existingBody: body,
+    });
+    if (generatedBody) {
+      initial = buildPromptFile({
+        description: fm.description || target.description,
+        argumentHint: fm["argument-hint"] || target.argumentHint,
+        model: fm.model || target.model,
+        thinking: ((fm.thinking as ThinkingLevel) || target.thinking),
+        body: generatedBody,
+      });
+    }
+  }
 
-  const updated = await ctx.ui?.editor(`📝 Sửa ${filePath}:`, current);
+  const updated = await ctx.ui?.editor(`📝 Sửa ${filePath}:`, initial);
   if (!updated || updated === current) {
     ctx.ui?.notify("Không thay đổi.", "info");
     return;
