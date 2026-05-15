@@ -192,7 +192,6 @@ export default function (pi: ExtensionAPI) {
 class BorderedEditor extends CustomEditor {
   private piRef: ExtensionAPI;
   private ctxRef: any;
-  private themeRef: any;
   private cwd: string;
   private getBranch: () => string | null;
   private getGitStats: () => GitWorkingTreeStats | null;
@@ -211,14 +210,13 @@ class BorderedEditor extends CustomEditor {
     super(tui, theme, keybindings);
     this.piRef = pi;
     this.ctxRef = ctx;
-    this.themeRef = theme;
     this.cwd = cwd;
     this.getBranch = getBranch;
     this.getGitStats = getGitStats;
   }
 
   render(width: number): string[] {
-    const t = this.themeRef;
+    const t = getSafeTheme(this.ctxRef);
     // Inner width = width - 4 (for "│ " on left + " │" on right)
     const inner = Math.max(1, width - 4);
 
@@ -576,8 +574,20 @@ function formatCompactReset(resetAt: number | undefined) {
   return restHours ? `${days}d${restHours}h` : `${days}d`;
 }
 
+function getSafeTheme(ctx?: any) {
+  try {
+    const t = ctx?.ui?.theme;
+    if (t && typeof t.fg === "function") return t;
+  } catch { /* ctx may be stale during session replacement */ }
+
+  return {
+    fg: (_color: string, text: string) => text,
+    bold: (text: string) => text,
+  };
+}
+
 function showBanner(ctx: any) {
-  const t = ctx.ui.theme;
+  const t = getSafeTheme(ctx);
   const time = new Date().toLocaleString("vi-VN", {
     weekday: "short", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit",
