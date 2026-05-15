@@ -26,6 +26,19 @@ export default function (pi: ExtensionAPI) {
   let gitBranch: string | null = null;
   let gitStats: GitWorkingTreeStats | null = null;
   let refreshingGitStats = false;
+  const sessionCleanups = new Set<() => void>();
+
+  const addSessionCleanup = (cleanup: () => void) => {
+    sessionCleanups.add(cleanup);
+    return () => sessionCleanups.delete(cleanup);
+  };
+
+  pi.on("session_shutdown", async () => {
+    for (const cleanup of sessionCleanups) {
+      try { cleanup(); } catch { /* best-effort cleanup */ }
+    }
+    sessionCleanups.clear();
+  });
 
   // ╔══════════════════════════════════════════════════════════════╗
   // ║  SESSION START                                               ║
@@ -33,31 +46,45 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
 
+    const cwd = ctx.cwd;
+    let disposed = false;
+    let gitStatsTimer: ReturnType<typeof setInterval> | undefined;
+    let bannerTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const unregisterCleanup = addSessionCleanup(() => {
+      disposed = true;
+      if (bannerTimer) clearTimeout(bannerTimer);
+      if (gitStatsTimer) clearInterval(gitStatsTimer);
+    });
+
     // ── Startup Banner ──────────────────────────────────────────
     showBanner(ctx);
-    setTimeout(() => ctx.ui.setWidget("aurora-banner", undefined), 5000);
+    bannerTimer = setTimeout(() => {
+      if (disposed) return;
+      try { ctx.ui.setWidget("aurora-banner", undefined); } catch { /* ctx may be stale during session replacement */ }
+    }, 5000);
 
     // ── Bordered Editor ─────────────────────────────────────────
     // CustomEditor constructor: (tui, theme, keybindings, options?)
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       installStickyBottomViewport(tui);
-      return new BorderedEditor(tui, theme, keybindings, pi, ctx, () => gitBranch, () => gitStats);
+      return new BorderedEditor(tui, theme, keybindings, pi, ctx, cwd, () => gitBranch, () => gitStats);
     });
 
     let requestRender = () => {};
     const refreshGitStats = async () => {
-      if (refreshingGitStats) return;
+      if (disposed || refreshingGitStats) return;
       refreshingGitStats = true;
       try {
-        gitStats = await readGitWorkingTreeStats(pi, ctx.cwd);
-        requestRender();
+        gitStats = await readGitWorkingTreeStats(pi, cwd);
+        if (!disposed) requestRender();
       } finally {
         refreshingGitStats = false;
       }
     };
 
     void refreshGitStats();
-    const gitStatsTimer = setInterval(refreshGitStats, 2500);
+    gitStatsTimer = setInterval(refreshGitStats, 2500);
 
     // ── Minimal Footer (chỉ extension statuses) ────────────────
     ctx.ui.setFooter((tui, theme, footerData) => {
@@ -70,8 +97,11 @@ export default function (pi: ExtensionAPI) {
 
       return {
         dispose: () => {
-          clearInterval(gitStatsTimer);
+          disposed = true;
+          if (bannerTimer) clearTimeout(bannerTimer);
+          if (gitStatsTimer) clearInterval(gitStatsTimer);
           branchDispose();
+          unregisterCleanup();
         },
         invalidate() {},
         render(_w: number): string[] {
@@ -162,6 +192,8 @@ export default function (pi: ExtensionAPI) {
 class BorderedEditor extends CustomEditor {
   private piRef: ExtensionAPI;
   private ctxRef: any;
+  private themeRef: any;
+  private cwd: string;
   private getBranch: () => string | null;
   private getGitStats: () => GitWorkingTreeStats | null;
 
@@ -171,6 +203,7 @@ class BorderedEditor extends CustomEditor {
     keybindings: any,
     pi: ExtensionAPI,
     ctx: any,
+    cwd: string,
     getBranch: () => string | null,
     getGitStats: () => GitWorkingTreeStats | null,
   ) {
@@ -178,12 +211,14 @@ class BorderedEditor extends CustomEditor {
     super(tui, theme, keybindings);
     this.piRef = pi;
     this.ctxRef = ctx;
+    this.themeRef = theme;
+    this.cwd = cwd;
     this.getBranch = getBranch;
     this.getGitStats = getGitStats;
   }
 
   render(width: number): string[] {
-    const t = this.ctxRef.ui.theme;
+    const t = this.themeRef;
     // Inner width = width - 4 (for "│ " on left + " │" on right)
     const inner = Math.max(1, width - 4);
 
@@ -269,7 +304,7 @@ class BorderedEditor extends CustomEditor {
       lParts.push({ raw, styled: t.fg(c, raw) });
     }
 
-    const cwd = this.ctxRef.cwd.replace(/\/home\/[^/]+/, "~");
+    const cwd = this.cwd.replace(/\/home\/[^/]+/, "~");
     const branch = this.getBranch();
     const gitStats = this.getGitStats();
     const gitBadge = formatGitStatsBadge(gitStats);
@@ -283,13 +318,15 @@ class BorderedEditor extends CustomEditor {
     // ── Right badges: model ─ thinking ─ session ──
     const rParts: { raw: string; styled: string }[] = [];
 
-    const m = this.ctxRef.model;
+    let m: any;
+    try { m = this.ctxRef.model; } catch { /* ctx may be stale during session replacement */ }
     if (m) {
       const name = shortModel(m.id);
       rParts.push({ raw: name, styled: t.fg("accent", name) });
     }
 
-    const lv = this.piRef.getThinkingLevel();
+    let lv: string | undefined;
+    try { lv = this.piRef.getThinkingLevel(); } catch { /* extension api may be stale during session replacement */ }
     if (lv && lv !== "off") {
       const dots: Record<string, string> = {
         minimal: "◌", low: "◔", medium: "◑", high: "◕", xhigh: "●",
@@ -301,7 +338,8 @@ class BorderedEditor extends CustomEditor {
       rParts.push({ raw: badge, styled: t.fg(colors[lv] ?? "muted", badge) });
     }
 
-    const sessionName = this.ctxRef.sessionManager?.getSessionName?.();
+    let sessionName: string | undefined;
+    try { sessionName = this.ctxRef.sessionManager?.getSessionName?.(); } catch { /* ctx may be stale during session replacement */ }
     if (sessionName) {
       rParts.push({ raw: sessionName, styled: t.fg("accent", sessionName) });
     }
