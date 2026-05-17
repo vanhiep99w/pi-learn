@@ -96,34 +96,34 @@ type StoredAccountsFile = {
 let cache: UsageState = { kind: "idle", fetchedAt: 0 };
 let pending: Promise<UsageState> | undefined;
 let timer: ReturnType<typeof setInterval> | undefined;
-let lastCtx: any;
+let activeIsChatGptProvider = false;
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    lastCtx = ctx;
     await updateVisibility(ctx);
     ensureTimer();
   });
 
   pi.on("model_select", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    lastCtx = ctx;
     await updateVisibility(ctx, true);
   });
 
   pi.on("agent_end", async (_event, ctx) => {
-    if (!ctx.hasUI || !isChatGptProvider(ctx)) return;
-    lastCtx = ctx;
-    await updateStatus(ctx, true);
+    if (!ctx.hasUI) return;
+    const isChatGpt = isChatGptProvider(ctx);
+    activeIsChatGptProvider = isChatGpt;
+    if (!isChatGpt) return;
+    await updateStatus(ctx, true, isChatGpt);
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
+    activeIsChatGptProvider = false;
     ctx.ui?.setStatus(STATUS_ID, undefined);
     ctx.ui?.setWidget(STATUS_ID, undefined);
     if (timer) clearInterval(timer);
     timer = undefined;
-    lastCtx = undefined;
   });
 
   pi.registerCommand("chatgpt-usage", {
@@ -193,56 +193,81 @@ export default function (pi: ExtensionAPI) {
   function ensureTimer() {
     if (timer) return;
     timer = setInterval(() => {
-      if (lastCtx?.hasUI && isChatGptProvider(lastCtx)) {
-        void updateStatus(lastCtx, false);
-      }
+      if (activeIsChatGptProvider) void refreshGlobalUsage(false);
     }, CACHE_MS);
   }
 }
 
 async function updateVisibility(ctx: any, force = false) {
-  if (!isChatGptProvider(ctx)) {
+  const ui = ctx.ui;
+  const isChatGpt = isChatGptProvider(ctx);
+  activeIsChatGptProvider = isChatGpt;
+
+  if (!isChatGpt) {
     clearGlobalUsage();
-    ctx.ui?.setStatus(STATUS_ID, undefined);
-    ctx.ui?.setWidget(STATUS_ID, undefined);
+    ui?.setStatus(STATUS_ID, undefined);
+    ui?.setWidget(STATUS_ID, undefined);
     return;
   }
-  await updateStatus(ctx, force);
+  await updateStatus(ctx, force, isChatGpt, ui);
 }
 
-async function updateStatus(ctx: any, force = false) {
-  const state = await fetchUsage(force);
-
-  if (!isChatGptProvider(ctx)) {
+async function updateStatus(ctx: any, force = false, isChatGpt = isChatGptProvider(ctx), ui = ctx.ui) {
+  if (!isChatGpt) {
     clearGlobalUsage();
-    ctx.ui?.setStatus(STATUS_ID, undefined);
+    ui?.setStatus(STATUS_ID, undefined);
+    ui?.setWidget(STATUS_ID, undefined);
     return;
   }
 
-  const snapshot = getSnapshot(state);
-  if (snapshot) setGlobalUsage(snapshot, state.kind === "error");
-  else clearGlobalUsage();
+  const state = await fetchUsage(force);
+  if (!activeIsChatGptProvider) {
+    clearGlobalUsage();
+    return;
+  }
+  applyUsageState(state);
 
   // Aurora UI reads the shared state and paints it on the input border.
   // Keep the normal footer clean (avoid duplicate status line below editor).
-  ctx.ui?.setStatus(STATUS_ID, undefined);
-  ctx.ui?.setWidget(STATUS_ID, undefined);
+  ui?.setStatus(STATUS_ID, undefined);
+  ui?.setWidget(STATUS_ID, undefined);
 }
 
-async function showDetails(ctx: any, force: boolean) {
-  ctx.ui.setWidget(STATUS_ID, [ctx.ui.theme.fg("dim", "Đang lấy ChatGPT usage…")], { placement: "belowEditor" });
+async function refreshGlobalUsage(force = false) {
   const state = await fetchUsage(force);
+  if (activeIsChatGptProvider) applyUsageState(state);
+}
+
+function applyUsageState(state: UsageState) {
   const snapshot = getSnapshot(state);
   if (snapshot) setGlobalUsage(snapshot, state.kind === "error");
   else clearGlobalUsage();
-  ctx.ui.setStatus(STATUS_ID, undefined);
-  ctx.ui.setWidget(STATUS_ID, renderDetails(ctx, state), { placement: "belowEditor" });
-  setTimeout(() => ctx.ui?.setWidget(STATUS_ID, undefined), 12_000);
+}
+
+async function showDetails(ctx: any, force: boolean) {
+  const ui = ctx.ui;
+  const theme = ui.theme;
+  ui.setWidget(STATUS_ID, [theme.fg("dim", "Đang lấy ChatGPT usage…")], { placement: "belowEditor" });
+  const state = await fetchUsage(force);
+  applyUsageState(state);
+  ui.setStatus(STATUS_ID, undefined);
+  ui.setWidget(STATUS_ID, renderDetails(theme, state), { placement: "belowEditor" });
+  setTimeout(() => {
+    try {
+      ui.setWidget(STATUS_ID, undefined);
+    } catch {
+      // UI may have been torn down by a session replacement/reload.
+    }
+  }, 12_000);
 }
 
 function isChatGptProvider(ctx: any) {
-  const provider = ctx.model?.provider;
-  return typeof provider === "string" && CHATGPT_PROVIDERS.has(provider);
+  try {
+    const provider = ctx.model?.provider;
+    return typeof provider === "string" && CHATGPT_PROVIDERS.has(provider);
+  } catch {
+    return false;
+  }
 }
 
 async function fetchUsage(force = false): Promise<UsageState> {
@@ -385,8 +410,15 @@ async function showChatGptAccounts(ctx: any) {
     lines.push(`${ctx.ui.theme.fg(account.accountId === activeId ? "success" : "muted", marker)} ${index + 1}. ${accountDisplayName(account)}`);
   });
   lines.push(ctx.ui.theme.fg("dim", "Dùng /chatgpt-switch để chuyển account, /chatgpt-delete để xoá account."));
-  ctx.ui.setWidget(STATUS_ID, lines, { placement: "belowEditor" });
-  setTimeout(() => ctx.ui?.setWidget(STATUS_ID, undefined), 12_000);
+  const ui = ctx.ui;
+  ui.setWidget(STATUS_ID, lines, { placement: "belowEditor" });
+  setTimeout(() => {
+    try {
+      ui.setWidget(STATUS_ID, undefined);
+    } catch {
+      // UI may have been torn down by a session replacement/reload.
+    }
+  }, 12_000);
 }
 
 async function deleteChatGptAccount(ctx: any) {
@@ -872,8 +904,7 @@ function clearGlobalUsage() {
   delete (globalThis as any)[GLOBAL_USAGE_KEY];
 }
 
-function renderDetails(ctx: any, state: UsageState): string[] {
-  const t = ctx.ui.theme;
+function renderDetails(t: any, state: UsageState): string[] {
   const border = t.fg("borderAccent", "─".repeat(44));
   const lines = [border, t.fg("accent", t.bold("ChatGPT Plus/Pro usage"))];
 
