@@ -7,37 +7,36 @@
     "surface2": "#18233d",
     "overlay": "#22304f",
     "selection": "#263a63",
-
     "border0": "#293956",
     "border1": "#385174",
     "border2": "#4f73a1",
-
     "dim0": "#56667f",
     "dim1": "#8191ad",
     "fg": "#d8e3f3",
     "fgBright": "#f4f8ff",
-
     "auroraViolet": "#b692ff",
     "auroraBlue": "#7db7ff",
     "auroraSky": "#5fd4ff",
     "auroraCyan": "#4be8df",
     "auroraMint": "#62f2b8",
     "auroraGreen": "#9af27f",
-
     "gold": "#f8d66d",
     "orange": "#ffad66",
     "coral": "#ff7a7a",
     "rose": "#ff6fa7",
     "magenta": "#e879f9",
-
     "successBg": "#10251d",
     "warningBg": "#29200e",
     "errorBg": "#2a1218",
-    "purpleBg": "#1d1838"
+    "purpleBg": "#1d1838",
+    "userPanelBg": "#101b31",
+    "userPanelBg2": "#14213a",
+    "userPanelText": "#f4f8ff",
+    "userPanelBorder": "#5fd4ff"
   },
   "colors": {
     "accent": "auroraCyan",
-    "border": "border2",
+    "border": "userPanelBorder",
     "borderAccent": "auroraSky",
     "borderMuted": "border0",
     "success": "auroraGreen",
@@ -47,10 +46,9 @@
     "dim": "dim0",
     "text": "fg",
     "thinkingText": "dim1",
-
     "selectedBg": "selection",
-    "userMessageBg": "surface2",
-    "userMessageText": "fgBright",
+    "userMessageBg": "userPanelBg",
+    "userMessageText": "userPanelText",
     "customMessageBg": "purpleBg",
     "customMessageText": "fg",
     "customMessageLabel": "auroraViolet",
@@ -59,9 +57,8 @@
     "toolErrorBg": "errorBg",
     "toolTitle": "auroraSky",
     "toolOutput": "fg",
-
     "mdHeading": "gold",
-    "mdLink": "auroraSky",
+    "mdLink": "auroraCyan",
     "mdLinkUrl": "dim1",
     "mdCode": "auroraMint",
     "mdCodeBlock": "fg",
@@ -70,11 +67,9 @@
     "mdQuoteBorder": "auroraViolet",
     "mdHr": "border1",
     "mdListBullet": "auroraCyan",
-
     "toolDiffAdded": "auroraGreen",
     "toolDiffRemoved": "coral",
     "toolDiffContext": "dim1",
-
     "syntaxComment": "#61708b",
     "syntaxKeyword": "auroraViolet",
     "syntaxFunction": "auroraSky",
@@ -84,14 +79,12 @@
     "syntaxType": "auroraCyan",
     "syntaxOperator": "magenta",
     "syntaxPunctuation": "dim1",
-
     "thinkingOff": "border0",
     "thinkingMinimal": "border1",
     "thinkingLow": "auroraBlue",
     "thinkingMedium": "auroraCyan",
     "thinkingHigh": "auroraViolet",
     "thinkingXhigh": "rose",
-
     "bashMode": "auroraMint"
   },
   "export": {
