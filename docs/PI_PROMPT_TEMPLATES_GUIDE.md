@@ -1,6 +1,6 @@
 # 📝 Pi Prompt Templates — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [packages/coding-agent/docs/prompt-templates.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/prompt-templates.md)  
+> Tham khảo từ [packages/coding-agent/docs/prompt-templates.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/prompt-templates.md)  
 > Pi có thể tự tạo prompt templates — hãy nhờ nó build cho workflow của bạn!
 
 ---
@@ -797,8 +797,8 @@ pi -p "/my-template arg1 arg2"
 
 ## Tham Khảo
 
-- **Docs chính thức:** [prompt-templates.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/prompt-templates.md)
-- **Source code:** [prompt-templates.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/prompt-templates.ts)
-- **Skills docs:** [skills.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md)
-- **Packages docs:** [packages.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md)
-- **Settings docs:** [settings.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/settings.md)
+- **Docs chính thức:** [prompt-templates.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/prompt-templates.md)
+- **Source code:** [prompt-templates.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/prompt-templates.ts)
+- **Skills docs:** [skills.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md)
+- **Packages docs:** [packages.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)
+- **Settings docs:** [settings.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/settings.md)

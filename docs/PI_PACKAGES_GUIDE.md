@@ -1,6 +1,6 @@
 # 📦 Pi Packages — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [packages/coding-agent/docs/packages.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md)  
+> Tham khảo từ [packages/coding-agent/docs/packages.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)  
 > Pi có thể tự tạo packages — hãy nhờ nó đóng gói extensions, skills, themes cho bạn!
 
 ---

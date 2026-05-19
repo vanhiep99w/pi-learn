@@ -1,6 +1,6 @@
 # 🐚 Pi Shell Aliases — Hướng Dẫn Sử Dụng
 
-> Tham khảo từ [packages/coding-agent/docs/shell-aliases.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/shell-aliases.md)
+> Tham khảo từ [packages/coding-agent/docs/shell-aliases.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/shell-aliases.md)
 
 ---
 

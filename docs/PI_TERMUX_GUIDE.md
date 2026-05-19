@@ -1,6 +1,6 @@
 # 📱 Pi trên Termux — Hướng Dẫn Cài Đặt
 
-> Tham khảo từ [packages/coding-agent/docs/termux.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/termux.md)
+> Tham khảo từ [packages/coding-agent/docs/termux.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/termux.md)
 
 ---
 

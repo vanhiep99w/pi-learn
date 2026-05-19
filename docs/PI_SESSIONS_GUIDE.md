@@ -1,6 +1,6 @@
 # 🌳 Pi Sessions & Branching — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [session.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/session.md), [tree.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/tree.md), [compaction.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/compaction.md)
+> Tham khảo từ [sessions.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sessions.md) và [compaction.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/compaction.md)
 
 ---
 
@@ -898,11 +898,11 @@ pi.on("session_start", async (_event, ctx) => {
 
 ## Tham Khảo
 
-- **Session docs:** [session.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/session.md)
-- **Tree docs:** [tree.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/tree.md)
-- **Compaction docs:** [compaction.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/compaction.md)
-- **Source — SessionManager:** [session-manager.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/session-manager.ts)
-- **Source — Compaction:** [compaction.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/compaction.ts)
-- **Source — Branch summarization:** [branch-summarization.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts)
-- **Example — Custom compaction:** [custom-compaction.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/custom-compaction.ts)
-- **Example — Git checkpoint:** [git-checkpoint.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/git-checkpoint.ts)
+- **Session docs:** [sessions.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sessions.md)
+- **Tree navigation docs:** [sessions.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sessions.md)
+- **Compaction docs:** [compaction.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/compaction.md)
+- **Source — SessionManager:** [session-manager.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/session-manager.ts)
+- **Source — Compaction:** [compaction.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/compaction.ts)
+- **Source — Branch summarization:** [branch-summarization.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts)
+- **Example — Custom compaction:** [custom-compaction.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/custom-compaction.ts)
+- **Example — Git checkpoint:** [git-checkpoint.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/git-checkpoint.ts)

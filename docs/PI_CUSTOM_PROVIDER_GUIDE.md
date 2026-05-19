@@ -1,6 +1,6 @@
 # 🔗 Pi Custom Providers — Hướng Dẫn Chi Tiết
 
-> Tham khảo chính thức từ [custom-provider.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/custom-provider.md)  
+> Tham khảo chính thức từ [custom-provider.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/custom-provider.md)  
 > Pi có thể tự tạo custom providers — hãy nhờ nó build cho bạn!
 
 ---
@@ -374,12 +374,12 @@ Cho providers có API không chuẩn, implement `streamSimple`.
 
 | File | API |
 |------|-----|
-| [anthropic.ts](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/providers/anthropic.ts) | Anthropic Messages API |
-| [openai-completions.ts](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/providers/openai-completions.ts) | OpenAI Chat Completions |
-| [openai-responses.ts](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/providers/openai-responses.ts) | OpenAI Responses API |
-| [mistral.ts](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/providers/mistral.ts) | Mistral Conversations API |
-| [google.ts](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/providers/google.ts) | Google Generative AI |
-| [amazon-bedrock.ts](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/providers/amazon-bedrock.ts) | AWS Bedrock |
+| [anthropic.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/providers/anthropic.ts) | Anthropic Messages API |
+| [openai-completions.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/providers/openai-completions.ts) | OpenAI Chat Completions |
+| [openai-responses.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/providers/openai-responses.ts) | OpenAI Responses API |
+| [mistral.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/providers/mistral.ts) | Mistral Conversations API |
+| [google.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/providers/google.ts) | Google Generative AI |
+| [amazon-bedrock.ts](https://github.com/earendil-works/pi/blob/main/packages/ai/src/providers/amazon-bedrock.ts) | AWS Bedrock |
 
 ### 7.1 Stream Pattern
 
@@ -583,7 +583,7 @@ pi.registerProvider("my-provider", {
 
 ## 8. Testing
 
-Test provider bằng cùng test suites dùng cho built-in providers. Copy và adapt từ [`packages/ai/test/`](https://github.com/badlogic/pi-mono/tree/main/packages/ai/test):
+Test provider bằng cùng test suites dùng cho built-in providers. Copy và adapt từ [`packages/ai/test/`](https://github.com/earendil-works/pi/tree/main/packages/ai/test):
 
 | Test File | Mục đích |
 |-----------|----------|
@@ -707,12 +707,12 @@ Tham khảo các provider examples hoàn chỉnh:
 
 | Extension | Mô tả |
 |-----------|-------|
-| [`custom-provider-anthropic/`](https://github.com/badlogic/pi-mono/tree/main/examples/extensions/custom-provider-anthropic) | Custom Anthropic proxy |
-| [`custom-provider-gitlab-duo/`](https://github.com/badlogic/pi-mono/tree/main/examples/extensions/custom-provider-gitlab-duo) | GitLab Duo integration |
-| [`custom-provider-qwen-cli/`](https://github.com/badlogic/pi-mono/tree/main/examples/extensions/custom-provider-qwen-cli) | Qwen CLI provider |
+| [`custom-provider-anthropic/`](https://github.com/earendil-works/pi/tree/main/examples/extensions/custom-provider-anthropic) | Custom Anthropic proxy |
+| [`custom-provider-gitlab-duo/`](https://github.com/earendil-works/pi/tree/main/examples/extensions/custom-provider-gitlab-duo) | GitLab Duo integration |
+| [`custom-provider-qwen-cli/`](https://github.com/earendil-works/pi/tree/main/examples/extensions/custom-provider-qwen-cli) | Qwen CLI provider |
 
 ---
 
 > **Xem thêm:**  
 > - [PI_EXTENSIONS_GUIDE.md](./PI_EXTENSIONS_GUIDE.md) — Hướng dẫn extensions toàn diện  
-> - [Custom provider (official)](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/custom-provider.md) — Tài liệu gốc
+> - [Custom provider (official)](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/custom-provider.md) — Tài liệu gốc

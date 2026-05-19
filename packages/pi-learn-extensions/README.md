@@ -47,7 +47,8 @@ extensions/
 ├── web-tools/
 ├── chatgpt-usage-status/
 ├── rtk/                 # RTK auto-rewrite + rtk_run/rtk_gain tools
-└── aurora-ui.ts
+├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
+└── aurora-ui.ts         # fixed input cluster + bordered editor
 
 themes/
 └── midnight-aurora.json

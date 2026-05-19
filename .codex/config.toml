@@ -1,0 +1,2 @@
+[mcp_servers.markitdown]
+command = "/home/hieptran/Desktop/pi-learn/lightrag-mcp/.venv/bin/markitdown-mcp"

@@ -1,6 +1,6 @@
 # 🔌 Pi Extensions — Hướng Dẫn Chi Tiết Toàn Diện
 
-> Tham khảo chính thức từ [github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md)  
+> Tham khảo chính thức từ [github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md)  
 > Pi có thể tự tạo extensions — hãy nhờ nó build cho bạn!
 
 ---
@@ -2062,7 +2062,7 @@ Kiểm tra `ctx.hasUI` trước khi dùng UI methods trong non-interactive modes
 
 ## 16. Danh Sách Examples
 
-Tất cả examples tại [examples/extensions/](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions).
+Tất cả examples tại [examples/extensions/](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions).
 
 ### Tools
 
@@ -2158,9 +2158,9 @@ Tất cả examples tại [examples/extensions/](https://github.com/badlogic/pi-
 
 ## Tham Khảo
 
-- **Extensions docs:** [extensions.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md)
-- **Custom providers:** [custom-provider.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/custom-provider.md)
-- **TUI components:** [tui.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/tui.md)
-- **Keybindings:** [keybindings.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/keybindings.md)
-- **Examples:** [examples/extensions/](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions)
-- **Packages:** [packages.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md)
+- **Extensions docs:** [extensions.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md)
+- **Custom providers:** [custom-provider.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/custom-provider.md)
+- **TUI components:** [tui.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/tui.md)
+- **Keybindings:** [keybindings.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/keybindings.md)
+- **Examples:** [examples/extensions/](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions)
+- **Packages:** [packages.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)

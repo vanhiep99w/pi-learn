@@ -1,6 +1,8 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { CustomEditor } from "@mariozechner/pi-coding-agent";
+import { copyToClipboard, CustomEditor } from "@mariozechner/pi-coding-agent";
 import { visibleWidth } from "@mariozechner/pi-tui";
+import { renderFixedEditorCluster } from "./fixed-input-layout/cluster.ts";
+import { TerminalSplitCompositor } from "./fixed-input-layout/terminal-split.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Aurora UI Extension — Bordered Input + Custom Footer
@@ -50,11 +52,68 @@ export default function (pi: ExtensionAPI) {
     let disposed = false;
     let gitStatsTimer: ReturnType<typeof setInterval> | undefined;
     let bannerTimer: ReturnType<typeof setTimeout> | undefined;
+    let currentEditor: BorderedEditor | null = null;
+    let tuiRef: any = null;
+    let footerDataRef: any = null;
+    let fixedInputCompositor: TerminalSplitCompositor | null = null;
+    let fixedEditorContainer: any = null;
+
+    const scheduleFixedInputInstall = () => {
+      queueMicrotask(installFixedInputLayout);
+      setTimeout(installFixedInputLayout, 0);
+      setTimeout(installFixedInputLayout, 50);
+    };
+
+    const teardownFixedInputLayout = (resetExtendedKeyboardModes = false) => {
+      fixedInputCompositor?.dispose({ resetExtendedKeyboardModes });
+      fixedInputCompositor = null;
+      fixedEditorContainer = null;
+    };
+
+    const installFixedInputLayout = () => {
+      if (disposed || fixedInputCompositor || !tuiRef || !currentEditor) return;
+      if (!tuiRef.terminal || typeof tuiRef.terminal.write !== "function") return;
+
+      const match = findContainerWithChild(tuiRef, currentEditor);
+      if (!match) return;
+
+      fixedEditorContainer = match.container;
+      let compositor: TerminalSplitCompositor;
+      compositor = new TerminalSplitCompositor({
+        tui: tuiRef,
+        terminal: tuiRef.terminal,
+        scrollBar: true,
+        onCopySelection: (text) => void copyToClipboard(text),
+        accentColor: (text: string) => getSafeTheme(ctx).fg("accent", text),
+        getShowHardwareCursor: () =>
+          typeof tuiRef.getShowHardwareCursor === "function" && tuiRef.getShowHardwareCursor(),
+        renderCluster: (width, terminalRows) => {
+          const statuses: string[] = [];
+          try {
+            const parts = [...(footerDataRef?.getExtensionStatuses?.() ?? new Map()).values()];
+            if (parts.length > 0) statuses.push(parts.join("  "));
+          } catch { /* footer data can be transient during session switch */ }
+
+          return renderFixedEditorCluster({
+            width,
+            terminalRows,
+            statusLines: statuses,
+            editorLines: fixedEditorContainer ? compositor.renderHidden(fixedEditorContainer, width) : [],
+          });
+        },
+      });
+
+      fixedInputCompositor = compositor;
+      compositor.hideRenderable(fixedEditorContainer);
+      compositor.install();
+      tuiRef.requestRender(true);
+    };
 
     const unregisterCleanup = addSessionCleanup(() => {
       disposed = true;
       if (bannerTimer) clearTimeout(bannerTimer);
       if (gitStatsTimer) clearInterval(gitStatsTimer);
+      teardownFixedInputLayout(true);
     });
 
     // ── Startup Banner ──────────────────────────────────────────
@@ -67,8 +126,10 @@ export default function (pi: ExtensionAPI) {
     // ── Bordered Editor ─────────────────────────────────────────
     // CustomEditor constructor: (tui, theme, keybindings, options?)
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-      installStickyBottomViewport(tui);
-      return new BorderedEditor(tui, theme, keybindings, pi, ctx, cwd, () => gitBranch, () => gitStats);
+      tuiRef = tui;
+      currentEditor = new BorderedEditor(tui, theme, keybindings, pi, ctx, cwd, () => gitBranch, () => gitStats);
+      scheduleFixedInputInstall();
+      return currentEditor;
     });
 
     let requestRender = () => {};
@@ -87,8 +148,15 @@ export default function (pi: ExtensionAPI) {
     gitStatsTimer = setInterval(refreshGitStats, 2500);
 
     // ── Minimal Footer (chỉ extension statuses) ────────────────
-    ctx.ui.setFooter((tui, theme, footerData) => {
-      requestRender = () => tui.requestRender();
+    ctx.ui.setFooter((tui, _theme, footerData) => {
+      tuiRef = tui;
+      footerDataRef = footerData;
+      requestRender = () => {
+        if (!fixedInputCompositor) scheduleFixedInputInstall();
+        fixedInputCompositor?.requestRepaint() ?? tui.requestRender();
+      };
+      scheduleFixedInputInstall();
+
       const branchDispose = footerData.onBranchChange(() => {
         gitBranch = footerData.getGitBranch();
         void refreshGitStats();
@@ -101,17 +169,14 @@ export default function (pi: ExtensionAPI) {
           if (bannerTimer) clearTimeout(bannerTimer);
           if (gitStatsTimer) clearInterval(gitStatsTimer);
           branchDispose();
+          teardownFixedInputLayout(true);
           unregisterCleanup();
         },
         invalidate() {},
         render(_w: number): string[] {
-          // Cập nhật git branch mỗi lần render
           gitBranch = footerData.getGitBranch();
-
-          // Chỉ hiển thị extension statuses (từ aurora-teams, etc.)
-          const parts: string[] = [];
-          for (const [, v] of footerData.getExtensionStatuses()) parts.push(v);
-          return parts.length > 0 ? [parts.join("  ")] : [];
+          // Fixed input layout renders extension statuses inside the bottom cluster.
+          return [];
         },
       };
     });
@@ -405,31 +470,17 @@ class BorderedEditor extends CustomEditor {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Sticky bottom viewport
+//  Fixed input layout helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const STICKY_BOTTOM_PATCH = Symbol.for("pi-learn.aurora-ui.sticky-bottom-patch");
+function findContainerWithChild(tui: any, child: any): { container: any; index: number } | null {
+  const children = Array.isArray(tui?.children) ? tui.children : [];
+  const index = children.findIndex((candidate: any) =>
+    candidate && Array.isArray(candidate.children) && candidate.children.includes(child),
+  );
 
-function installStickyBottomViewport(tui: any) {
-  if (!tui || tui[STICKY_BOTTOM_PATCH]) return;
-
-  const originalRender = tui.render?.bind(tui);
-  if (typeof originalRender !== "function") return;
-
-  tui.render = (width: number) => {
-    const lines = originalRender(width) as string[];
-    const rows = tui.terminal?.rows;
-
-    // Pi's TUI renders components sequentially. When the rendered content is
-    // shorter than the terminal height, the editor naturally appears above the
-    // physical bottom and leaves blank rows below it. Pad the top of the render
-    // buffer instead, so the prompt/editor stays glued to the bottom edge.
-    if (!Number.isFinite(rows) || rows <= 0 || lines.length >= rows) return lines;
-
-    return [...Array(rows - lines.length).fill(""), ...lines];
-  };
-
-  tui[STICKY_BOTTOM_PATCH] = true;
+  if (index === -1) return null;
+  return { container: children[index], index };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

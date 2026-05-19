@@ -1,6 +1,6 @@
 # ⚙️ Pi Settings — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [packages/coding-agent/docs/settings.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/settings.md)  
+> Tham khảo từ [packages/coding-agent/docs/settings.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/settings.md)  
 > Gõ `/settings` trong Pi để chỉnh nhanh các tuỳ chọn phổ biến!
 
 ---
@@ -450,7 +450,7 @@ Arrays hỗ trợ **glob patterns** và **exclusions**:
 }
 ```
 
-> 📦 Xem thêm chi tiết về package management trong [packages.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md).
+> 📦 Xem thêm chi tiết về package management trong [packages.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md).
 
 ---
 

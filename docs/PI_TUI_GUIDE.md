@@ -1,7 +1,7 @@
 # 🖥️ Pi Custom TUI — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [packages/coding-agent/docs/tui.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/tui.md) và [keybindings.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/keybindings.md)  
-> Source: [`@mariozechner/pi-tui`](https://github.com/badlogic/pi-mono/tree/main/packages/tui)  
+> Tham khảo từ [packages/coding-agent/docs/tui.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/tui.md) và [keybindings.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/keybindings.md)  
+> Source: [`@mariozechner/pi-tui`](https://github.com/earendil-works/pi/tree/main/packages/tui)  
 > Pi có thể tự tạo TUI components — hãy nhờ nó build cho use case của bạn!
 
 ---
@@ -1160,30 +1160,30 @@ PI_TUI_WRITE_LOG=/tmp/tui-ansi.log pi "Hello"
 
 | Example | Mô tả | Key APIs |
 |---------|--------|----------|
-| [preset.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/preset.ts) | SelectList + DynamicBorder | `ctx.ui.custom`, `SelectList` |
-| [qna.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/qna.ts) | BorderedLoader cho LLM calls | `BorderedLoader` |
-| [tools.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/tools.ts) | SettingsList enable/disable | `SettingsList` |
-| [plan-mode/](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/plan-mode/) | setStatus + setWidget | `setStatus`, `setWidget` |
-| [custom-footer.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/custom-footer.ts) | setFooter with stats | `setFooter` |
-| [modal-editor.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/modal-editor.ts) | Vim-like editing | `CustomEditor` |
-| [rainbow-editor.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/rainbow-editor.ts) | Custom editor styling | `setEditorComponent` |
-| [todo.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/todo.ts) | renderCall + renderResult | Tool rendering |
-| [snake.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/snake.ts) | Full game + keyboard + loop | Custom component |
-| [space-invaders.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/space-invaders.ts) | Game | Custom component |
-| [doom-overlay/](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/doom-overlay/) | DOOM qua overlay | Overlay |
-| [overlay-qa-tests.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/overlay-qa-tests.ts) | Overlay anchors, margins | `overlayOptions` |
-| [widget-placement.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/widget-placement.ts) | Widget positioning | `setWidget` |
-| [message-renderer.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/message-renderer.ts) | Custom messages | `registerMessageRenderer` |
-| [status-line.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/status-line.ts) | Footer status | `setStatus` |
-| [timed-confirm.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/timed-confirm.ts) | Timed dialogs | `timeout`, `AbortSignal` |
+| [preset.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/preset.ts) | SelectList + DynamicBorder | `ctx.ui.custom`, `SelectList` |
+| [qna.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/qna.ts) | BorderedLoader cho LLM calls | `BorderedLoader` |
+| [tools.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/tools.ts) | SettingsList enable/disable | `SettingsList` |
+| [plan-mode/](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/plan-mode/) | setStatus + setWidget | `setStatus`, `setWidget` |
+| [custom-footer.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/custom-footer.ts) | setFooter with stats | `setFooter` |
+| [modal-editor.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/modal-editor.ts) | Vim-like editing | `CustomEditor` |
+| [rainbow-editor.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/rainbow-editor.ts) | Custom editor styling | `setEditorComponent` |
+| [todo.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/todo.ts) | renderCall + renderResult | Tool rendering |
+| [snake.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/snake.ts) | Full game + keyboard + loop | Custom component |
+| [space-invaders.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/space-invaders.ts) | Game | Custom component |
+| [doom-overlay/](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/doom-overlay/) | DOOM qua overlay | Overlay |
+| [overlay-qa-tests.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/overlay-qa-tests.ts) | Overlay anchors, margins | `overlayOptions` |
+| [widget-placement.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/widget-placement.ts) | Widget positioning | `setWidget` |
+| [message-renderer.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/message-renderer.ts) | Custom messages | `registerMessageRenderer` |
+| [status-line.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/status-line.ts) | Footer status | `setStatus` |
+| [timed-confirm.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/timed-confirm.ts) | Timed dialogs | `timeout`, `AbortSignal` |
 
 ---
 
 ## Tham Khảo
 
-- **TUI docs:** [tui.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/tui.md)
-- **Keybindings docs:** [keybindings.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/keybindings.md)
-- **Extensions docs:** [extensions.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md)
-- **Themes docs:** [themes.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/themes.md)
-- **TUI source:** [packages/tui](https://github.com/badlogic/pi-mono/tree/main/packages/tui)
-- **Examples:** [examples/extensions/](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions)
+- **TUI docs:** [tui.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/tui.md)
+- **Keybindings docs:** [keybindings.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/keybindings.md)
+- **Extensions docs:** [extensions.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md)
+- **Themes docs:** [themes.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/themes.md)
+- **TUI source:** [packages/tui](https://github.com/earendil-works/pi/tree/main/packages/tui)
+- **Examples:** [examples/extensions/](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions)

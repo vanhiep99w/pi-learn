@@ -1,6 +1,6 @@
 # 🧠 Pi Skills — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [packages/coding-agent/docs/skills.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md)  
+> Tham khảo từ [packages/coding-agent/docs/skills.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md)  
 > Chuẩn mở: [Agent Skills Specification](https://agentskills.io/specification)  
 > Pi có thể tự tạo skills — hãy nhờ nó build cho use case của bạn!
 
@@ -955,7 +955,7 @@ pi.on("resources_discover", async (event, ctx) => {
 });
 ```
 
-Extensions cũng có thể load dynamic skills thông qua `dynamic-resources` pattern — xem [examples/extensions/dynamic-resources/](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions/dynamic-resources).
+Extensions cũng có thể load dynamic skills thông qua `dynamic-resources` pattern — xem [examples/extensions/dynamic-resources/](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions/dynamic-resources).
 
 ---
 
@@ -1242,10 +1242,10 @@ pi --list-skills  # (nếu available)
 
 ## Tham Khảo
 
-- **Docs chính thức:** [skills.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md)
-- **Source code:** [skills.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/skills.ts)
+- **Docs chính thức:** [skills.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md)
+- **Source code:** [skills.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/skills.ts)
 - **Agent Skills spec:** [agentskills.io/specification](https://agentskills.io/specification)
 - **Pi Skills repo:** [github.com/badlogic/pi-skills](https://github.com/badlogic/pi-skills)
 - **Anthropic Skills repo:** [github.com/anthropics/skills](https://github.com/anthropics/skills)
-- **Packages docs:** [packages.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md)
+- **Packages docs:** [packages.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)
 - **Progressive disclosure:** [agentskills.io](https://agentskills.io)

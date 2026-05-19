@@ -1,7 +1,7 @@
 # 🔧 Pi — Tools Deep Dive
 
 > Tài liệu chi tiết về hệ thống **Tools** trong Pi Coding Agent.
-> Tổng hợp từ [official docs](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/docs), source code & extension examples.
+> Tổng hợp từ [official docs](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/docs), source code & extension examples.
 
 ---
 
@@ -1001,18 +1001,18 @@ pi -e ./my-extension.ts
 | `subagent/` | Spawn sub-agents | `registerTool`, `exec` |
 | `sandbox/` | Sandboxed tool execution | Tool operations |
 
-Source code: [`examples/extensions/`](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions)
+Source code: [`examples/extensions/`](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions)
 
 ---
 
 ## Tham Khảo
 
-- [Extensions docs](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md) — Custom Tools section
-- [Source: read.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/tools/read.ts)
-- [Source: bash.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/tools/bash.ts)
-- [Source: edit.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/tools/edit.ts)
-- [Source: write.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/tools/write.ts)
-- [Source: grep.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/tools/grep.ts)
-- [Source: find.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/tools/find.ts)
-- [Source: ls.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/tools/ls.ts)
-- [Extension examples](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions)
+- [Extensions docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) — Custom Tools section
+- [Source: read.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/read.ts)
+- [Source: bash.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/bash.ts)
+- [Source: edit.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/edit.ts)
+- [Source: write.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/write.ts)
+- [Source: grep.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/grep.ts)
+- [Source: find.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/find.ts)
+- [Source: ls.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/tools/ls.ts)
+- [Extension examples](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions)

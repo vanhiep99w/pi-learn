@@ -1,6 +1,6 @@
 # 🤖 Pi Custom Models — Hướng Dẫn Chi Tiết
 
-> Tham khảo chính thức từ [packages/coding-agent/docs/models.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/models.md)  
+> Tham khảo chính thức từ [packages/coding-agent/docs/models.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md)  
 > Thêm custom providers và models (Ollama, vLLM, LM Studio, proxies) qua file JSON đơn giản!
 
 ---

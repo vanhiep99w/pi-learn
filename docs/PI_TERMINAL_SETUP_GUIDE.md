@@ -1,6 +1,6 @@
 # ⌨️ Pi Terminal Setup — Hướng Dẫn Cài Đặt Terminal
 
-> Tham khảo từ [packages/coding-agent/docs/terminal-setup.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/terminal-setup.md)
+> Tham khảo từ [packages/coding-agent/docs/terminal-setup.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/terminal-setup.md)
 
 ---
 

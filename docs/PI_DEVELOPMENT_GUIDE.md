@@ -1,6 +1,6 @@
 # 🛠️ Pi Development — Hướng Dẫn Phát Triển
 
-> Tham khảo từ [packages/coding-agent/docs/development.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/development.md)
+> Tham khảo từ [packages/coding-agent/docs/development.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/development.md)
 
 ---
 
@@ -36,7 +36,7 @@ Hướng dẫn này dành cho ai muốn **contribute** hoặc **fork** Pi — ba
 
 ```bash
 # 1. Clone repo
-git clone https://github.com/badlogic/pi-mono.git
+git clone https://github.com/earendil-works/pi.git
 cd pi-mono
 
 # 2. Install dependencies

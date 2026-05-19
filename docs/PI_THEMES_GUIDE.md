@@ -1,6 +1,6 @@
 # 🎨 Pi Themes — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [packages/coding-agent/docs/themes.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/themes.md)  
+> Tham khảo từ [packages/coding-agent/docs/themes.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/themes.md)  
 > Pi có thể tự tạo themes — hãy nhờ nó build cho terminal setup của bạn!
 
 ---
@@ -132,7 +132,7 @@ mkdir -p ~/.pi/agent/themes
 # 2. Tạo file theme
 cat > ~/.pi/agent/themes/my-theme.json << 'EOF'
 {
-  "$schema": "https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
+  "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
   "name": "my-theme",
   "vars": {
     "primary": "#00aaff",
@@ -153,7 +153,7 @@ EOF
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
+  "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
   "name": "my-theme",
   "vars": {
     "blue": "#0066cc",
@@ -221,7 +221,7 @@ Thêm `$schema` để editor (VS Code, etc.) cung cấp:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json"
+  "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json"
 }
 ```
 
@@ -500,7 +500,7 @@ Dùng tone muted, dễ đọc trên nền sáng.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
+  "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
   "name": "nord",
   "vars": {
     "nord0": "#2e3440",
@@ -1145,9 +1145,9 @@ Pi hiểu theme schema và có thể tự tạo file JSON đầy đủ 51 tokens
 
 ## Tham Khảo
 
-- **Docs chính thức:** [themes.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/themes.md)
-- **Dark theme:** [dark.json](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/modes/interactive/theme/dark.json)
-- **Light theme:** [light.json](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/modes/interactive/theme/light.json)
-- **Schema:** [theme-schema.json](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json)
-- **TUI docs:** [tui.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/tui.md)
-- **Mac theme sync:** [mac-system-theme.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/mac-system-theme.ts)
+- **Docs chính thức:** [themes.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/themes.md)
+- **Dark theme:** [dark.json](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/modes/interactive/theme/dark.json)
+- **Light theme:** [light.json](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/modes/interactive/theme/light.json)
+- **Schema:** [theme-schema.json](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json)
+- **TUI docs:** [tui.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/tui.md)
+- **Mac theme sync:** [mac-system-theme.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/mac-system-theme.ts)

@@ -1,6 +1,6 @@
 # 🔑 Pi Providers — Hướng Dẫn Chi Tiết
 
-> Tham khảo từ [packages/coding-agent/docs/providers.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/providers.md)  
+> Tham khảo từ [packages/coding-agent/docs/providers.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/providers.md)  
 > Pi hỗ trợ cả đăng nhập bằng subscription (OAuth) và API key cho nhiều nhà cung cấp LLM.
 
 ---
@@ -95,7 +95,7 @@ Bảng đầy đủ các provider và biến môi trường tương ứng:
 | MiniMax | `MINIMAX_API_KEY` | `minimax` |
 | MiniMax (China) | `MINIMAX_CN_API_KEY` | `minimax-cn` |
 
-> **Tham khảo source:** [`const envMap` trong `packages/ai/src/env-api-keys.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/env-api-keys.ts)
+> **Tham khảo source:** [`const envMap` trong `packages/ai/src/env-api-keys.ts`](https://github.com/earendil-works/pi/blob/main/packages/ai/src/env-api-keys.ts)
 
 ### 2.2 Auth File (`auth.json`)
 
@@ -232,14 +232,14 @@ Hoặc set `GOOGLE_APPLICATION_CREDENTIALS` trỏ đến file service account ke
 
 Thêm Ollama, LM Studio, vLLM, hoặc bất kỳ provider nào nói API tương thích (OpenAI Completions, OpenAI Responses, Anthropic Messages, Google Generative AI).
 
-→ Xem chi tiết: [models.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/models.md)
+→ Xem chi tiết: [models.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md)
 
 ### Qua Extensions
 
 Cho các provider cần custom API implementation hoặc OAuth flows, tạo extension.
 
-→ Xem chi tiết: [custom-provider.md](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/custom-provider.md)  
-→ Ví dụ: [custom-provider-gitlab-duo](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions/custom-provider-gitlab-duo/)
+→ Xem chi tiết: [custom-provider.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/custom-provider.md)  
+→ Ví dụ: [custom-provider-gitlab-duo](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/examples/extensions/custom-provider-gitlab-duo/)
 
 ---
 

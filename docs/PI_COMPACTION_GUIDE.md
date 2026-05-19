@@ -1,7 +1,7 @@
 # 🗜️ Pi — Compaction & Branch Summarization Deep Dive
 
 > Tài liệu tìm hiểu chi tiết cơ chế **Compaction** (nén context) và **Branch Summarization** (tóm tắt nhánh) trong Pi Coding Agent.  
-> Tổng hợp từ [official docs](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/docs) & source code analysis.
+> Tổng hợp từ [official docs](https://github.com/earendil-works/pi/tree/main/packages/coding-agent/docs) & source code analysis.
 
 ---
 
@@ -758,11 +758,11 @@ Trong `~/.pi/agent/settings.json` hoặc `<project>/.pi/settings.json`:
 
 | File | Chức Năng |
 |------|-----------|
-| [`compaction.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/compaction.ts) | Auto-compaction logic: token estimation, cut point, summary generation |
-| [`branch-summarization.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts) | Branch summarization: entry collection, preparation, generation |
-| [`utils.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/utils.ts) | Shared: file tracking, message serialization, system prompt |
-| [`session-manager.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/session-manager.ts) | Entry types (`CompactionEntry`, `BranchSummaryEntry`), tree navigation |
-| [`extensions/types.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/extensions/types.ts) | Extension event types |
+| [`compaction.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/compaction.ts) | Auto-compaction logic: token estimation, cut point, summary generation |
+| [`branch-summarization.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts) | Branch summarization: entry collection, preparation, generation |
+| [`utils.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/utils.ts) | Shared: file tracking, message serialization, system prompt |
+| [`session-manager.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/session-manager.ts) | Entry types (`CompactionEntry`, `BranchSummaryEntry`), tree navigation |
+| [`extensions/types.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/extensions/types.ts) | Extension event types |
 
 ### Key Functions
 
@@ -928,10 +928,10 @@ export default function(pi: HookAPI) {
 
 ## Tham Khảo
 
-- [Official compaction docs](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/compaction.md)
-- [Session docs](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/session.md)
-- [Tree navigation docs](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/tree.md)
-- [Settings docs](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/settings.md)
-- [Source: compaction.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/compaction.ts)
-- [Source: branch-summarization.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts)
-- [Source: utils.ts](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/utils.ts)
+- [Official compaction docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/compaction.md)
+- [Sessions docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sessions.md)
+- [Tree navigation docs in sessions.md](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sessions.md)
+- [Settings docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/settings.md)
+- [Source: compaction.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/compaction.ts)
+- [Source: branch-summarization.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts)
+- [Source: utils.ts](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/compaction/utils.ts)
