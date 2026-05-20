@@ -783,12 +783,15 @@ export class TerminalSplitCompositor {
       }
 
       if (!isKeyRelease(data) && matchesPreviousUserMessageKey(data)) {
-         this.jumpToPreviousUserMessage();
+         // Prefer semantic jumps between user prompts. If Pi's rendered transcript
+         // no longer exposes prompt markers, still make the key visibly useful by
+         // falling back to page-style scrolling.
+         if (!this.jumpToPreviousUserMessage()) this.scrollBy(10, true);
          return { consume: true };
       }
 
       if (!isKeyRelease(data) && matchesNextUserMessageKey(data)) {
-         this.jumpToNextUserMessage();
+         if (!this.jumpToNextUserMessage()) this.scrollBy(-10, true);
          return { consume: true };
       }
 
