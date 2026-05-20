@@ -562,7 +562,7 @@ export class TerminalSplitCompositor {
       const width = Math.max(1, this.terminal.columns || 80);
       this.refreshRootWindow(width);
       const targetLines = this.rootLines
-         .map((line, index) => (line.includes(USER_MESSAGE_ZONE_START) ? index : -1))
+         .map((line, index) => (this.isUserMessageTargetLine(line) ? index : -1))
          .filter((index) => index >= 0);
 
       return direction === "previous"
@@ -753,8 +753,18 @@ export class TerminalSplitCompositor {
       const keyboardDelta = parseKeyboardScrollDelta(data);
       if (keyboardDelta === 0) return undefined;
 
-      this.scrollBy(keyboardDelta);
+      this.scrollBy(keyboardDelta, true);
       return { consume: true };
+   }
+
+   private isUserMessageTargetLine(line: string): boolean {
+      // Pi currently uses the same OSC 133 zone marker for user and assistant
+      // messages. The user message zone starts on the line that visibly contains
+      // the `user` label, while assistant zones may start with Thinking or plain
+      // assistant text. Require both signals to avoid jumping into thinking
+      // blocks.
+      if (!line.includes(USER_MESSAGE_ZONE_START)) return false;
+      return /(^|[^a-z])user([^a-z]|$)/i.test(stripAnsi(line));
    }
 
    private handleMousePacket(packet: SgrMousePacket): void {
@@ -765,7 +775,7 @@ export class TerminalSplitCompositor {
             return;
          }
          this.selectionDragging = false;
-         this.scrollBy(delta);
+         this.scrollBy(delta, false);
          return;
       }
 
@@ -1161,11 +1171,11 @@ export class TerminalSplitCompositor {
       return Boolean(range && location.point.col >= range.startCol && location.point.col < range.endCol);
    }
 
-   private scrollBy(delta: number): void {
+   private scrollBy(delta: number, allowDoubleBottom = false): void {
       const width = Math.max(1, this.terminal.columns || 80);
       this.refreshRootWindow(width);
 
-      if (delta < 0) {
+      if (allowDoubleBottom && delta < 0) {
          const now = Date.now();
          if (this.lastScrollDownAt > 0 && now - this.lastScrollDownAt <= DOUBLE_SCROLL_DOWN_MS) {
             this.lastScrollDownAt = 0;
@@ -1173,7 +1183,7 @@ export class TerminalSplitCompositor {
             return;
          }
          this.lastScrollDownAt = now;
-      } else if (delta > 0) {
+      } else if (delta > 0 || !allowDoubleBottom) {
          this.lastScrollDownAt = 0;
       }
 
