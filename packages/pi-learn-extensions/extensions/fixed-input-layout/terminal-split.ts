@@ -174,12 +174,21 @@ function matchesPreviousUserMessageKey(data: string): boolean {
    return (
       matchesKey(data, "ctrl+up") ||
       matchesKey(data, "alt+up") ||
+      matchesKey(data, "ctrl+shift+up") ||
+      matchesKey(data, "shift+up") ||
+      matchesKey(data, "alt+p") ||
+      matchesKey(data, "alt+k") ||
       // Common xterm/VTE modified-arrow sequences. Some terminals do not expose
       // these through the generic key matcher when extended keyboard modes vary.
-      data === "\x1b[1;5A" ||
+      data === "\x1b[1;5A" || // Ctrl+Up
       data === "\x1b[1;5:1A" ||
-      data === "\x1b[1;3A" ||
-      data === "\x1b[1;3:1A"
+      data === "\x1b[1;3A" || // Alt+Up
+      data === "\x1b[1;3:1A" ||
+      data === "\x1b[1;6A" || // Ctrl+Shift+Up
+      data === "\x1b[1;6:1A" ||
+      data === "\x1b[1;2A" || // Shift+Up
+      data === "\x1b[1;2:1A" ||
+      data === "\x1b[a"
    );
 }
 
@@ -187,10 +196,19 @@ function matchesNextUserMessageKey(data: string): boolean {
    return (
       matchesKey(data, "ctrl+down") ||
       matchesKey(data, "alt+down") ||
-      data === "\x1b[1;5B" ||
+      matchesKey(data, "ctrl+shift+down") ||
+      matchesKey(data, "shift+down") ||
+      matchesKey(data, "alt+n") ||
+      matchesKey(data, "alt+j") ||
+      data === "\x1b[1;5B" || // Ctrl+Down
       data === "\x1b[1;5:1B" ||
-      data === "\x1b[1;3B" ||
-      data === "\x1b[1;3:1B"
+      data === "\x1b[1;3B" || // Alt+Down
+      data === "\x1b[1;3:1B" ||
+      data === "\x1b[1;6B" || // Ctrl+Shift+Down
+      data === "\x1b[1;6:1B" ||
+      data === "\x1b[1;2B" || // Shift+Down
+      data === "\x1b[1;2:1B" ||
+      data === "\x1b[b"
    );
 }
 
