@@ -73,6 +73,8 @@ const CONTEXT_MENU_MOUSE_REPORTING_PAUSE_MS = 1200;
 const CONTEXT_MENU_SELECTION_RESTORE_WINDOW_MS = 5000;
 const CONTEXT_MENU_CLIPBOARD_RESTORE_INTERVAL_MS = 100;
 const DOUBLE_CLICK_MS = 500;
+const DOUBLE_SCROLL_DOWN_MS = 350;
+const USER_MESSAGE_ZONE_START = "\x1b]133;A\x07";
 
 export function beginSynchronizedOutput(): string {
    return "\x1b[?2026h";
@@ -418,6 +420,7 @@ export class TerminalSplitCompositor {
    private selectionFromDoubleClick = false;
    private preserveSelectionFocusOnRelease = false;
    private lastLeftPress: { area: SelectionArea; line: number; at: number } | null = null;
+   private lastScrollDownAt = 0;
 
    constructor(options: TerminalSplitCompositorOptions) {
       this.tui = options.tui;
@@ -543,6 +546,28 @@ export class TerminalSplitCompositor {
       this.scrollOffset = this.maxScrollOffset;
       this.requestRender();
       return true;
+   }
+
+   jumpToPreviousUserMessage(): boolean {
+      return this.jumpToUserMessage("previous");
+   }
+
+   jumpToNextUserMessage(): boolean {
+      return this.jumpToUserMessage("next");
+   }
+
+   private jumpToUserMessage(direction: "previous" | "next"): boolean {
+      if (this.disposed || this.hasVisibleOverlay()) return false;
+
+      const width = Math.max(1, this.terminal.columns || 80);
+      this.refreshRootWindow(width);
+      const targetLines = this.rootLines
+         .map((line, index) => (line.includes(USER_MESSAGE_ZONE_START) ? index : -1))
+         .filter((index) => index >= 0);
+
+      return direction === "previous"
+         ? this.jumpToPreviousRootTarget(targetLines)
+         : this.jumpToNextRootTarget(targetLines);
    }
 
    private jumpToRootTarget(targetLines: readonly number[], direction: "previous" | "next"): boolean {
@@ -712,6 +737,16 @@ export class TerminalSplitCompositor {
 
       if (!isKeyRelease(data) && matchesKey(data, "home")) {
          this.jumpToRootTop();
+         return { consume: true };
+      }
+
+      if (!isKeyRelease(data) && matchesKey(data, "ctrl+up")) {
+         this.jumpToPreviousUserMessage();
+         return { consume: true };
+      }
+
+      if (!isKeyRelease(data) && matchesKey(data, "ctrl+down")) {
+         this.jumpToNextUserMessage();
          return { consume: true };
       }
 
@@ -1129,6 +1164,18 @@ export class TerminalSplitCompositor {
    private scrollBy(delta: number): void {
       const width = Math.max(1, this.terminal.columns || 80);
       this.refreshRootWindow(width);
+
+      if (delta < 0) {
+         const now = Date.now();
+         if (this.lastScrollDownAt > 0 && now - this.lastScrollDownAt <= DOUBLE_SCROLL_DOWN_MS) {
+            this.lastScrollDownAt = 0;
+            this.jumpToRootBottom();
+            return;
+         }
+         this.lastScrollDownAt = now;
+      } else if (delta > 0) {
+         this.lastScrollDownAt = 0;
+      }
 
       const nextOffset = Math.max(0, Math.min(this.scrollOffset + delta, this.maxScrollOffset));
       if (nextOffset === this.scrollOffset) return;
