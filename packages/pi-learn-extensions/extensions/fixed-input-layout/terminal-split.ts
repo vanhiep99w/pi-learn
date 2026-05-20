@@ -170,6 +170,30 @@ function parseKeyboardScrollDelta(data: string): number {
    return 0;
 }
 
+function matchesPreviousUserMessageKey(data: string): boolean {
+   return (
+      matchesKey(data, "ctrl+up") ||
+      matchesKey(data, "alt+up") ||
+      // Common xterm/VTE modified-arrow sequences. Some terminals do not expose
+      // these through the generic key matcher when extended keyboard modes vary.
+      data === "\x1b[1;5A" ||
+      data === "\x1b[1;5:1A" ||
+      data === "\x1b[1;3A" ||
+      data === "\x1b[1;3:1A"
+   );
+}
+
+function matchesNextUserMessageKey(data: string): boolean {
+   return (
+      matchesKey(data, "ctrl+down") ||
+      matchesKey(data, "alt+down") ||
+      data === "\x1b[1;5B" ||
+      data === "\x1b[1;5:1B" ||
+      data === "\x1b[1;3B" ||
+      data === "\x1b[1;3:1B"
+   );
+}
+
 function parseSgrMousePackets(data: string): SgrMousePacket[] | null {
    const pattern = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g;
    const packets: SgrMousePacket[] = [];
@@ -740,12 +764,12 @@ export class TerminalSplitCompositor {
          return { consume: true };
       }
 
-      if (!isKeyRelease(data) && matchesKey(data, "ctrl+up")) {
+      if (!isKeyRelease(data) && matchesPreviousUserMessageKey(data)) {
          this.jumpToPreviousUserMessage();
          return { consume: true };
       }
 
-      if (!isKeyRelease(data) && matchesKey(data, "ctrl+down")) {
+      if (!isKeyRelease(data) && matchesNextUserMessageKey(data)) {
          this.jumpToNextUserMessage();
          return { consume: true };
       }
