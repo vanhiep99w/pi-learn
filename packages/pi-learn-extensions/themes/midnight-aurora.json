@@ -29,10 +29,10 @@
     "warningBg": "#29200e",
     "errorBg": "#2a1218",
     "purpleBg": "#1d1838",
-    "userPanelBg": "#101b31",
-    "userPanelBg2": "#14213a",
-    "userPanelText": "#f4f8ff",
-    "userPanelBorder": "#5fd4ff"
+    "userPanelBg": "#111827",
+    "userPanelBg2": "#162036",
+    "userPanelText": "#d3deee",
+    "userPanelBorder": "#3f8fb0"
   },
   "colors": {
     "accent": "auroraCyan",
