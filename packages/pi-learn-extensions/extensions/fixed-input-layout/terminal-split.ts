@@ -759,11 +759,12 @@ export class TerminalSplitCompositor {
 
    private isUserMessageTargetLine(line: string): boolean {
       // Pi currently uses the same OSC 133 zone marker for user and assistant
-      // messages. The user message zone starts on the line that visibly contains
-      // the `user` label, while assistant zones may start with Thinking or plain
-      // assistant text. Require both signals to avoid jumping into thinking
-      // blocks.
+      // messages. User messages are rendered by UserMessageComponent inside a
+      // themed Box, so the zone-start line carries a background SGR (`48;...`).
+      // Assistant/thinking zones generally do not. Keep the visible `user` label
+      // fallback for terminals/themes that expose it on the marker line.
       if (!line.includes(USER_MESSAGE_ZONE_START)) return false;
+      if (/\x1b\[48;/.test(line)) return true;
       return /(^|[^a-z])user([^a-z]|$)/i.test(stripAnsi(line));
    }
 
