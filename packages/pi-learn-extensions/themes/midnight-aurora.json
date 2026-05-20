@@ -62,7 +62,7 @@
     "mdLinkUrl": "dim1",
     "mdCode": "auroraMint",
     "mdCodeBlock": "fg",
-    "mdCodeBlockBorder": "border1",
+    "mdCodeBlockBorder": "dim1",
     "mdQuote": "dim1",
     "mdQuoteBorder": "auroraViolet",
     "mdHr": "border1",
