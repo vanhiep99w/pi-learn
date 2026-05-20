@@ -703,8 +703,11 @@ export class TerminalSplitCompositor {
       }
       this.renderedRootOverlayActive = useOverlay;
       this.rootLines = lines;
-      if (this.scrollOffset > 0 && this.lastRootLineCount > 0 && lines.length > this.lastRootLineCount) {
-         this.scrollOffset += lines.length - this.lastRootLineCount;
+      if (this.lastRootLineCount > 0 && lines.length > this.lastRootLineCount) {
+         // New transcript content usually means a freshly submitted prompt or a
+         // streaming response. Follow the active generation instead of preserving
+         // an older scrolled viewport.
+         this.scrollOffset = 0;
       }
       this.lastRootLineCount = lines.length;
       this.maxScrollOffset = Math.max(0, lines.length - scrollableRows);
