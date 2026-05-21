@@ -754,6 +754,16 @@ export class TerminalSplitCompositor {
          return { consume: true };
       }
 
+      if (!isKeyRelease(data) && (data === "\r" || data === "\n" || matchesKey(data, "enter"))) {
+         // Prompt submit should jump to the live tail even if the user was
+         // reading older transcript content. Do not consume the key; the editor
+         // still needs to submit the prompt.
+         this.scrollOffset = 0;
+         this.followStreamingOutput = true;
+         this.requestRender();
+         return undefined;
+      }
+
       if (!isKeyRelease(data) && matchesKey(data, "end")) {
          this.jumpToRootBottom();
          return { consume: true };
