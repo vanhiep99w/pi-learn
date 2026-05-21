@@ -407,6 +407,7 @@ export class TerminalSplitCompositor {
    private scrollOffset = 0;
    private maxScrollOffset = 0;
    private lastRootLineCount = 0;
+   private lastUserMessageTargetCount = 0;
    private rootLines: string[] = [];
    private visibleRootStart = 0;
    private visibleScrollableRows = 0;
@@ -700,16 +701,30 @@ export class TerminalSplitCompositor {
       if (useOverlay !== this.renderedRootOverlayActive) {
          this.scrollOffset = 0;
          this.lastRootLineCount = 0;
+         this.lastUserMessageTargetCount = 0;
       }
       this.renderedRootOverlayActive = useOverlay;
+
+      const previousLineCount = this.lastRootLineCount;
+      const previousUserMessageTargetCount = this.lastUserMessageTargetCount;
+      const nextUserMessageTargetCount = lines.reduce(
+         (count, line) => count + (this.isUserMessageTargetLine(line) ? 1 : 0),
+         0,
+      );
+      const addedLineCount = Math.max(0, lines.length - previousLineCount);
+      const addedUserMessage = nextUserMessageTargetCount > previousUserMessageTargetCount;
+
       this.rootLines = lines;
-      if (this.lastRootLineCount > 0 && lines.length > this.lastRootLineCount) {
-         // New transcript content usually means a freshly submitted prompt or a
-         // streaming response. Follow the active generation instead of preserving
-         // an older scrolled viewport.
+      if (addedUserMessage) {
+         // Follow the transcript only when the user submits a new prompt.
          this.scrollOffset = 0;
+      } else if (previousLineCount > 0 && addedLineCount > 0) {
+         // Keep the current viewport stable while assistant output streams so
+         // users can scroll/read freely without being pulled back to bottom.
+         this.scrollOffset += addedLineCount;
       }
       this.lastRootLineCount = lines.length;
+      this.lastUserMessageTargetCount = nextUserMessageTargetCount;
       this.maxScrollOffset = Math.max(0, lines.length - scrollableRows);
       this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, this.maxScrollOffset));
 
