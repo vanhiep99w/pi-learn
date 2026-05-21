@@ -408,6 +408,7 @@ export class TerminalSplitCompositor {
    private maxScrollOffset = 0;
    private lastRootLineCount = 0;
    private lastUserMessageTargetCount = 0;
+   private followStreamingOutput = true;
    private rootLines: string[] = [];
    private visibleRootStart = 0;
    private visibleScrollableRows = 0;
@@ -537,6 +538,7 @@ export class TerminalSplitCompositor {
       if (this.disposed || this.hasVisibleOverlay() || this.scrollOffset === 0) return false;
 
       this.scrollOffset = 0;
+      this.followStreamingOutput = true;
       this.requestRender();
       return true;
    }
@@ -545,6 +547,7 @@ export class TerminalSplitCompositor {
       if (this.disposed || this.hasVisibleOverlay() || this.scrollOffset === this.maxScrollOffset) return false;
 
       this.scrollOffset = this.maxScrollOffset;
+      this.followStreamingOutput = false;
       this.requestRender();
       return true;
    }
@@ -702,6 +705,7 @@ export class TerminalSplitCompositor {
          this.scrollOffset = 0;
          this.lastRootLineCount = 0;
          this.lastUserMessageTargetCount = 0;
+         this.followStreamingOutput = true;
       }
       this.renderedRootOverlayActive = useOverlay;
 
@@ -716,11 +720,13 @@ export class TerminalSplitCompositor {
 
       this.rootLines = lines;
       if (addedUserMessage) {
-         // Follow the transcript only when the user submits a new prompt.
+         // A submitted prompt starts a new live tail; follow the response until
+         // the user scrolls away.
          this.scrollOffset = 0;
-      } else if (previousLineCount > 0 && addedLineCount > 0) {
-         // Keep the current viewport stable while assistant output streams so
-         // users can scroll/read freely without being pulled back to bottom.
+         this.followStreamingOutput = true;
+      } else if (previousLineCount > 0 && addedLineCount > 0 && !this.followStreamingOutput) {
+         // Once the user scrolls away, keep the viewport stable while assistant
+         // output streams so reading is not interrupted.
          this.scrollOffset += addedLineCount;
       }
       this.lastRootLineCount = lines.length;
@@ -1210,6 +1216,7 @@ export class TerminalSplitCompositor {
       if (nextOffset === this.scrollOffset) return;
 
       this.scrollOffset = nextOffset;
+      this.followStreamingOutput = nextOffset === 0;
       this.repaintScrollableViewport(width);
       this.requestRender();
    }
