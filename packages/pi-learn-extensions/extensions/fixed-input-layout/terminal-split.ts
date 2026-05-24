@@ -710,28 +710,34 @@ export class TerminalSplitCompositor {
       this.renderedRootOverlayActive = useOverlay;
 
       const previousLineCount = this.lastRootLineCount;
+      const previousVisibleStart = this.visibleRootStart;
       const previousUserMessageTargetCount = this.lastUserMessageTargetCount;
       const nextUserMessageTargetCount = lines.reduce(
          (count, line) => count + (this.isUserMessageTargetLine(line) ? 1 : 0),
          0,
       );
-      const addedLineCount = Math.max(0, lines.length - previousLineCount);
       const addedUserMessage = nextUserMessageTargetCount > previousUserMessageTargetCount;
 
       this.rootLines = lines;
+      this.maxScrollOffset = Math.max(0, lines.length - scrollableRows);
+
       if (addedUserMessage) {
          // A submitted prompt starts a new live tail; follow the response until
          // the user scrolls away.
          this.scrollOffset = 0;
          this.followStreamingOutput = true;
-      } else if (previousLineCount > 0 && addedLineCount > 0 && !this.followStreamingOutput) {
-         // Once the user scrolls away, keep the viewport stable while assistant
-         // output streams so reading is not interrupted.
-         this.scrollOffset += addedLineCount;
+      } else if (previousLineCount > 0 && !this.followStreamingOutput) {
+         // Detached/readback mode: preserve the current top visible transcript
+         // line across streaming re-renders. The previous implementation only
+         // compensated for positive line-count growth (`scrollOffset += added`),
+         // which still allowed small jumps when streamed markdown/wrapping/tool
+         // rows temporarily changed height. Recompute the offset from the old
+         // top line instead, so the viewport stays visually anchored.
+         this.scrollOffset = lines.length - scrollableRows - previousVisibleStart;
       }
+
       this.lastRootLineCount = lines.length;
       this.lastUserMessageTargetCount = nextUserMessageTargetCount;
-      this.maxScrollOffset = Math.max(0, lines.length - scrollableRows);
       this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, this.maxScrollOffset));
 
       return this.updateVisibleRootWindow(scrollableRows);
