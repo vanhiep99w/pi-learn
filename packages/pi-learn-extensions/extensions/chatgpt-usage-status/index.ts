@@ -349,7 +349,13 @@ async function loginChatGptAccount(pi: ExtensionAPI, ctx: any) {
         );
         return value ?? "";
       },
+      onSelect: async (prompt: { message: string; options: Array<{ id: string; label: string }> }) => {
+        const labels = prompt.options.map((option) => option.label);
+        const selected = await ctx.ui.select(prompt.message, labels, { signal: manualInputController.signal });
+        return prompt.options.find((option) => option.label === selected)?.id;
+      },
       onProgress: (message: string) => ctx.ui.notify(message, "info"),
+      signal: manualInputController.signal,
     });
 
     const credential = ctx.modelRegistry.authStorage.get("openai-codex") as Partial<AuthRecord> | undefined;
