@@ -6,7 +6,6 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 
 ## Có gì trong package này?
 
-- `ask-user` — tool để agent hỏi user khi cần clarification.
 - `web-tools` — `web_search`, `web_fetch`, `tool_search`.
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
 - `rtk` — tích hợp RTK: auto-rewrite Bash command + tools `rtk_run`, `rtk_gain`.
@@ -106,6 +105,20 @@ export TAVILY_API_KEY="tvly-..."
 ```
 
 Thêm lâu dài vào `~/.bashrc` hoặc `~/.zshrc` nếu cần.
+
+### Cài tool hỏi user bên ngoài
+
+Package này không còn ship extension `ask-user` tự viết. Nếu cần tool hỏi user có cấu trúc, cài package ngoài:
+
+```bash
+pi install npm:@juicesharp/rpiv-ask-user-question
+```
+
+Tool package này cung cấp:
+
+```txt
+ask_user_question
+```
 
 ### ChatGPT usage
 
@@ -212,7 +225,6 @@ Khi sửa extension trong `.pi/extensions`, sync sang package trước khi relea
 rm -rf packages/pi-learn-extensions/extensions packages/pi-learn-extensions/themes
 mkdir -p packages/pi-learn-extensions/extensions packages/pi-learn-extensions/themes
 
-cp -r .pi/extensions/ask-user packages/pi-learn-extensions/extensions/
 cp -r .pi/extensions/web-tools packages/pi-learn-extensions/extensions/
 cp -r .pi/extensions/chatgpt-usage-status packages/pi-learn-extensions/extensions/
 cp .pi/extensions/aurora-ui.ts packages/pi-learn-extensions/extensions/

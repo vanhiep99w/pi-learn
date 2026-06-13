@@ -43,7 +43,6 @@ Xem hướng dẫn chi tiết ở README root repo:
 
 ```txt
 extensions/
-├── ask-user/
 ├── web-tools/
 ├── chatgpt-usage-status/
 ├── rtk/                 # RTK auto-rewrite + rtk_run/rtk_gain tools

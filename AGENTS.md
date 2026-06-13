@@ -30,7 +30,6 @@ pi-learn/
         ├── package.json               # Package con expose extensions/themes
         ├── README.md
         ├── extensions/
-        │   ├── ask-user/
         │   ├── web-tools/
         │   ├── chatgpt-usage-status/
         │   ├── rtk/
@@ -75,15 +74,6 @@ Các dependency/runtime chính:
 - Một extension local `.pi/extensions/log-llm-payload.ts` dùng import `@earendil-works/pi-coding-agent`; đừng đổi namespace hàng loạt nếu không kiểm tra version Pi đang chạy.
 
 ## Extensions trong package
-
-### `ask-user/`
-
-Đăng ký tool `ask_user` để agent hỏi user khi cần clarification.
-
-- Modes: `input`, `select`, `multiselect`, `confirm`, `editor`.
-- Hỗ trợ batch `questions`, rich options `{ label, description, preview }`, annotation/notes.
-- Tự thêm option `Other…` cho select/multiselect.
-- Có custom UI form khi batch/rich options; simple single question dùng UI built-in.
 
 ### `web-tools/`
 
