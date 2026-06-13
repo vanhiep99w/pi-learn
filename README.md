@@ -53,18 +53,43 @@ Nếu cần bản ổn định cố định, có thể pin tag release, ví dụ
 
 Danh sách thêm ngoài package này:
 
+- `npm:@juicesharp/rpiv-ask-user-question` — tool `ask_user_question` để agent hỏi clarification có cấu trúc.
 - `git:github.com/edxeth/pi-gpt-config` — config/GPT helpers. Local cache: `/home/hieptran/.pi/agent/git/github.com/edxeth/pi-gpt-config`
+
+`pi install` nhận **một source mỗi lần**, nên khi cài nhiều package hãy chạy lần lượt hoặc dùng loop.
 
 Global:
 
 ```bash
-pi install git:github.com/vanhiep99w/pi-learn@main git:github.com/edxeth/pi-gpt-config npm:pi-tool-display npm:pi-mcp-adapter npm:pi-markdown-preview npm:pi-mermaid npm:pi-image-preview
+for pkg in \
+  git:github.com/vanhiep99w/pi-learn@main \
+  npm:@juicesharp/rpiv-ask-user-question \
+  git:github.com/edxeth/pi-gpt-config \
+  npm:pi-tool-display \
+  npm:pi-mcp-adapter \
+  npm:pi-markdown-preview \
+  npm:pi-mermaid \
+  npm:pi-image-preview
+do
+  pi install "$pkg"
+done
 ```
 
 Project-local:
 
 ```bash
-pi install -l git:github.com/vanhiep99w/pi-learn@main git:github.com/edxeth/pi-gpt-config npm:pi-tool-display npm:pi-mcp-adapter npm:pi-markdown-preview npm:pi-mermaid npm:pi-image-preview
+for pkg in \
+  git:github.com/vanhiep99w/pi-learn@main \
+  npm:@juicesharp/rpiv-ask-user-question \
+  git:github.com/edxeth/pi-gpt-config \
+  npm:pi-tool-display \
+  npm:pi-mcp-adapter \
+  npm:pi-markdown-preview \
+  npm:pi-mermaid \
+  npm:pi-image-preview
+do
+  pi install -l "$pkg"
+done
 ```
 
 Sau khi cài, restart Pi hoặc chạy:
