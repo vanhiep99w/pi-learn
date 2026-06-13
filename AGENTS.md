@@ -1,92 +1,260 @@
 # AGENTS.md — Pi Learn Project
 
-## Tổng Quan
+## Tổng quan hiện tại
 
-Đây là project học tập và thực nghiệm Pi Coding Agent — một terminal coding agent mã nguồn mở của Mario Zechner. Project tập trung vào việc xây dựng extensions, custom agents, Aurora Teams, themes, và tài liệu hướng dẫn bằng tiếng Việt.
+`pi-learn` là repo học tập + package phân phối cho Pi Coding Agent. Repo hiện tập trung vào:
 
-## Cấu Trúc Dự Án
+- Tài liệu Pi bằng tiếng Việt trong `docs/`.
+- Bộ extension/theme dùng được qua Pi package Git/GitHub.
+- Tùy biến TUI, web tools, prompt templates, usage status và RTK token-optimized command output.
 
-```
+Repo GitHub/package được ghi trong README: `https://github.com/vanhiep99w/pi-learn`.
+
+## Cấu trúc dự án thực tế
+
+```text
 pi-learn/
-├── .pi/                          # Pi project config
-│   ├── settings.json             # Theme: midnight-aurora
-│   ├── agents/                   # Custom sub-agents (Aurora Teams)
-│   │   ├── scout.md              # Trinh sát codebase (haiku, read-only)
-│   │   ├── planner.md            # Lập kế hoạch implementation (sonnet, read-only)
-│   │   ├── worker.md             # Thực thi code (sonnet, full tools)
-│   │   └── reviewer.md           # Code review (sonnet, read-only)
+├── AGENTS.md
+├── README.md                         # Hướng dẫn cài package, update, release
+├── PI_DOCUMENTATION.md                # Tài liệu tổng hợp dài về Pi
+├── package.json                       # Root Pi package manifest
+├── package-lock.json / bun.lock
+├── .codex/config.toml                 # MCP config local cho Codex
+├── .pi/
 │   ├── extensions/
-│   │   ├── web-tools/            # 🌐 Web search, fetch, librarian
-│   │   ├── aurora-teams/         # 🤖 Multi-agent orchestration
-│   │   ├── aurora-ui.ts          # 🎨 Aurora Teams TUI monitor
-│   │   └── titlebar-spinner.ts   # 🔄 Braille spinner trên terminal title
-│   ├── teams/                    # Aurora team definitions
-│   ├── themes/
-│   │   └── midnight-aurora.json  # Custom dark theme
-│   └── workflows/                # Automation workflows
-├── docs/                         # 📚 Tài liệu Pi bằng tiếng Việt
-│   ├── PI_EXTENSIONS_GUIDE.md
-│   ├── PI_TUI_GUIDE.md
-│   ├── PI_THEMES_GUIDE.md
-│   ├── PI_SKILLS_GUIDE.md
-│   ├── PI_SESSIONS_GUIDE.md
-│   ├── PI_PROMPT_TEMPLATES_GUIDE.md
-│   └── AURORA_TEAMS.md
-├── scripts/                      # Utility scripts
-│   ├── watch-team.sh             # Monitor Aurora team execution
-│   └── aurora-monitor            # TUI monitor binary
-└── landing-page/                 # Landing page project
+│   │   └── log-llm-payload.ts         # Extension local/dev-only log payload LLM
+│   └── logs/llm-payloads/             # Log payload local; coi là nhạy cảm
+├── docs/                              # Tài liệu Pi tiếng Việt, có docs/README.md làm index
+└── packages/
+    └── pi-learn-extensions/
+        ├── package.json               # Package con expose extensions/themes
+        ├── README.md
+        ├── extensions/
+        │   ├── ask-user/
+        │   ├── web-tools/
+        │   ├── chatgpt-usage-status/
+        │   ├── rtk/
+        │   ├── fixed-input-layout/
+        │   ├── aurora-ui.ts
+        │   └── prompt-with-model.ts
+        └── themes/
+            └── midnight-aurora.json
 ```
 
-## Extensions
+Lưu ý: các mục cũ như `.pi/agents`, `.pi/teams`, `scripts/`, `landing-page/`, `aurora-teams` hiện không có trong tree hiện tại. Không giả định chúng tồn tại khi làm việc.
 
-### web-tools (`@pi-learn/web-tools`)
-Extension cung cấp khả năng truy cập web cho Pi agent. Gồm 3 tools:
+## Pi package manifest
+
+Root `package.json` là manifest chính để Pi load package:
+
+```json
+{
+  "pi": {
+    "extensions": ["./packages/pi-learn-extensions/extensions"],
+    "themes": ["./packages/pi-learn-extensions/themes"]
+  }
+}
+```
+
+`packages/pi-learn-extensions/package.json` cũng expose:
+
+```json
+{
+  "pi": {
+    "extensions": ["./extensions"],
+    "themes": ["./themes"]
+  }
+}
+```
+
+Các dependency/runtime chính:
+
+- ESM TypeScript (`"type": "module"`).
+- `@sinclair/typebox` cho schema tool parameters.
+- Pi peer deps hiện đang dùng namespace `@mariozechner/*` trong package source.
+- Một extension local `.pi/extensions/log-llm-payload.ts` dùng import `@earendil-works/pi-coding-agent`; đừng đổi namespace hàng loạt nếu không kiểm tra version Pi đang chạy.
+
+## Extensions trong package
+
+### `ask-user/`
+
+Đăng ký tool `ask_user` để agent hỏi user khi cần clarification.
+
+- Modes: `input`, `select`, `multiselect`, `confirm`, `editor`.
+- Hỗ trợ batch `questions`, rich options `{ label, description, preview }`, annotation/notes.
+- Tự thêm option `Other…` cho select/multiselect.
+- Có custom UI form khi batch/rich options; simple single question dùng UI built-in.
+
+### `web-tools/`
+
+Đăng ký 3 tools:
 
 | Tool | Mô tả |
-|------|--------|
-| `web_search` | Tìm kiếm web qua Tavily API |
-| `web_fetch` | Fetch và parse nội dung từ URL |
-| `tool_search` | Tìm NPM packages phù hợp |
+| --- | --- |
+| `web_search` | Search web; dùng Tavily nếu có `TAVILY_API_KEY`, fallback DuckDuckGo. Hỗ trợ batch `queries` tối đa 5. |
+| `web_fetch` | Fetch URL, đổi GitHub blob → raw, HTTP → HTTPS, HTML → Markdown, hỗ trợ `max_length`, `start_index`, `raw`. |
+| `tool_search` | Liệt kê/tìm tools và slash commands hiện có trong session Pi. |
 
-**Lưu ý khi sửa web-tools:**
-- File chính: `index.ts` (đăng ký tools)
-- Mỗi tool một file riêng: `web-search.ts`, `web-fetch.ts`, `tool-search.ts`
-- Utils dùng chung: `utils.ts` (cache, rate limit), `parsers.ts` (HTML parsing)
-- Cần `TAVILY_API_KEY` env var cho web_search
+Chi tiết kỹ thuật:
 
-- Dùng `ctx.ui?.` (optional chaining) tránh crash khi `ui` chưa init
+- `TAVILY_API_KEY` có thể chứa nhiều key, phân tách bằng dấu phẩy.
+- Cache search/fetch TTL 15 phút, giới hạn cache khoảng 50 entries.
+- Rate limit web-tools: khoảng 15 requests/phút.
 
-### aurora-teams
-Extension multi-agent orchestration. Cho phép định nghĩa team gồm nhiều sub-agents (scout → planner → worker → reviewer) phối hợp hoàn thành task.
+### `chatgpt-usage-status/`
 
-### titlebar-spinner
-Extension nhẹ — hiện braille spinner animation (`⠋⠙⠹…`) trên terminal title khi agent đang xử lý.
+Hiển thị usage ChatGPT Plus/Pro khi provider là `openai-codex` hoặc `chatgpt`.
 
-## Custom Agents (Sub-agents)
+Slash commands:
 
-Dành cho Aurora Teams, 4 agent chuyên biệt:
+- `/chatgpt-login`
+- `/chatgpt-usage`
+- `/chatgpt-usage-refresh`
+- `/chatgpt-accounts`
+- `/chatgpt-switch`
+- `/chatgpt-delete`
+- `/chatgpt-logout`
 
-| Agent | Model | Vai trò | Tools |
-|-------|-------|---------|-------|
-| `scout` | claude-haiku-4-5 | Trinh sát codebase, thu thập context | read, grep, find, ls, bash |
-| `planner` | claude-sonnet-4-5 | Lập kế hoạch chi tiết, KHÔNG sửa code | read, grep, find, ls |
-| `worker` | claude-sonnet-4-5 | Thực thi implementation plan | full tools |
-| `reviewer` | claude-sonnet-4-5 | Review code quality, security | read, grep, find, ls, bash |
+Credential/account data là local, không commit:
+
+```text
+~/.pi/agent/auth.json
+~/.pi/agent/chatgpt-usage-accounts.json
+```
+
+### `rtk/`
+
+Tích hợp RTK để giảm token output từ các command noisy.
+
+- Auto-rewrite `bash`/user bash cho command đơn giản được hỗ trợ, ví dụ `git`, `find`, `grep`, `pytest`, `mvn`, `docker`, `kubectl`, `aws`, ...
+- Không rewrite command có shell control (`|`, `>`, `&&`, newline, `$()`, ...); dùng `bash` trực tiếp cho các case đó.
+- Tools: `rtk_run`, `rtk_gain`.
+- Commands: `/rtk-toggle on|off|status`, `/rtk-status`.
+- Cần binary `rtk` trong PATH hoặc `~/.local/bin/rtk`.
+
+### `aurora-ui.ts`
+
+Tùy biến interactive TUI:
+
+- Startup banner.
+- Bordered custom editor.
+- Fixed input cluster qua `fixed-input-layout/`.
+- Footer tối giản chỉ hiển thị extension statuses.
+- Working messages tiếng Việt cho agent/tool execution.
+- Hiển thị cwd, git branch, git working tree stats.
+- Slash command `/aurora-themes` và keybinding liên quan trong code.
+
+Khi sửa TUI:
+
+- Luôn guard `ctx.hasUI` trước thao tác UI lớn.
+- Dùng `ctx.ui?.` hoặc try/catch ở cleanup để tránh crash khi session thay đổi.
+- Cleanup timer/compositor trong `dispose` hoặc `session_shutdown`.
+
+### `prompt-with-model.ts`
+
+Extension prompt template nâng cao:
+
+- Scan prompt Markdown ở:
+  - `~/.pi/agent/model-prompts/`
+  - `.pi/agent/model-prompts/`
+- Mỗi file `.md` tạo một slash command theo tên file.
+- Frontmatter hỗ trợ: `model`, `thinking`, `description`, `argument-hint`.
+- Có thể auto switch model → chạy prompt → restore model/thinking.
+- Không dùng folder core `prompts/` để tránh trùng cơ chế prompt template mặc định của Pi.
+- Wizard commands: `/prompt-create`, `/prompt-edit`.
+
+### `.pi/extensions/log-llm-payload.ts`
+
+Extension local/dev-only ghi payload trước request provider vào:
+
+```text
+.pi/logs/llm-payloads/*.json
+```
+
+Các file này có thể chứa prompt, context, path, metadata nhạy cảm. Không đọc/commit/chia sẻ trừ khi user yêu cầu rõ.
 
 ## Theme
 
-**midnight-aurora** — Dark theme với bảng màu aurora borealis:
-- Background: `#111827` (deep navy)
-- Accent: sky blue (`#5dc8f5`)
-- Border: blue/cyan gradient
-- Success: lime, Error: red, Warning: yellow
+Theme hiện tại: `midnight-aurora` tại `packages/pi-learn-extensions/themes/midnight-aurora.json`.
 
-## Quy Tắc Khi Làm Việc
+Màu chính hiện tại:
 
-1. **Ngôn ngữ:** Comments và docs có thể bằng tiếng Việt. Code identifiers bằng tiếng Anh.
-2. **Extensions:** Luôn dùng optional chaining (`ctx.ui?.`) cho UI methods để tránh crash khi context chưa ready.
-3. **Testing:** Restart pi sau khi sửa extension (`ctrl+c` rồi chạy lại `pi`).
-4. **Docs:** Tài liệu Pi bằng tiếng Việt nằm trong `docs/` — tham khảo trước khi hỏi.
-5. **Theme:** Project dùng theme `midnight-aurora` — dùng theme colors chứ không hard-code ANSI.
-6. **Terminal:** User dùng XFCE4 Terminal (không hỗ trợ inline image). Các feature cần image protocol sẽ không hoạt động.
+- Background: `#0b1020`
+- Surface: `#121a2f`
+- Accent: `auroraCyan` / `#3fbfba`
+- Border: `userPanelBorder` / `#5d7cff`
+- Success: `auroraGreen`
+- Warning: `gold`
+- Error: `coral`
+
+Khi sửa UI/theme:
+
+- Ưu tiên dùng token màu từ theme (`theme.fg(...)`, tên color trong JSON).
+- Không hard-code ANSI escape nếu có API theme/TUI phù hợp.
+
+## Docs
+
+`docs/README.md` là index chính cho tài liệu tiếng Việt. Bộ docs hiện ghi chú cập nhật theo Pi docs chính thức `earendil-works/pi` ngày `2026-05-19`.
+
+Nhóm docs quan trọng:
+
+- Bắt đầu/sử dụng: `PI_QUICKSTART_GUIDE.md`, `PI_USAGE_GUIDE.md`, `PI_KEYBINDINGS_GUIDE.md`.
+- Cấu hình/models: `PI_PROVIDERS_GUIDE.md`, `PI_MODELS_GUIDE.md`, `PI_SETTINGS_GUIDE.md`.
+- Mở rộng Pi: `PI_EXTENSIONS_GUIDE.md`, `PI_SKILLS_GUIDE.md`, `PI_PROMPT_TEMPLATES_GUIDE.md`, `PI_THEMES_GUIDE.md`, `PI_PACKAGES_GUIDE.md`, `PI_TUI_GUIDE.md`, `PI_TOOLS_GUIDE.md`.
+- Sessions/context: `PI_SESSIONS_GUIDE.md`, `PI_SESSION_FORMAT_GUIDE.md`, `PI_COMPACTION_GUIDE.md`.
+- Integration: `PI_SDK_GUIDE.md`, `PI_RPC_GUIDE.md`, `PI_JSON_MODE_GUIDE.md`.
+- Platform: Windows/Termux/tmux/terminal/shell aliases.
+
+Khi thêm/sửa docs:
+
+- Viết tiếng Việt rõ ràng, có ví dụ command/config thực tế.
+- Cập nhật `docs/README.md` nếu thêm file mới.
+- Không để docs mâu thuẫn với README/package manifest hiện tại.
+
+## Workflow cài đặt, test, update
+
+Cài package từ GitHub:
+
+```bash
+pi install git:github.com/vanhiep99w/pi-learn@main
+```
+
+Test tạm không ghi settings:
+
+```bash
+pi -e git:github.com/vanhiep99w/pi-learn@main
+```
+
+Sau khi sửa extension/theme, restart Pi hoặc chạy trong Pi:
+
+```text
+/reload
+```
+
+Update package đã cài theo `@main`:
+
+```bash
+pi update
+```
+
+Release ổn định nếu cần:
+
+```bash
+git tag v1.0.2
+git push origin v1.0.2
+```
+
+Repo hiện chưa có script test/build trong `package.json`. Khi cần kiểm tra code TypeScript, ưu tiên chạy Pi thực tế hoặc thêm script kiểm tra có chủ đích thay vì giả định có sẵn `npm test`.
+
+## Quy tắc làm việc trong repo
+
+1. **Ngôn ngữ:** docs/comments có thể dùng tiếng Việt; code identifiers dùng tiếng Anh.
+2. **Source of truth:** extension/theme public nằm trong `packages/pi-learn-extensions/`. `.pi/extensions/` hiện chỉ có extension local/dev-only.
+3. **UI safety:** luôn dùng `ctx.hasUI` và/hoặc `ctx.ui?.` cho UI operations; cleanup timers/listeners/compositor.
+4. **Secrets/logs:** không commit token, auth files, `.pi/logs/llm-payloads/*.json`, hoặc nội dung payload nhạy cảm.
+5. **Web tools:** `TAVILY_API_KEY` là optional; code phải fallback được sang DuckDuckGo.
+6. **RTK:** dùng `rtk_run` cho lệnh noisy đơn giản; dùng `bash` khi cần pipe/redirect/env/compound shell.
+7. **Terminal:** user dùng XFCE4 Terminal; không dựa vào inline image protocol.
+8. **Package versions:** nếu bump version, giữ root `package.json` và `packages/pi-learn-extensions/package.json` đồng bộ khi phù hợp.
+9. **Imports:** giữ style import hiện có theo từng extension; không migrate namespace Pi package nếu chưa kiểm tra compatibility.
+10. **Docs trước khi sửa Pi API:** nếu đụng extension/theme/TUI/package behavior, đọc docs liên quan trong `docs/` và/hoặc docs Pi chính thức cài local trước khi thay đổi lớn.
