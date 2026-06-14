@@ -453,8 +453,8 @@ async function runCreateWizard(args: string | undefined, ctx: ExtensionCommandCo
   }
 
   const initialRequest = args?.trim() || await ctx.ui.editor(
-    "🪄 Mô tả prompt bạn muốn tạo. Pi sẽ tự gen tên, model, thinking, body:",
-    "Ví dụ: tạo prompt review code TypeScript thật kỹ, output tiếng Việt, có severity và checklist.",
+    "🪄 Mô tả prompt bạn muốn tạo. Pi sẽ tự gen tên, model, thinking, body. Nhập nội dung của bạn bên dưới:",
+    "",
   );
   if (!initialRequest?.trim()) return;
 
