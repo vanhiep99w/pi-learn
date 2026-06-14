@@ -3,6 +3,7 @@ import { parseSessionFile } from "../session/parse-session.js";
 import { buildSessionTree } from "../session/tree.js";
 import { normalizeSessionEvents } from "../normalize/events.js";
 import { computeSessionMetrics } from "../metrics/session-metrics.js";
+import { collectNormalizeWarnings, enrichWarnings } from "../session/warnings.js";
 import { atomicWriteJson, atomicWriteJsonl, ensureDir } from "./atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "./harness-home.js";
 
@@ -15,7 +16,11 @@ export async function writeSessionCache({ sessionFile, config, project, logger }
 
   const parsed = await parseSessionFile(sessionFile);
   const tree = buildSessionTree(parsed.entries, sessionFile);
-  const warnings = [...parsed.warnings, ...tree.warnings];
+  const warnings = enrichWarnings([
+    ...parsed.warnings,
+    ...tree.warnings,
+    ...collectNormalizeWarnings(parsed),
+  ], { parsed, project });
 
   logger?.info("parse_end", "Parsed session JSONL", {
     component: "parser",

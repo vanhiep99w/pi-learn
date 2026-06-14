@@ -15,6 +15,8 @@
 > Roadmap chi tiết + current status: [`roadmap.md`](./roadmap.md).
 >
 > Harness observability/self-improvement logs: [`harness-observability.md`](./harness-observability.md).
+>
+> Plan chuyển primary UX từ CLI sang Pi extension: [`extension-migration-plan.md`](./extension-migration-plan.md).
 
 ---
 

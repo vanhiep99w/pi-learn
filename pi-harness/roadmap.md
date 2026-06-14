@@ -11,15 +11,22 @@
 Trạng thái hiện tại của `pi-harness` trong repo này:
 
 ```txt
-Status: Phase 3 normalize cache writer implemented
+Status: Phase 8 LLM reflection MVP and Phase 9 controlled apply MVP implemented
 Runtime implementation: packages/harness-runtime
-CLI: implemented for doctor/config/project resolve/sessions/inspect/scan
-Pi extension: not implemented
+CLI: implemented for doctor/config/project resolve/sessions/inspect/scan/report/reflect/propose/proposals/show/approve/reject/apply/rollback/history
+Pi extension: implemented wrapper commands under packages/pi-learn-extensions/extensions/harness/
 Parser: implemented for full JSONL parse, tree, active path
 Normalized cache: implemented for manifest/events/metrics/warnings
-Harness logging: implemented minimal runtime/self-improvement/error-capable JSONL logger
-Rules engine: not implemented
-Apply/eval loop: not implemented
+Report: implemented Markdown latest + dated report from normalized cache
+Inspect: implemented `inspect --entry <id> --full` with redaction by default
+Harness logging: implemented minimal runtime/self_improvement/error-capable JSONL logger
+Rules engine: implemented MVP detectors for repeated bash failures, repeated tool errors, sensitive path access and parser warnings
+Proposal writer: implemented private draft Markdown proposals with evidence refs, dedupe fingerprints, test and rollback plans
+Memory drafts: implemented private `memory/draft.jsonl` writer for reviewed memory candidates
+Targeted improvements: implemented `propose --target memory|rules|parser|redaction`
+Pi wrapper: implemented `/harness-report`, `/harness-last`, `/harness-warnings`, `/harness-propose`, `/harness-proposals`, `/harness-note`, `/harness-tag`
+Apply loop: controlled MVP implemented with approval, proposal history, target allowlist, git branch, patch apply and rollback
+Eval loop: not implemented
 ```
 
 Docs/spec đã có:
@@ -32,6 +39,7 @@ pi-harness/
 ├── config.md                       # config spec
 ├── improvement-matrix.md           # signal → target → improvement mapping
 ├── harness-observability.md        # harness runtime/audit/error logs for self-improvement
+├── extension-migration-plan.md     # plan chuyển primary UX từ CLI sang Pi extension
 └── roadmap.md                      # file này
 ```
 
@@ -115,14 +123,14 @@ packages/harness-runtime/src/metrics/session-metrics.js
 packages/harness-runtime/src/storage/cache-writer.js
 ```
 
-Việc còn thiếu trước Phase 4:
+Việc còn thiếu sau Phase 8/9 MVP:
 
 ```txt
-- implement Markdown report generator
-- implement show-cache command if still needed
-- implement inspect full entry by rawRef
-- improve redaction policy with more fixtures if needed
+- extend proposal history with richer review notes if needed
+- add more target detectors for user corrections, .pi/logs staging, long sessions/compaction
+- add more redaction fixtures if needed
 - decide whether to add npm workspace wiring at root
+- optionally implement show-cache command if still useful
 ```
 
 Deferred/explicitly reserved until Phase 3+:
@@ -530,8 +538,8 @@ harness show-cache --project . --session <session-id>
 
 ### Tasks
 
-- [ ] Generate Markdown report from cached metrics/events.
-- [ ] Report summary:
+- [x] Generate Markdown report from cached metrics/events.
+- [x] Report summary:
   ```txt
   sessions scanned
   turns/messages
@@ -543,10 +551,10 @@ harness show-cache --project . --session <session-id>
   warnings
   safety findings
   ```
-- [ ] Implement `inspect --entry` from rawRef.
-- [ ] Redact by default even for `--full`.
-- [ ] Add explicit warning for `--no-redact` if ever supported.
-- [ ] Write `reports/latest.md`.
+- [x] Implement `inspect --entry` from rawRef.
+- [x] Redact by default even for `--full`.
+- [x] Keep `--no-redact` reserved; cache/log/full inspect output remains redacted for safety.
+- [x] Write `reports/latest.md`.
 
 ### Output
 
@@ -580,11 +588,18 @@ harness show P-0001
 
 ### Initial rules
 
+Implemented MVP rules:
+
 ```txt
 - repeated bash failure
-- repeated edit tool oldText mismatch
+- repeated edit/tool error pattern, including edit oldText mismatch
 - sensitive path access
-- parser warning repeated
+- parser/normalizer warning pattern
+```
+
+Still planned rules:
+
+```txt
 - redaction warning repeated
 - user correction repeated
 - .pi/logs staged/mentioned in commit workflow
@@ -593,13 +608,13 @@ harness show P-0001
 
 ### Tasks
 
-- [ ] Implement rule engine.
-- [ ] Implement rule config loader.
-- [ ] Implement evidence refs.
-- [ ] Implement proposal writer.
-- [ ] Implement dedupe by fingerprint.
-- [ ] Add risk classification.
-- [ ] Add target routing using improvement matrix.
+- [x] Implement rule engine.
+- [x] Implement rule config loader.
+- [x] Implement evidence refs.
+- [x] Implement proposal writer.
+- [x] Implement dedupe by fingerprint.
+- [x] Add risk classification.
+- [x] Add target routing using improvement matrix.
 
 ### Output
 
@@ -638,18 +653,26 @@ eval
 harness propose --project . --target memory
 harness propose --project . --target rules
 harness propose --project . --target parser
+harness propose --project . --target redaction
 ```
 
 ### Tasks
 
-- [ ] Generate MemoryItem drafts.
-- [ ] Generate rule add/tune/disable proposals.
-- [ ] Generate parser warning proposals.
-- [ ] Generate redaction warning proposals.
-- [ ] Track proposal source rule/signal.
-- [ ] Track accepted/rejected proposal history.
+- [x] Generate MemoryItem drafts.
+- [x] Generate rule add/tune/disable proposals.
+- [x] Generate parser warning proposals.
+- [x] Generate redaction warning proposals.
+- [x] Track proposal source rule/signal in proposal metadata.
+
+Deferred to Phase 9 controlled apply/proposal lifecycle:
+
+```txt
+- Track accepted/rejected proposal history.
+```
 
 ### Definition of Done
+
+Status: done for MVP.
 
 Harness can say:
 
@@ -665,9 +688,11 @@ without applying automatically.
 
 ## 11. Phase 7 — Pi extension wrapper
 
+> Detailed migration plan: [`extension-migration-plan.md`](./extension-migration-plan.md).
+
 ### Mục tiêu
 
-Expose existing CLI/runtime through Pi slash commands.
+Chuyển primary UX sang Pi slash commands, trong khi CLI giữ vai trò dev/debug/automation fallback.
 
 Không implement business logic riêng trong extension. Extension gọi core runtime.
 
@@ -677,6 +702,7 @@ Không implement business logic riêng trong extension. Extension gọi core run
 /harness-report
 /harness-last
 /harness-warnings
+/harness-propose [rules|memory|rule-config|parser|redaction] [last]
 /harness-proposals
 /harness-note <text>
 /harness-tag success|failure <reason>
@@ -684,14 +710,15 @@ Không implement business logic riêng trong extension. Extension gọi core run
 
 ### Tasks
 
-- [ ] Add extension source under package if integrating into `pi-learn`.
-- [ ] Register slash commands.
-- [ ] Guard UI calls with `ctx.hasUI` / `ctx.ui?.`.
-- [ ] `/harness-report` calls runtime report.
-- [ ] `/harness-warnings` shows parser warnings summary.
-- [ ] `/harness-proposals` lists draft proposals.
-- [ ] `/harness-note` writes custom note/memory draft.
-- [ ] `/harness-tag` appends label/custom entry.
+- [x] Add extension source under package if integrating into `pi-learn`.
+- [x] Register slash commands.
+- [x] Guard UI calls with `ctx.hasUI` / `ctx.ui?.`.
+- [x] `/harness-report` calls runtime report.
+- [x] `/harness-warnings` shows parser warnings summary.
+- [x] `/harness-propose` calls runtime rule/target proposal generation.
+- [x] `/harness-proposals` lists draft proposals.
+- [x] `/harness-note` appends custom note entry.
+- [x] `/harness-tag` appends label/custom entry.
 
 ### Definition of Done
 
@@ -727,17 +754,31 @@ Pi:
 
 ### Tasks
 
-- [ ] Select excerpts from events, not raw session full text.
-- [ ] Include evidence refs.
-- [ ] Enforce max excerpt chars.
-- [ ] Enforce redaction.
-- [ ] Prompt LLM to avoid weak proposals.
-- [ ] Save output as draft proposal.
-- [ ] Never apply automatically.
+- [x] Select excerpts from events, not raw session full text.
+- [x] Include evidence refs.
+- [x] Enforce max excerpt chars.
+- [x] Enforce redaction.
+- [x] Prompt LLM to avoid weak proposals.
+- [x] Save reflection prompt under private harness home.
+- [x] Pi extension path using the current Pi session model via `/harness-reflect-pi` + `harness_import_llm_reflection` tool.
+- [x] Runtime stays API-key free; no separate LLM provider credentials in harness runtime.
+- [x] Import LLM JSON response as draft proposals.
+- [x] Validate imported proposals include evidence refs, target files, risk, test plan and rollback.
+- [x] Never apply automatically.
+
+### Output
+
+```txt
+~/.pi/harness/projects/<project-key>/reflections/latest.md
+~/.pi/harness/projects/<project-key>/reflections/YYYY-MM-DD-reflection-prompt.md
+~/.pi/harness/projects/<project-key>/proposals/draft/P-0001-*.md
+```
 
 ### Definition of Done
 
-LLM-generated proposal:
+Status: done for MVP.
+
+LLM-assisted proposal import requires:
 
 ```txt
 - has evidence refs
@@ -755,6 +796,8 @@ LLM-generated proposal:
 ### Mục tiêu
 
 Apply approved proposals safely.
+
+Status: done for MVP.
 
 ### Commands
 
@@ -787,12 +830,26 @@ Pi:
 9. Never push unless user explicitly asks.
 ```
 
+### Tasks
+
+- [x] Add proposal lifecycle commands: `approve`, `reject`, `history`.
+- [x] Append accepted/rejected/applied/rolled_back events to private `proposals/history.jsonl`.
+- [x] Require approved status before apply.
+- [x] Require git repository and clean worktree by default.
+- [x] Create/use branch `harness/P-0001` before applying.
+- [x] Apply only machine-readable `## Patch` JSON entries.
+- [x] Enforce proposal target file allowlist and project-root containment.
+- [x] Run extracted backticked test commands from `## Test plan` unless `--skip-tests` is passed.
+- [x] Support optional `--commit` with proposal id in commit message.
+- [x] Support rollback for uncommitted applies and committed applies.
+- [x] Add Pi wrapper commands: `/harness-approve`, `/harness-reject`, `/harness-apply`, `/harness-history`.
+
 ### Definition of Done
 
-- Apply cannot touch files outside proposal target list.
-- Failed tests prevent commit.
-- Rollback command documented.
-- Commit references proposal id and evidence.
+- [x] Apply cannot touch files outside proposal target list.
+- [x] Failed tests prevent commit.
+- [x] Rollback command documented.
+- [x] Commit references proposal id and evidence.
 
 ---
 
@@ -906,26 +963,14 @@ Do not enter next phase unless gate passes.
 Immediate recommended next steps:
 
 ```txt
-1. Decide implementation location:
-   A. package riêng
-   B. packages/harness-runtime trong repo này
-   C. extension-only under packages/pi-learn-extensions
-
-2. Decide CLI/package name:
-   CLI: harness
-   Package: @pi-learn/harness-runtime
-
-3. Create runtime skeleton.
-
-4. Implement:
-   harness doctor
-   harness config print
-   harness project resolve --project .
-
-5. Then implement session discovery.
+1. Start Phase 5 rule engine and deterministic proposal writer.
+2. Implement evidence refs from normalized events/warnings.
+3. Add proposal draft writer under private harness home.
+4. Add dedupe/fingerprint for repeated findings.
+5. Keep Pi extension as wrapper later; do not duplicate core logic there.
 ```
 
-Recommended choice:
+Current implementation choice:
 
 ```txt
 Location: packages/harness-runtime
@@ -1002,14 +1047,10 @@ MVP must guarantee:
 Updated roadmap:
 
 ```txt
-Current: docs/spec stage
-Next: runtime skeleton
-Then: session discovery → parser/tree → normalized cache → report/inspect
-Then: deterministic rules/proposals
-Then: Pi extension wrapper
-Then: LLM reflection
-Then: controlled apply/eval
-Finally: gated automation
+Current: Phase 8 LLM reflection MVP + Phase 9 controlled apply MVP implemented
+Next: Phase 10 eval harness
+Then: gated automation
+Finally: broader auto-improvement only after eval gates
 ```
 
 Most important sequencing rule:

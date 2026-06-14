@@ -40,6 +40,31 @@ test("writeSessionCache writes manifest events metrics and warnings", async () =
   assert.equal(events.every((event) => event.rawRef?.sessionFile === sessionFile), true);
 });
 
+test("writeSessionCache enriches normalize warnings with project and session ids", async () => {
+  const fixture = createFixture();
+  const sessionFile = path.join(fixture.sessionDir, "unknown-session.jsonl");
+  const timestamp = "2026-06-14T01:00:00.000Z";
+  fs.writeFileSync(sessionFile, [
+    JSON.stringify({ type: "session", version: 3, id: "s-warn", cwd: fs.realpathSync(fixture.project), timestamp }),
+    JSON.stringify({ type: "usage_snapshot", id: "u1", parentId: null, timestamp }),
+    JSON.stringify({ type: "message", id: "m1", parentId: "u1", timestamp, message: { role: "alien", content: "hi" } }),
+  ].join("\n") + "\n");
+
+  const project = resolveProject(fixture.project);
+  const result = await writeSessionCache({
+    sessionFile,
+    config: { harnessHome: fixture.harnessHome, redact: true, logging: { enabled: false } },
+    project,
+  });
+
+  const warnings = fs.readFileSync(result.paths.warnings, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(warnings.length, 2);
+  assert.equal(warnings[0].projectKey, project.projectKey);
+  assert.equal(warnings[0].sessionId, "s-warn");
+  assert.equal(warnings.some((warning) => warning.code === "unknown_entry_type"), true);
+  assert.equal(warnings.some((warning) => warning.code === "unknown_message_role"), true);
+});
+
 test("writeSessionCache redacts event excerpts", async () => {
   const fixture = createFixture();
   const sessionFile = path.join(fixture.sessionDir, "secret-session.jsonl");

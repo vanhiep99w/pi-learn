@@ -59,14 +59,20 @@ export function createLogger({ config, command, project } = {}) {
 
 function appendLog(logDir, stream, event) {
   const day = event.timestamp.slice(0, 10);
-  const file = path.join(logDir, stream, `${day}.jsonl`);
+  const file = path.join(logDir, folderForStream(stream), `${day}.jsonl`);
   ensureDir(path.dirname(file));
   fs.appendFileSync(file, `${JSON.stringify(event)}\n`);
 }
 
 function streamForLevel(level, event) {
   if (level === "audit") return "audit";
-  if (level === "error") return "errors";
-  if (/warning|proposal|rule|redaction|parser/.test(event)) return "self-improvement";
+  if (level === "error") return "error";
+  if (/warning|proposal|rule|redaction|parser/.test(event)) return "self_improvement";
   return "runtime";
+}
+
+function folderForStream(stream) {
+  if (stream === "error") return "errors";
+  if (stream === "self_improvement") return "self-improvement";
+  return stream;
 }

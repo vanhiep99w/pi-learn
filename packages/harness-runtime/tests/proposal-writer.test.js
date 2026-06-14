@@ -1,0 +1,70 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { writeDraftProposals, readDraftProposals, findDraftProposal, renderProposalMarkdown } from "../src/proposals/proposal-writer.js";
+
+test("writeDraftProposals writes markdown and dedupes by fingerprint", () => {
+  const fixture = createFixture();
+  const proposal = createProposal({ fingerprint: "fp-1" });
+
+  const first = writeDraftProposals({ config: fixture.config, project: fixture.project, proposals: [proposal] });
+  assert.equal(first.written.length, 1);
+  assert.equal(first.skipped.length, 0);
+  assert.equal(fs.existsSync(first.written[0].filePath), true);
+
+  const second = writeDraftProposals({ config: fixture.config, project: fixture.project, proposals: [proposal] });
+  assert.equal(second.written.length, 0);
+  assert.equal(second.skipped.length, 1);
+
+  const drafts = readDraftProposals({ config: fixture.config, project: fixture.project });
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].id, "P-0001");
+  assert.equal(drafts[0].fingerprint, "fp-1");
+
+  const found = findDraftProposal({ config: fixture.config, project: fixture.project, id: "P-0001" });
+  assert.equal(found?.title, proposal.title);
+});
+
+test("renderProposalMarkdown includes required evidence/test/rollback sections", () => {
+  const markdown = renderProposalMarkdown({ id: "P-9999", status: "draft", ...createProposal({ fingerprint: "fp-2" }) });
+
+  assert.match(markdown, /^---\n/);
+  assert.match(markdown, /# P-9999 — Test proposal/);
+  assert.match(markdown, /## Evidence/);
+  assert.match(markdown, /entry: e1/);
+  assert.match(markdown, /## Test plan/);
+  assert.match(markdown, /## Rollback/);
+});
+
+function createFixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-proposals-"));
+  return {
+    config: { harnessHome: root },
+    project: { projectKey: "project-test" },
+  };
+}
+
+function createProposal({ fingerprint }) {
+  return {
+    ruleId: "R-test",
+    title: "Test proposal",
+    target: "agents",
+    targetFiles: ["AGENTS.md"],
+    risk: "low",
+    problem: "Problem text",
+    proposedChange: "Proposed change text",
+    testPlan: ["Run tests"],
+    rollbackPlan: "Revert change",
+    evidence: [{
+      sessionId: "s1",
+      sessionFile: "/tmp/session.jsonl",
+      entryId: "e1",
+      timestamp: "2026-06-14T00:00:00.000Z",
+      kind: "tool_result",
+      excerpt: "oldText did not match",
+    }],
+    fingerprint,
+  };
+}
