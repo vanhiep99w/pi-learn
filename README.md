@@ -8,6 +8,7 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 
 - `web-tools` — `web_search`, `web_fetch`, `tool_search`.
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
+- `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
 - `aurora-ui` — custom input border + ChatGPT usage badge.
 - `midnight-aurora` — theme dark custom.
 
@@ -169,6 +170,49 @@ Credential lưu local, không commit:
 ~/.pi/agent/chatgpt-usage-accounts.json
 ```
 
+### Model prompt templates
+
+Extension `prompt-with-model` cho phép tạo slash command từ file Markdown nhưng có thêm frontmatter `model` và `thinking` riêng cho từng prompt.
+
+Nơi scan prompt:
+
+```txt
+~/.pi/agent/model-prompts/*.md      # global
+.pi/agent/model-prompts/*.md        # project-local
+```
+
+Lệnh chính:
+
+```txt
+/prompt-create <ý tưởng prompt>      # AI tự viết prompt, cho preview/edit trước khi lưu
+/prompt-edit                         # sửa prompt hiện có
+/prompt-model                        # chọn prompt rồi đổi model/thinking
+/prompt-model <prompt> <provider/model|clear>
+```
+
+Ví dụ frontmatter:
+
+```md
+---
+description: "Review code và chỉ ra rủi ro chính"
+argument-hint: "<file-or-scope>"
+model: "anthropic/claude-sonnet-4-20250514"
+thinking: "high"
+---
+
+Review phạm vi sau và trả lời có cấu trúc:
+
+$@
+```
+
+Ghi chú:
+
+- `/prompt-create` chỉ cần bạn nhập ý tưởng; AI sẽ sinh `name`, `description`, `argument-hint`, `model`, `thinking` và nội dung prompt.
+- Trước khi lưu, Pi mở editor preview để bạn sửa trực tiếp.
+- Khi chạy prompt có `model`, extension sẽ thông báo nổi bật `🤖 MODEL SWITCH`, đổi model tạm thời, chạy prompt, rồi restore model ban đầu.
+- Autocomplete của slash command hiển thị `🤖 current` hoặc `🤖 provider/model`, và `🧠 <thinking>` nếu có.
+- Sau khi thêm/sửa prompt hoặc đổi model, chạy `/reload` để cập nhật danh sách/mô tả slash command.
+
 ## Update / remove
 
 Xem package đã cài:
@@ -237,6 +281,7 @@ mkdir -p packages/pi-learn-extensions/extensions packages/pi-learn-extensions/th
 
 cp -r .pi/extensions/web-tools packages/pi-learn-extensions/extensions/
 cp -r .pi/extensions/chatgpt-usage-status packages/pi-learn-extensions/extensions/
+cp .pi/extensions/prompt-with-model.ts packages/pi-learn-extensions/extensions/
 cp .pi/extensions/aurora-ui.ts packages/pi-learn-extensions/extensions/
 cp .pi/themes/midnight-aurora.json packages/pi-learn-extensions/themes/
 ```

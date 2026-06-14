@@ -46,6 +46,7 @@ extensions/
 ├── web-tools/
 ├── chatgpt-usage-status/
 ├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
+├── prompt-with-model.ts # AI prompt creator + per-prompt model/thinking
 └── aurora-ui.ts         # fixed input cluster + bordered editor
 
 themes/
