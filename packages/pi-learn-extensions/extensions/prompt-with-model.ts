@@ -251,6 +251,14 @@ function sameModel(a: Model<any> | undefined, b: Model<any> | undefined): boolea
   return a.provider === b.provider && a.id === b.id;
 }
 
+function modelLabel(model: Model<any> | undefined): string {
+  return model ? `${model.provider}/${model.id}` : "<none>";
+}
+
+function modelSpecLabel(spec: string | undefined): string {
+  return spec?.trim() || "model hiện tại";
+}
+
 function parseArgs(args: string): string[] {
   const out: string[] = [];
   let current = "";
@@ -668,9 +676,14 @@ async function runPromptModel(args: string | undefined, ctx: ExtensionCommandCon
       : thinkingChoice as ThinkingLevel;
 
   const current = readFileSync(target.filePath, "utf-8");
+  const before = parseFrontmatter(current).fm;
   const updated = updateFrontmatter(current, { model: chosenModel, thinking });
   writeFileSync(target.filePath, updated, "utf-8");
-  ctx.ui.notify(`✅ Đã đổi model cho /${target.name}. Chạy /reload để áp dụng mô tả command mới.`, "info");
+  const after = parseFrontmatter(updated).fm;
+  ctx.ui.notify(
+    `🤖 /${target.name}\nMODEL: ${modelSpecLabel(before.model)} → ${modelSpecLabel(after.model)}\nTHINKING: ${before.thinking || "giữ nguyên/current"} → ${after.thinking || "current"}\nChạy /reload để áp dụng mô tả command mới.`,
+    "warning",
+  );
 }
 
 export default function promptWithModelExtension(pi: ExtensionAPI) {
@@ -715,8 +728,9 @@ export default function promptWithModelExtension(pi: ExtensionAPI) {
 
   for (const prompt of map.values()) {
     const hint = prompt.argumentHint ? ` ${prompt.argumentHint}` : "";
-    const tag = prompt.model ? ` [${prompt.model}]` : "";
-    const desc = `${hint}${hint ? " — " : ""}${prompt.description}${tag} (${prompt.source})`;
+    const tag = prompt.model ? ` 🤖 ${prompt.model}` : " 🤖 current";
+    const thinkingTag = prompt.thinking ? ` 🧠 ${prompt.thinking}` : "";
+    const desc = `${hint}${hint ? " — " : ""}${prompt.description}${tag}${thinkingTag} (${prompt.source})`;
 
     pi.registerCommand(prompt.name, {
       description: desc,
@@ -739,7 +753,10 @@ export default function promptWithModelExtension(pi: ExtensionAPI) {
                 return;
               }
               switched = true;
-              ctx.ui?.notify(`Switched to ${selected.model.provider}/${selected.model.id}`, "info");
+              ctx.ui?.notify(
+                `🤖 MODEL SWITCH for /${prompt.name}\n${modelLabel(original)} → ${modelLabel(selected.model)}${prompt.thinking ? `\n🧠 thinking → ${prompt.thinking}` : ""}`,
+                "warning",
+              );
             }
           }
 
@@ -761,8 +778,12 @@ export default function promptWithModelExtension(pi: ExtensionAPI) {
           if (prompt.thinking && originalThinking !== pi.getThinkingLevel()) pi.setThinkingLevel(originalThinking);
           if (switched && original) {
             const ok = await pi.setModel(original);
-            if (ok) ctx.ui?.notify(`Restored to ${original.provider}/${original.id}`, "info");
-            else ctx.ui?.notify(`Failed to restore ${original.provider}/${original.id}`, "error");
+            if (ok) {
+              ctx.ui?.notify(
+                `↩️ MODEL RESTORED after /${prompt.name}\n${modelSpecLabel(prompt.model)} → ${modelLabel(original)}${prompt.thinking ? `\n🧠 thinking restored → ${originalThinking}` : ""}`,
+                "info",
+              );
+            } else ctx.ui?.notify(`Failed to restore ${original.provider}/${original.id}`, "error");
           }
         }
       },
