@@ -6,7 +6,7 @@
 
 - Tài liệu Pi bằng tiếng Việt trong `docs/`.
 - Bộ extension/theme dùng được qua Pi package Git/GitHub.
-- Tùy biến TUI, web tools, prompt templates, usage status và RTK token-optimized command output.
+- Tùy biến TUI, web tools, prompt templates và usage status.
 
 Repo GitHub/package được ghi trong README: `https://github.com/vanhiep99w/pi-learn`.
 
@@ -32,7 +32,6 @@ pi-learn/
         ├── extensions/
         │   ├── web-tools/
         │   ├── chatgpt-usage-status/
-        │   ├── rtk/
         │   ├── fixed-input-layout/
         │   ├── aurora-ui.ts
         │   └── prompt-with-model.ts
@@ -111,16 +110,6 @@ Credential/account data là local, không commit:
 ~/.pi/agent/auth.json
 ~/.pi/agent/chatgpt-usage-accounts.json
 ```
-
-### `rtk/`
-
-Tích hợp RTK để giảm token output từ các command noisy.
-
-- Auto-rewrite `bash`/user bash cho command đơn giản được hỗ trợ, ví dụ `git`, `find`, `grep`, `pytest`, `mvn`, `docker`, `kubectl`, `aws`, ...
-- Không rewrite command có shell control (`|`, `>`, `&&`, newline, `$()`, ...); dùng `bash` trực tiếp cho các case đó.
-- Tools: `rtk_run`, `rtk_gain`.
-- Commands: `/rtk-toggle on|off|status`, `/rtk-status`.
-- Cần binary `rtk` trong PATH hoặc `~/.local/bin/rtk`.
 
 ### `aurora-ui.ts`
 
@@ -243,8 +232,7 @@ Repo hiện chưa có script test/build trong `package.json`. Khi cần kiểm t
 3. **UI safety:** luôn dùng `ctx.hasUI` và/hoặc `ctx.ui?.` cho UI operations; cleanup timers/listeners/compositor.
 4. **Secrets/logs:** không commit token, auth files, `.pi/logs/llm-payloads/*.json`, hoặc nội dung payload nhạy cảm.
 5. **Web tools:** `TAVILY_API_KEY` là optional; code phải fallback được sang DuckDuckGo.
-6. **RTK:** dùng `rtk_run` cho lệnh noisy đơn giản; dùng `bash` khi cần pipe/redirect/env/compound shell.
-7. **Terminal:** user dùng XFCE4 Terminal; không dựa vào inline image protocol.
-8. **Package versions:** nếu bump version, giữ root `package.json` và `packages/pi-learn-extensions/package.json` đồng bộ khi phù hợp.
-9. **Imports:** giữ style import hiện có theo từng extension; không migrate namespace Pi package nếu chưa kiểm tra compatibility.
-10. **Docs trước khi sửa Pi API:** nếu đụng extension/theme/TUI/package behavior, đọc docs liên quan trong `docs/` và/hoặc docs Pi chính thức cài local trước khi thay đổi lớn.
+6. **Terminal:** user dùng XFCE4 Terminal; không dựa vào inline image protocol.
+7. **Package versions:** nếu bump version, giữ root `package.json` và `packages/pi-learn-extensions/package.json` đồng bộ khi phù hợp.
+8. **Imports:** giữ style import hiện có theo từng extension; không migrate namespace Pi package nếu chưa kiểm tra compatibility.
+9. **Docs trước khi sửa Pi API:** nếu đụng extension/theme/TUI/package behavior, đọc docs liên quan trong `docs/` và/hoặc docs Pi chính thức cài local trước khi thay đổi lớn.

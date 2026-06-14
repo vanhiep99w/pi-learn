@@ -45,7 +45,6 @@ Xem hướng dẫn chi tiết ở README root repo:
 extensions/
 ├── web-tools/
 ├── chatgpt-usage-status/
-├── rtk/                 # RTK auto-rewrite + rtk_run/rtk_gain tools
 ├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
 └── aurora-ui.ts         # fixed input cluster + bordered editor
 

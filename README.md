@@ -8,7 +8,6 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 
 - `web-tools` — `web_search`, `web_fetch`, `tool_search`.
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
-- `rtk` — tích hợp RTK: auto-rewrite Bash command + tools `rtk_run`, `rtk_gain`.
 - `aurora-ui` — custom input border + ChatGPT usage badge.
 - `midnight-aurora` — theme dark custom.
 
@@ -130,20 +129,6 @@ export TAVILY_API_KEY="tvly-..."
 ```
 
 Thêm lâu dài vào `~/.bashrc` hoặc `~/.zshrc` nếu cần.
-
-### Cài tool hỏi user bên ngoài
-
-Package này không còn ship extension `ask-user` tự viết. Nếu cần tool hỏi user có cấu trúc, cài package ngoài:
-
-```bash
-pi install npm:@juicesharp/rpiv-ask-user-question
-```
-
-Tool package này cung cấp:
-
-```txt
-ask_user_question
-```
 
 ### ChatGPT usage
 
