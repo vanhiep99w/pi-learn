@@ -72,26 +72,60 @@ const RESERVED_COMMANDS = new Set([
 ]);
 
 const PROMPT_SPEC_SYSTEM = `Bạn là chuyên gia thiết kế prompt template cho coding agent Pi.
-Từ yêu cầu của user, hãy tạo MỘT prompt template hoàn chỉnh.
+Từ một yêu cầu ngắn của user, hãy tự biến nó thành MỘT prompt template hoàn chỉnh, dùng được nhiều lần.
 Chỉ trả về JSON object hợp lệ, không markdown fence, không giải thích.
-Schema:
+
+Schema bắt buộc:
 {
   "name": "slash-command-name-kebab-case",
   "description": "mô tả ngắn tiếng Việt",
-  "argumentHint": "<input> hoặc [optional]",
+  "argumentHint": "<input> hoặc [optional] hoặc chuỗi rỗng",
   "model": "provider/id hoặc chuỗi rỗng",
   "thinking": "off|minimal|low|medium|high|xhigh hoặc chuỗi rỗng",
   "body": "markdown prompt body"
 }
-Quy tắc:
-- name chỉ dùng a-z, A-Z, 0-9, dấu gạch ngang hoặc gạch dưới; không dùng command hệ thống.
-- description ngắn, rõ khi nào dùng.
+
+Cách suy luận trước khi ghi JSON:
+- Capture intent: xác định user muốn command này giúp làm gì, khi nào dùng, input thường là gì, output mong đợi ra sao.
+- Nếu user nói mơ hồ, hãy chọn default hợp lý thay vì hỏi lại; prompt sẽ được preview để user sửa sau.
+- Generalize: đừng viết prompt chỉ khớp đúng ví dụ user đưa. Hãy biến nó thành workflow tái sử dụng cho nhiều input tương tự.
+- Keep it lean: chỉ đưa hướng dẫn có tác dụng. Tránh dài dòng, tránh checklist vô nghĩa.
+- Explain the why: trong body, ưu tiên giải thích ngắn vì sao cần làm bước đó thay vì lặp nhiều MUST/NEVER cứng nhắc.
+- Principle of least surprise: không tạo prompt có hành vi nguy hiểm, lén đọc/ghi/xoá file, exfiltrate secrets, hoặc vượt ngoài ý định user.
+
+Quy tắc metadata:
+- name chỉ dùng a-z, A-Z, 0-9, dấu gạch ngang hoặc gạch dưới; không dùng command hệ thống; nên ngắn và nhớ được.
+- description phải nói rõ command dùng khi nào và làm gì, hơi "pushy" để người dùng hiểu đúng ngữ cảnh dùng.
+- argumentHint mô tả input thật ngắn, ví dụ "<file-or-request>", "<text>", "[instructions]"; không dùng câu ví dụ dài.
 - Chọn model từ danh sách available nếu user có nhu cầu rõ; nếu không chắc, dùng current model được cung cấp.
-- Chọn thinking phù hợp: tác vụ đơn giản dùng minimal/low, review/debug/kiến trúc dùng medium/high.
-- body phải production-grade bằng tiếng Việt, rõ vai trò, nhiệm vụ, quy trình, quy tắc đầu ra.
-- body phải dùng placeholder $@ đúng 1 lần cho input của user.
+- Chọn thinking theo độ khó: dịch/format đơn giản = minimal/low; review/debug/refactor/architecture/planning = medium/high; bài rất phức tạp = xhigh.
+
+Quy tắc body:
+- Viết bằng tiếng Việt, production-grade, có cấu trúc rõ.
+- Body nên có các phần phù hợp như: Vai trò, Nhiệm vụ, Quy trình, Quy tắc đầu ra, Tiêu chí chất lượng.
+- Với coding agent, luôn nhắc đọc/kiểm tra context liên quan trước khi kết luận nếu nhiệm vụ phụ thuộc repo/file.
+- Định nghĩa output format cụ thể khi cần: bullet list, bảng, patch plan, JSON, checklist, v.v.
+- Body phải nhận input runtime của user bằng placeholder $@ đúng 1 lần. Đặt $@ ở vị trí tự nhiên như "Yêu cầu/ngữ cảnh từ người dùng:"; không gọi nó là ví dụ.
 - Có thể dùng $1, $2, $ARGUMENTS, \${@:2}, \${1:-default} nếu hữu ích, nhưng vẫn phải có $@ đúng 1 lần.
-- Nếu là prompt dịch thuật: tự phát hiện ngôn ngữ nguồn, bảo toàn markdown/code/path/tên riêng khi cần, output chỉ bản dịch.`;
+- Nếu là prompt dịch thuật: tự phát hiện ngôn ngữ nguồn, bảo toàn markdown/code/path/tên riêng khi cần, output chỉ bản dịch.
+- Nếu là prompt review/đánh giá: yêu cầu phân loại mức độ nghiêm trọng, dẫn chứng cụ thể, và đề xuất sửa thực tế.
+- Nếu là prompt tạo code: yêu cầu theo convention hiện có, tránh phá API, và nêu cách verify/test.
+- Nếu là prompt lập kế hoạch: yêu cầu phân rã bước, rủi ro, quyết định cần xác nhận, và tiêu chí hoàn thành.`;
+
+const PROMPT_SPEC_REVIEW_SYSTEM = `Bạn là reviewer khó tính cho prompt template Pi.
+Nhiệm vụ: đọc yêu cầu user và draft JSON, rồi trả về JSON đã cải thiện theo cùng schema.
+Chỉ trả về JSON object hợp lệ, không markdown fence, không giải thích.
+
+Checklist review:
+- Intent có được capture đúng không? Có thiếu input/output kỳ vọng rõ ràng không?
+- Prompt có generalize cho nhiều lần dùng hay chỉ overfit ví dụ không?
+- Body có lean không, có câu rỗng/checklist trang trí không?
+- Body có giải thích ngắn vì sao cần các bước quan trọng không?
+- Output format có đủ cụ thể để agent trả lời nhất quán không?
+- Với tác vụ coding, có nhắc đọc context/file liên quan và verify/test không?
+- Có hành vi bất ngờ/nguy hiểm/lệch ý định user không?
+- Metadata name/description/argumentHint/model/thinking có hợp lý không?
+- Body phải có $@ đúng 1 lần ở vị trí input runtime tự nhiên.`;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -299,6 +333,41 @@ function extractJsonObject(text: string): any | undefined {
   }
 }
 
+function countRuntimeInputPlaceholders(body: string): number {
+  return (body.match(/\$@/g) ?? []).length;
+}
+
+function ensureSingleRuntimeInput(body: string): string {
+  const count = countRuntimeInputPlaceholders(body);
+  if (count === 0) {
+    return `${body.trim()}\n\n## Yêu cầu/ngữ cảnh từ người dùng\n\n$@`;
+  }
+  if (count === 1) return body;
+
+  let seen = 0;
+  return body.replace(/\$@/g, () => {
+    seen += 1;
+    return seen === 1 ? "$@" : "nội dung/ngữ cảnh đã nêu ở trên";
+  });
+}
+
+function normalizeGeneratedSpec(raw: any, currentModel: string, registry: RegistryLike): GeneratedPromptSpec {
+  const rawName = sanitizePromptName(String(raw?.name || "prompt"));
+  const name = rawName && !RESERVED_COMMANDS.has(rawName) ? rawName : `prompt-${Date.now().toString(36)}`;
+  const rawModel = raw?.model ? String(raw.model).trim() : currentModel;
+  const model = rawModel && getCandidates(rawModel, registry).length > 0 ? rawModel : currentModel;
+  const body = ensureSingleRuntimeInput(String(raw?.body || "").trim() || "## Yêu cầu/ngữ cảnh từ người dùng\n\n$@");
+
+  return {
+    name,
+    description: String(raw?.description || `Run /${name}`).trim(),
+    argumentHint: raw?.argumentHint ? String(raw.argumentHint).trim() : undefined,
+    model,
+    thinking: normalizeThinking(String(raw?.thinking || "")) || "medium",
+    body,
+  };
+}
+
 function buildPromptFile(p: {
   description: string;
   argumentHint?: string;
@@ -387,28 +456,47 @@ async function aiGeneratePromptSpec(ctx: ExtensionCommandContext, requestText: s
   };
 
   const run = async (signal?: AbortSignal) => {
-    const response = await complete(
+    const draftResponse = await complete(
       ctx.model!,
       { systemPrompt: PROMPT_SPEC_SYSTEM, messages: [userMessage] },
       { apiKey: auth.apiKey, headers: auth.headers, signal, maxTokens: 3200 },
     );
-    if (response.stopReason === "aborted") return undefined;
-    const text = response.content
+    if (draftResponse.stopReason === "aborted") return undefined;
+    const draftText = draftResponse.content
       .filter((c): c is { type: "text"; text: string } => c.type === "text")
       .map((c) => c.text)
       .join("\n");
-    const raw = extractJsonObject(text);
-    if (!raw) return undefined;
+    const draftRaw = extractJsonObject(draftText);
+    if (!draftRaw) return undefined;
 
-    const name = sanitizePromptName(String(raw.name || "prompt"));
-    return {
-      name: name && !RESERVED_COMMANDS.has(name) ? name : `prompt-${Date.now().toString(36)}`,
-      description: String(raw.description || "Generated prompt"),
-      argumentHint: raw.argumentHint ? String(raw.argumentHint) : undefined,
-      model: raw.model ? String(raw.model) : currentModel,
-      thinking: normalizeThinking(String(raw.thinking || "")) || "medium",
-      body: String(raw.body || `Input: $@`),
-    } satisfies GeneratedPromptSpec;
+    const draft = normalizeGeneratedSpec(draftRaw, currentModel, ctx.modelRegistry);
+    const reviewMessage: UserMessage = {
+      role: "user",
+      content: [{
+        type: "text",
+        text: [
+          `Yêu cầu user gốc:\n${requestText}`,
+          `Current model: ${currentModel}`,
+          `Available models:\n${availableModelSpecs(ctx).slice(0, 80).join("\n")}`,
+          `Draft JSON cần review:\n${JSON.stringify(draft, null, 2)}`,
+          "Hãy trả về JSON đã cải thiện, vẫn theo schema ban đầu.",
+        ].join("\n\n"),
+      }],
+      timestamp: Date.now(),
+    };
+
+    const reviewedResponse = await complete(
+      ctx.model!,
+      { systemPrompt: PROMPT_SPEC_REVIEW_SYSTEM, messages: [reviewMessage] },
+      { apiKey: auth.apiKey, headers: auth.headers, signal, maxTokens: 3200 },
+    );
+    if (reviewedResponse.stopReason === "aborted") return undefined;
+    const reviewedText = reviewedResponse.content
+      .filter((c): c is { type: "text"; text: string } => c.type === "text")
+      .map((c) => c.text)
+      .join("\n");
+    const reviewedRaw = extractJsonObject(reviewedText);
+    return normalizeGeneratedSpec(reviewedRaw || draft, currentModel, ctx.modelRegistry);
   };
 
   if (!ctx.hasUI || !ctx.ui) return run();
