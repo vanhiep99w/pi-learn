@@ -13,32 +13,25 @@
 
 ## 1. Quyết định mới
 
-Harness vẫn giữ core runtime testable, nhưng **Pi extension là primary user interface**.
+Harness vẫn giữ core runtime testable, nhưng **Pi extension là primary user interface**. Standalone CLI đã được xoá; extension import runtime API trực tiếp.
 
 ```txt
-Core runtime:
+Core runtime API:
   parse / tree / normalize / metrics / cache / logs
-  testable outside Pi
+  testable outside Pi qua unit tests
+  package entry: packages/harness-runtime/src/api.js
 
 Pi extension:
   primary UX inside Pi
   slash commands
   current-session aware
+  gọi runtime API, không spawn CLI child process
 
 CLI:
-  dev/debug/automation fallback
-  không phải UX chính lâu dài
+  removed
 ```
 
-Không nên xoá CLI ngay. CLI vẫn hữu ích để:
-
-```txt
-- chạy tests/debug ngoài Pi
-- automation sau này
-- isolate bug parser/cache khỏi Pi UI
-```
-
-Nhưng user workflow chính nên là:
+User workflow chính:
 
 ```txt
 Trong Pi:

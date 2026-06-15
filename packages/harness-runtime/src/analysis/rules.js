@@ -143,7 +143,7 @@ function detectRepeatedToolErrors({ dataset, rule }) {
         testPlan: [
           "Add a fixture or rule test for the repeated tool error pattern.",
           "Run `npm --prefix packages/harness-runtime test`.",
-          "Run `harness propose --project . --rules` and confirm duplicate proposals are deduped.",
+          "Run `/harness-propose rules` in Pi and confirm duplicate proposals are deduped.",
         ],
         rollbackPlan: "Revert the proposal commit or disable the new rule/checklist if it generates false positives.",
         evidence: evidence.slice(0, 8),
@@ -201,7 +201,7 @@ function detectParserWarnings({ dataset, rule }) {
       testPlan: [
         "Add a fixture covering this warning shape.",
         "Run `npm --prefix packages/harness-runtime test`.",
-        "Run `harness scan --project . --last 5` and confirm warnings are expected or resolved.",
+        "Run `/harness-warnings 5` in Pi and confirm warnings are expected or resolved.",
       ],
       rollbackPlan: "Revert parser/normalizer changes if the new handling misclassifies session entries.",
       evidence: evidence.slice(0, 8),

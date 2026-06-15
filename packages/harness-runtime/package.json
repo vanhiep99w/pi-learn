@@ -3,13 +3,11 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Read-only Pi session miner and improvement proposal runtime.",
-  "bin": {
-    "harness": "./src/cli.js"
+  "description": "Pi session miner and improvement proposal runtime API for the Pi extension.",
+  "exports": {
+    ".": "./src/api.js"
   },
   "scripts": {
-    "doctor": "node ./src/cli.js doctor",
-    "config": "node ./src/cli.js config print",
     "test": "node --test"
   },
   "engines": {

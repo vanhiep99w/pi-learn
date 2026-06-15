@@ -11,10 +11,10 @@
 Trạng thái hiện tại của `pi-harness` trong repo này:
 
 ```txt
-Status: Phase 8 LLM reflection MVP and Phase 9 controlled apply MVP implemented
+Status: Phase 8 LLM reflection MVP, Phase 9 controlled apply MVP, Phase 10 eval harness MVP, and Phase 11 gated automation MVP implemented
 Runtime implementation: packages/harness-runtime
-CLI: implemented for doctor/config/project resolve/sessions/inspect/scan/report/reflect/propose/proposals/show/approve/reject/apply/rollback/history
-Pi extension: implemented wrapper commands under packages/pi-learn-extensions/extensions/harness/
+CLI: removed; runtime is API-only and consumed by Pi extension
+Pi extension: primary UX implemented under packages/pi-learn-extensions/extensions/harness/
 Parser: implemented for full JSONL parse, tree, active path
 Normalized cache: implemented for manifest/events/metrics/warnings
 Report: implemented Markdown latest + dated report from normalized cache
@@ -24,9 +24,10 @@ Rules engine: implemented MVP detectors for repeated bash failures, repeated too
 Proposal writer: implemented private draft Markdown proposals with evidence refs, dedupe fingerprints, test and rollback plans
 Memory drafts: implemented private `memory/draft.jsonl` writer for reviewed memory candidates
 Targeted improvements: implemented `propose --target memory|rules|parser|redaction`
-Pi wrapper: implemented `/harness-report`, `/harness-last`, `/harness-warnings`, `/harness-propose`, `/harness-proposals`, `/harness-note`, `/harness-tag`
+Pi wrapper: implemented `/harness-report`, `/harness-last`, `/harness-warnings`, `/harness-reflect`, `/harness-reflect-pi`, `/harness-propose`, `/harness-proposals`, `/harness-approve`, `/harness-reject`, `/harness-apply`, `/harness-history`, `/harness-eval`, `/harness-note`, `/harness-tag`
 Apply loop: controlled MVP implemented with approval, proposal history, target allowlist, git branch, patch apply and rollback
-Eval loop: not implemented
+Eval loop: deterministic MVP implemented with private JSON/Markdown reports
+Gated automation: opt-in MVP implemented for scan/report/draft proposals/eval only; no apply/push
 ```
 
 Docs/spec đã có:
@@ -73,8 +74,11 @@ Package location:
 Package name:
   @pi-learn/harness-runtime
 
-CLI command:
-  harness
+Runtime API:
+  packages/harness-runtime/src/api.js
+
+Primary commands:
+  Pi slash commands in packages/pi-learn-extensions/extensions/harness/index.ts
 ```
 
 Phase 0 đã tạo:
@@ -84,7 +88,7 @@ packages/harness-runtime/
 ├── package.json
 ├── README.md
 ├── src/
-│   ├── cli.js
+│   ├── api.js
 │   ├── config/load-config.js
 │   ├── project/project-key.js
 │   ├── project/resolve-project.js
@@ -869,12 +873,14 @@ harness eval --scenario smart-commit-basic
 
 ### Tasks
 
-- [ ] Define eval schema.
-- [ ] Create fixtures from redacted sessions.
-- [ ] Add deterministic checks first.
-- [ ] Add LLM judge only if needed.
-- [ ] Compare before/after.
-- [ ] Require eval for high-risk proposals.
+- [x] Define eval schema.
+- [x] Create deterministic fixture scenarios.
+- [x] Add deterministic checks first.
+- [x] Defer LLM judge until deterministic evals are insufficient.
+- [x] Compare before/after for apply safety fixtures.
+- [x] Require proposal-quality checks for proposal-specific evals, including high-risk eval/test evidence.
+- [x] Write private eval JSON/Markdown reports.
+- [x] Add Pi wrapper command `/harness-eval`.
 
 ### Initial scenarios
 
@@ -887,9 +893,29 @@ edit-oldText-workflow
 ts-extension-safety
 ```
 
+### Output
+
+```txt
+~/.pi/harness/projects/<project-key>/evals/latest.json
+~/.pi/harness/projects/<project-key>/evals/latest.md
+~/.pi/harness/projects/<project-key>/evals/YYYY-MM-DD-eval.json
+~/.pi/harness/projects/<project-key>/evals/YYYY-MM-DD-eval.md
+```
+
 ### Definition of Done
 
-At least 3 scenarios run and report pass/fail.
+Status: done for MVP.
+
+At least 3 scenarios run and report pass/fail. Current MVP scenarios:
+
+```txt
+redaction-fixture
+parser-unknown-entry
+edit-oldText-workflow
+file-protection
+smart-commit-basic
+ts-extension-safety
+```
 
 ---
 
@@ -898,6 +924,8 @@ At least 3 scenarios run and report pass/fail.
 ### Mục tiêu
 
 Low-risk automation only after manual pipeline is stable.
+
+Status: done for MVP.
 
 ### Allowed automation initially
 
@@ -919,6 +947,17 @@ Low-risk automation only after manual pipeline is stable.
 - auto-read sensitive logs
 ```
 
+### Tasks
+
+- [x] Add runtime automation status API.
+- [x] Add gated automation API.
+- [x] Add opt-in config under `automation.enabled`.
+- [x] Allow only scan/report/proposal drafts/eval/eval fixture drafts.
+- [x] Block unsafe policy combinations: `autoApply`, `autoPush`, `lowRiskAutoPatch`, or disabled human approval.
+- [x] Add Pi commands `/harness-automation-status` and `/harness-automate`.
+- [x] Add UI confirmation before manual automation run.
+- [x] Add unit tests for disabled and enabled automation paths.
+
 ### Definition of Done
 
 Automation is opt-in in config:
@@ -927,6 +966,16 @@ Automation is opt-in in config:
 {
   "autoApply": false,
   "autoPush": false,
+  "automation": {
+    "enabled": true,
+    "maxSessions": 5,
+    "scan": true,
+    "report": true,
+    "proposeRules": true,
+    "proposeTargets": ["memory", "parser", "redaction"],
+    "eval": true,
+    "createEvalFixtureDraft": true
+  },
   "riskPolicy": {
     "lowRiskAutoPatch": false,
     "requireHumanApproval": true
@@ -934,7 +983,7 @@ Automation is opt-in in config:
 }
 ```
 
-No silent changes.
+No silent changes. MVP automation never apply/commit/push.
 
 ---
 
@@ -963,11 +1012,11 @@ Do not enter next phase unless gate passes.
 Immediate recommended next steps:
 
 ```txt
-1. Start Phase 5 rule engine and deterministic proposal writer.
-2. Implement evidence refs from normalized events/warnings.
-3. Add proposal draft writer under private harness home.
-4. Add dedupe/fingerprint for repeated findings.
-5. Keep Pi extension as wrapper later; do not duplicate core logic there.
+1. Live-test `/harness-automation-status` and `/harness-automate` inside Pi after `/reload`.
+2. Decide whether Phase 12 should be dashboard/status UI or richer automation scheduling.
+3. Keep automation opt-in and proposal-first.
+4. Use eval results as the gate before any broader automation.
+5. Do not add silent auto-apply or auto-push.
 ```
 
 Current implementation choice:
@@ -975,8 +1024,8 @@ Current implementation choice:
 ```txt
 Location: packages/harness-runtime
 Package: @pi-learn/harness-runtime
-CLI: harness
-Extension: later wrapper only
+Runtime API: packages/harness-runtime/src/api.js
+Extension: primary UX, imports runtime API directly
 ```
 
 Reason:
@@ -984,8 +1033,8 @@ Reason:
 ```txt
 - keeps docs/spec in pi-harness/
 - keeps runtime separate from public Pi extension package
-- avoids building TUI integration before parser/cache is stable
-- allows CLI testing outside Pi
+- parser/cache is now stable enough for extension-first UX
+- keeps runtime testable outside Pi through unit tests without a CLI/bin
 ```
 
 ---
@@ -1047,10 +1096,10 @@ MVP must guarantee:
 Updated roadmap:
 
 ```txt
-Current: Phase 8 LLM reflection MVP + Phase 9 controlled apply MVP implemented
-Next: Phase 10 eval harness
-Then: gated automation
-Finally: broader auto-improvement only after eval gates
+Current: Phase 8 LLM reflection MVP + Phase 9 controlled apply MVP + Phase 10 eval harness MVP + Phase 11 gated automation MVP implemented
+Next: live Pi UI verification and decide Phase 12
+Then: broader auto-improvement only after eval gates
+Finally: no silent auto-apply/auto-push
 ```
 
 Most important sequencing rule:

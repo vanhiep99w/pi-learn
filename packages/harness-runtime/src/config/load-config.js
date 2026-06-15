@@ -13,6 +13,16 @@ export const builtInDefaults = Object.freeze({
   activePathOnly: true,
   autoApply: false,
   autoPush: false,
+  automation: {
+    enabled: false,
+    maxSessions: 5,
+    scan: true,
+    report: true,
+    proposeRules: true,
+    proposeTargets: ["memory", "parser", "redaction"],
+    eval: true,
+    createEvalFixtureDraft: true,
+  },
   targets: {
     agents: true,
     memory: true,

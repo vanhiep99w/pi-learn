@@ -81,7 +81,7 @@ function generateRuleImprovementProposals({ dataset }) {
       proposedChange: "Add a reviewed project rule config for edit tool failures with minOccurrences and oldText mismatch fingerprinting.",
       testPlan: [
         "Add rule config under harness/rules/.",
-        "Run `harness propose --project . --rules` and confirm the rule still dedupes proposals.",
+        "Run `/harness-propose rules` in Pi and confirm the rule still dedupes proposals.",
         "Run `npm --prefix packages/harness-runtime test`.",
       ],
       rollbackPlan: "Delete or disable the rule config if it creates noisy proposals.",
@@ -102,7 +102,7 @@ function generateRuleImprovementProposals({ dataset }) {
       proposedChange: "Add a reviewed project rule config for repeated bash failure detection with command-family grouping.",
       testPlan: [
         "Add rule config under harness/rules/.",
-        "Run `harness propose --project . --rules` and verify proposal count is reasonable.",
+        "Run `/harness-propose rules` in Pi and verify proposal count is reasonable.",
         "Run `npm --prefix packages/harness-runtime test`.",
       ],
       rollbackPlan: "Delete or disable the rule config if it creates false positives.",
@@ -133,7 +133,7 @@ function generateParserImprovementProposals({ dataset }) {
     testPlan: [
       "Add a focused parser fixture for this warning.",
       "Run `npm --prefix packages/harness-runtime test`.",
-      "Run `harness scan --project . --last 5` and compare warnings count.",
+      "Run `/harness-warnings 5` in Pi and compare warnings count.",
     ],
     rollbackPlan: "Revert parser changes if active path or event normalization becomes less accurate.",
     evidence: evidence.slice(0, 8),

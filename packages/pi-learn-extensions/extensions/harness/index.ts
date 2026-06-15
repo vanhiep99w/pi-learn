@@ -1,15 +1,12 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFile, stat } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
-const RUNTIME_CLI = resolve(EXTENSION_DIR, "../../../harness-runtime/src/cli.js");
+const RUNTIME_API = resolve(EXTENSION_DIR, "../../../harness-runtime/src/api.js");
 const DEFAULT_LAST = "5";
-const COMMAND_TIMEOUT_MS = 120_000;
 
 type HarnessRun = {
   stdout: string;
@@ -33,10 +30,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
     async execute(_toolCallId: any, params: any, _signal: any, _onUpdate: any, ctx: any) {
       const cwd = ctx?.cwd ?? process.cwd();
       const payload = params?.response ?? JSON.stringify({ proposals: params?.proposals ?? [] });
-      const tmpRoot = await mkdtemp(join(tmpdir(), "harness-pi-llm-"));
-      const responsePath = join(tmpRoot, "reflection-response.json");
-      await writeFile(responsePath, payload.endsWith("\n") ? payload : `${payload}\n`, "utf8");
-      const run = await runHarness({ cwd, signal: ctx?.signal } as ExtensionCommandContext, ["reflect", "--import", responsePath, "--project", cwd, "--json"]);
+      const run = await runHarness({ cwd, signal: ctx?.signal } as ExtensionCommandContext, ["reflect", "--response", payload, "--project", cwd, "--json"]);
       const output = parseJson(run.stdout);
       const written = output?.written ?? [];
       const skipped = output?.skipped ?? [];
@@ -102,6 +96,70 @@ export default function harnessExtension(pi: ExtensionAPI) {
         }
       }
       await showText(ctx, `⚠️ Harness warnings (${last} sessions)`, lines.join("\n") || "No warnings found.");
+    }),
+  });
+
+  pi.registerCommand("harness-automation-status", {
+    description: "Show Harness gated automation status",
+    handler: async (_args, ctx) => withHarnessErrors(ctx, async () => {
+      const run = await runHarness(ctx, ["automation-status", "--project", ctx.cwd, "--json"]);
+      const output = parseJson(run.stdout);
+      const status = output?.status;
+      const lines = [
+        `enabled: ${status?.enabled ?? false}`,
+        `allowed: ${status?.allowed ?? false}`,
+        `reason: ${status?.reason ?? "unknown"}`,
+        `maxSessions: ${status?.automation?.maxSessions ?? ""}`,
+        `scan: ${status?.automation?.scan ?? false}`,
+        `report: ${status?.automation?.report ?? false}`,
+        `proposeRules: ${status?.automation?.proposeRules ?? false}`,
+        `proposeTargets: ${(status?.automation?.proposeTargets ?? []).join(", ")}`,
+        `eval: ${status?.automation?.eval ?? false}`,
+        `createEvalFixtureDraft: ${status?.automation?.createEvalFixtureDraft ?? false}`,
+      ].join("\n");
+      await showText(ctx, "🧪 Harness automation status", lines);
+    }),
+  });
+
+  pi.registerCommand("harness-automate", {
+    description: "Run gated Harness automation if enabled in harness/config.json",
+    handler: async (_args, ctx) => withHarnessErrors(ctx, async () => {
+      if (ctx.hasUI && ctx.ui?.confirm) {
+        const ok = await ctx.ui.confirm("Run Harness gated automation", "Run scan/report/proposal/eval drafting only? This will not apply or push changes.");
+        if (!ok) return notifyOrLog(ctx, "Harness automation cancelled.", "info");
+      }
+      const run = await runHarness(ctx, ["automate", "--project", ctx.cwd, "--json"]);
+      const output = parseJson(run.stdout);
+      const lines = [
+        `status: ${output?.status ?? "unknown"}`,
+        output?.reason ? `reason: ${output.reason}` : undefined,
+        "",
+        ...(output?.actions ?? []).map((action: any) => `${action.name}: ${action.status}${action.written !== undefined ? ` written=${action.written}` : ""}${action.skipped !== undefined ? ` skipped=${action.skipped}` : ""}`),
+      ].filter(Boolean).join("\n");
+      await showText(ctx, "🤖 Harness gated automation", lines || "No automation actions ran.");
+    }),
+  });
+
+  pi.registerCommand("harness-eval", {
+    description: "Run Harness eval suite. Usage: /harness-eval [scenario|proposal-id]",
+    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
+      const first = firstArg(args);
+      const cliArgs = ["eval", "--project", ctx.cwd, "--json"];
+      if (first) {
+        if (/^P-\d+$/i.test(first)) cliArgs.splice(1, 0, first.toUpperCase());
+        else cliArgs.push("--scenario", first);
+      }
+      const run = await runHarness(ctx, cliArgs);
+      const output = parseJson(run.stdout);
+      const lines = [
+        `passed: ${output?.summary?.passed ?? 0}`,
+        `failed: ${output?.summary?.failed ?? 0}`,
+        `skipped: ${output?.summary?.skipped ?? 0}`,
+        `report: ${output?.paths?.latestMarkdownPath ?? "(missing)"}`,
+        "",
+        ...(output?.results ?? []).map((result: any) => `${result.scenario}: ${result.status} — ${result.message ?? ""}`),
+      ].join("\n");
+      await showText(ctx, "🧪 Harness eval", lines);
     }),
   });
 
@@ -229,6 +287,10 @@ export default function harnessExtension(pi: ExtensionAPI) {
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
       const id = firstArg(args);
       if (!id) return notifyOrLog(ctx, "Usage: /harness-apply P-0001", "warning");
+      if (ctx.hasUI && ctx.ui?.confirm) {
+        const ok = await ctx.ui.confirm("Apply Harness proposal", `Apply ${id} on a harness/* branch? This may edit files listed in the proposal patch.`);
+        if (!ok) return notifyOrLog(ctx, `Harness apply cancelled: ${id}`, "info");
+      }
       const run = await runHarness(ctx, ["apply", id, "--project", ctx.cwd, "--json"]);
       const output = parseJson(run.stdout);
       const lines = [
@@ -291,7 +353,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui?.notify("🧪 Harness commands: /harness-report, /harness-reflect-pi, /harness-propose, /harness-proposals", "info");
+    ctx.ui?.notify("🧪 Harness commands: /harness-report, /harness-eval, /harness-automate, /harness-reflect-pi", "info");
   });
 }
 
@@ -304,23 +366,113 @@ async function withHarnessErrors(ctx: ExtensionCommandContext, fn: () => Promise
   }
 }
 
-function runHarness(ctx: ExtensionCommandContext, args: string[]): Promise<HarnessRun> {
-  return new Promise((resolveRun, reject) => {
-    const child = execFile(
-      process.execPath,
-      [RUNTIME_CLI, ...args],
-      { cwd: ctx.cwd, timeout: COMMAND_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        if (error) {
-          const details = stderr?.trim() || stdout?.trim() || error.message;
-          reject(new Error(details));
-          return;
-        }
-        resolveRun({ stdout, stderr });
-      },
-    );
-    ctx.signal?.addEventListener("abort", () => child.kill("SIGTERM"), { once: true });
-  });
+async function runHarness(ctx: ExtensionCommandContext, args: string[]): Promise<HarnessRun> {
+  const apiUrl = pathToFileURL(RUNTIME_API);
+  apiUrl.searchParams.set("mtime", String((await stat(RUNTIME_API)).mtimeMs));
+  const api = await import(apiUrl.href);
+  const { command, rest, options } = parseHarnessArgs(args, ctx.cwd);
+  let output: any;
+
+  switch (command) {
+    case "report":
+      output = await api.report(options);
+      break;
+    case "sessions":
+      output = api.sessions(options);
+      break;
+    case "scan":
+      output = await api.scan(options);
+      break;
+    case "reflect":
+      output = options.response !== undefined
+        ? api.importReflectionResponse(options)
+        : options.importFile
+          ? api.importReflection(options)
+          : await api.reflect(options);
+      break;
+    case "propose":
+      output = await api.propose(options);
+      break;
+    case "proposals":
+      output = api.proposals(options);
+      break;
+    case "approve":
+      output = api.approve({ ...options, id: rest[0] });
+      break;
+    case "reject":
+      output = api.reject({ ...options, id: rest[0] });
+      break;
+    case "apply":
+      output = api.apply({ ...options, id: rest[0] });
+      break;
+    case "history":
+      output = api.history({ ...options, id: rest[0] });
+      break;
+    case "automation-status":
+      output = api.automationStatus(options);
+      break;
+    case "automate":
+      output = await api.automate(options);
+      break;
+    case "eval":
+      output = await api.evalHarness({ ...options, id: rest[0] });
+      break;
+    default:
+      throw new Error(`Unsupported Harness extension operation: ${command}`);
+  }
+
+  return { stdout: JSON.stringify(output, null, 2), stderr: "" };
+}
+
+function parseHarnessArgs(args: string[], cwd: string) {
+  const positional: string[] = [];
+  const options: any = { project: cwd };
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    switch (arg) {
+      case "--json":
+        break;
+      case "--project":
+        options.project = args[++i];
+        break;
+      case "--last": {
+        const value = Number(args[++i]);
+        if (!Number.isFinite(value) || value < 1) throw new Error("--last must be a positive number");
+        options.maxSessionsPerScan = value;
+        break;
+      }
+      case "--target":
+        options.target = args[++i];
+        break;
+      case "--rules":
+        options.rules = true;
+        break;
+      case "--llm":
+        options.llm = true;
+        break;
+      case "--import":
+        options.importFile = args[++i];
+        break;
+      case "--response":
+        options.response = args[++i];
+        break;
+      case "--scenario":
+        options.scenario = args[++i];
+        break;
+      case "--allow-dirty":
+        options.allowDirty = true;
+        break;
+      case "--skip-tests":
+        options.skipTests = true;
+        break;
+      case "--commit":
+        options.commit = true;
+        break;
+      default:
+        positional.push(arg);
+    }
+  }
+  return { command: positional[0], rest: positional.slice(1), options };
 }
 
 async function showText(ctx: ExtensionCommandContext, title: string, text: string) {

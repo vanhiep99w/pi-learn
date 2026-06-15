@@ -44,7 +44,7 @@ Xem hướng dẫn chi tiết ở README root repo:
 ```txt
 extensions/
 ├── web-tools/
-├── harness/             # /harness-report, /harness-reflect-pi, /harness-propose, /harness-approve
+├── harness/             # /harness-report, /harness-eval, /harness-automate, /harness-reflect-pi
 ├── chatgpt-usage-status/
 ├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
 ├── prompt-with-model.ts # AI prompt creator + per-prompt model/thinking
