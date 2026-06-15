@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerWebSearch } from "./web-search";
 import { registerWebFetch } from "./web-fetch";
 import { registerToolSearch } from "./tool-search";

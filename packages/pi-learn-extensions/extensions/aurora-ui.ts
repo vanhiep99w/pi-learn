@@ -1,6 +1,6 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { copyToClipboard, CustomEditor } from "@mariozechner/pi-coding-agent";
-import { visibleWidth } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { copyToClipboard, CustomEditor } from "@earendil-works/pi-coding-agent";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { renderFixedEditorCluster } from "./fixed-input-layout/cluster.ts";
 import { TerminalSplitCompositor } from "./fixed-input-layout/terminal-split.ts";
 

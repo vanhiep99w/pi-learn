@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { complete, type Model, type UserMessage } from "@mariozechner/pi-ai";
-import { BorderedLoader, type ExtensionAPI, type ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import { complete, type Model, type UserMessage } from "@earendil-works/pi-ai";
+import { BorderedLoader, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Prompt With Model
