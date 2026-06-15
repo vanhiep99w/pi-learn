@@ -528,18 +528,59 @@ async function pickModel(ctx: ExtensionCommandContext, allowClear = true): Promi
     grouped.get(m.provider)!.push(m.id);
   }
 
-  const providers = [
-    ...(allowClear ? ["(clear — dùng model hiện tại khi chạy)"] : []),
-    ...Array.from(grouped.keys()).sort(),
-  ];
-  const provider = await ctx.ui?.select("📡 Chọn provider:", providers);
-  if (!provider) return undefined;
-  if (provider.startsWith("(clear")) return "";
+  const searchModels = async (providerFilter?: string): Promise<string | undefined> => {
+    const keyword = await ctx.ui?.editor(
+      providerFilter
+        ? `🔎 Search model trong provider ${providerFilter}:`
+        : "🔎 Search provider/model:",
+      "",
+    );
+    const q = keyword?.trim().toLowerCase();
+    if (!q) return undefined;
 
-  const ids = (grouped.get(provider) ?? []).sort();
-  const id = await ctx.ui?.select(`🤖 Chọn model (${provider}):`, ids);
-  if (!id) return undefined;
-  return `${provider}/${id}`;
+    const matches = all
+      .filter((m) => !providerFilter || m.provider === providerFilter)
+      .map((m) => `${m.provider}/${m.id}`)
+      .filter((spec) => spec.toLowerCase().includes(q))
+      .sort()
+      .slice(0, 100);
+
+    if (matches.length === 0) {
+      ctx.ui?.notify(`Không tìm thấy model/provider khớp: ${keyword}`, "warning");
+      return undefined;
+    }
+
+    return await ctx.ui?.select(`🤖 Chọn model (${matches.length} kết quả):`, matches);
+  };
+
+  while (true) {
+    const providers = [
+      "🔎 Search provider/model...",
+      ...(allowClear ? ["(clear — dùng model hiện tại khi chạy)"] : []),
+      ...Array.from(grouped.keys()).sort(),
+    ];
+    const provider = await ctx.ui?.select("📡 Chọn provider hoặc search:", providers);
+    if (!provider) return undefined;
+    if (provider.startsWith("(clear")) return "";
+    if (provider.startsWith("🔎")) {
+      const picked = await searchModels();
+      if (picked !== undefined) return picked;
+      continue;
+    }
+
+    const ids = (grouped.get(provider) ?? []).sort();
+    const modelChoice = await ctx.ui?.select(`🤖 Chọn model (${provider}):`, [
+      `🔎 Search model trong ${provider}...`,
+      ...ids,
+    ]);
+    if (!modelChoice) return undefined;
+    if (modelChoice.startsWith("🔎")) {
+      const picked = await searchModels(provider);
+      if (picked !== undefined) return picked;
+      continue;
+    }
+    return `${provider}/${modelChoice}`;
+  }
 }
 
 async function runCreateWizard(args: string | undefined, ctx: ExtensionCommandContext) {
@@ -580,15 +621,50 @@ async function runCreateWizard(args: string | undefined, ctx: ExtensionCommandCo
     return;
   }
 
-  const filePath = join(dirForScope("project"), `${finalName}.md`);
-  mkdirSync(dirForScope("project"), { recursive: true });
+  const scopeChoice = await ctx.ui.select("📍 Lưu prompt ở đâu?", [
+    "project — chỉ dùng trong repo hiện tại (.pi/agent/model-prompts)",
+    "global — dùng mọi nơi (~/.pi/agent/model-prompts)",
+  ]);
+  if (!scopeChoice) return;
+
+  const scope: "user" | "project" = scopeChoice.startsWith("global") ? "user" : "project";
+
+  const modelChoice = await ctx.ui.select("🤖 Model cố định cho prompt này?", [
+    `giữ nguyên — ${modelSpecLabel(finalSpec.model)}`,
+    "chọn/search model...",
+    "clear — dùng model hiện tại khi chạy",
+  ]);
+  if (!modelChoice) return;
+  if (modelChoice.startsWith("chọn")) {
+    const pickedModel = await pickModel(ctx, false);
+    if (pickedModel === undefined) return;
+    finalSpec.model = pickedModel;
+  } else if (modelChoice.startsWith("clear")) {
+    finalSpec.model = undefined;
+  }
+
+  const thinkingChoice = await ctx.ui.select("🧠 Thinking level cho prompt này?", [
+    `giữ nguyên — ${finalSpec.thinking || "current"}`,
+    "clear — dùng thinking hiện tại khi chạy",
+    ...VALID_THINKING,
+  ]);
+  if (!thinkingChoice) return;
+  if (thinkingChoice.startsWith("clear")) {
+    finalSpec.thinking = undefined;
+  } else if (!thinkingChoice.startsWith("giữ nguyên")) {
+    finalSpec.thinking = thinkingChoice as ThinkingLevel;
+  }
+
+  const targetDir = dirForScope(scope);
+  const filePath = join(targetDir, `${finalName}.md`);
+  mkdirSync(targetDir, { recursive: true });
   if (existsSync(filePath)) {
     const overwrite = await ctx.ui.confirm("⚠️  File đã tồn tại", `Ghi đè ${filePath}?`);
     if (!overwrite) return;
   }
 
   writeFileSync(filePath, buildPromptFile(finalSpec), "utf-8");
-  ctx.ui.notify(`✅ Đã tạo /${finalName} → ${filePath}. Chạy /reload để load command mới.`, "info");
+  ctx.ui.notify(`✅ Đã tạo /${finalName} (${scope === "user" ? "global" : "project"}) → ${filePath}. Chạy /reload để load command mới.`, "info");
 }
 
 async function runEditWizard(ctx: ExtensionCommandContext) {
