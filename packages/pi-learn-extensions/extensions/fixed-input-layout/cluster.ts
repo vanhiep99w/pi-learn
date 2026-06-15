@@ -1,6 +1,6 @@
 // Vendored from @nielpattin/pi-station (MIT) fixed-editor/cluster.ts.
 // Local import scope changed to match pi-learn's package namespace.
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 export const CURSOR_MARKER = "\x1b_pi:c\x07";
 

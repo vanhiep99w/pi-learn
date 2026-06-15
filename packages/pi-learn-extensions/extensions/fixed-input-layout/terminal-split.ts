@@ -1,6 +1,6 @@
 // Vendored from @nielpattin/pi-station (MIT) fixed-editor/terminal-split.ts.
 // Local import scope changed to match pi-learn's package namespace.
-import { isKeyRelease, matchesKey, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { isKeyRelease, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { FixedEditorClusterRender } from "./cluster.ts";
 
 export interface TerminalLike {
