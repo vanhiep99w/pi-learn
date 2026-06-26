@@ -188,7 +188,12 @@ function ensureCleanWorktree(git, { allowDirty }) {
   if (allowDirty) return;
   const status = runGit(git, ["status", "--porcelain"]);
   if (status.status !== 0) throw cliLikeError(`git status failed: ${status.stderr || status.stdout}`);
-  if (status.stdout.trim()) throw cliLikeError("Git worktree is not clean. Commit/stash changes or pass --allow-dirty.");
+  const dirty = status.stdout.trim();
+  if (dirty) {
+    const preview = dirty.split("\n").slice(0, 10).join("\n");
+    const more = dirty.split("\n").length > 10 ? "\n..." : "";
+    throw cliLikeError(`Git worktree is not clean. Commit/stash changes or pass --allow-dirty.\n\nDirty files:\n${preview}${more}`);
+  }
 }
 
 function ensureOnlyExpectedPathsDirty(git, expectedPaths) {

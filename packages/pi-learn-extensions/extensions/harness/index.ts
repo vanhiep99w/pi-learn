@@ -283,15 +283,18 @@ export default function harnessExtension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("harness-apply", {
-    description: "Apply an approved Harness proposal with a JSON Patch section. Usage: /harness-apply P-0001",
+    description: "Apply an approved Harness proposal with a JSON Patch section. Usage: /harness-apply P-0001 [--allow-dirty] [--skip-tests] [--commit]",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const id = firstArg(args);
-      if (!id) return notifyOrLog(ctx, "Usage: /harness-apply P-0001", "warning");
+      const parts = splitArgs(args ?? "");
+      const id = parts[0];
+      const flags = parts.slice(1);
+      if (!id) return notifyOrLog(ctx, "Usage: /harness-apply P-0001 [--allow-dirty] [--skip-tests] [--commit]", "warning");
       if (ctx.hasUI && ctx.ui?.confirm) {
-        const ok = await ctx.ui.confirm("Apply Harness proposal", `Apply ${id} on a harness/* branch? This may edit files listed in the proposal patch.`);
+        const dirty = flags.includes("--allow-dirty") ? " with dirty-worktree override" : "";
+        const ok = await ctx.ui.confirm("Apply Harness proposal", `Apply ${id}${dirty} on a harness/* branch? This may edit files listed in the proposal patch.`);
         if (!ok) return notifyOrLog(ctx, `Harness apply cancelled: ${id}`, "info");
       }
-      const run = await runHarness(ctx, ["apply", id, "--project", ctx.cwd, "--json"]);
+      const run = await runHarness(ctx, ["apply", id, ...flags, "--project", ctx.cwd, "--json"]);
       const output = parseJson(run.stdout);
       const lines = [
         `${output?.proposal?.id ?? id}: ${output?.proposal?.status ?? "applied"}`,
