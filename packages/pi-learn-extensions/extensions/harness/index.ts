@@ -188,10 +188,10 @@ export default function harnessExtension(pi: ExtensionAPI) {
       if (!promptPath) return notifyOrLog(ctx, "Harness reflect did not return latestPath.", "warning");
       const prompt = await readFile(promptPath, "utf8");
       const userMessage = [
-        "Use the current Pi session model to review this Harness reflection prompt.",
-        "Return no chat prose. Instead, call the `harness_import_llm_reflection` tool with a JSON object matching the required schema.",
-        "If there are no strong evidence-backed proposals, call the tool with `{\"proposals\":[]}`.",
-        "Do not read raw session logs. Use only the normalized evidence in the prompt.",
+        "Review the Harness reflection prompt below using only its normalized evidence.",
+        "Do not read raw session logs or other files.",
+        "Call `harness_import_llm_reflection` with `{ \"proposals\": [...] }`; if no strong evidence-backed proposals exist, call it with `{ \"proposals\": [] }`.",
+        "Do not reply with chat prose.",
         "",
         prompt,
       ].join("\n");
