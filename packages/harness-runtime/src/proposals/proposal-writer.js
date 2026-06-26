@@ -79,6 +79,7 @@ export function renderProposalMarkdown(proposal) {
       lines.push(`- session: ${item.sessionId ?? "unknown"}`);
       lines.push(`  entry: ${item.entryId ?? "unknown"}`);
       lines.push(`  kind: ${item.kind ?? "unknown"}`);
+      if (item.reason) lines.push(`  reason: ${item.reason}`);
       if (item.timestamp) lines.push(`  timestamp: ${item.timestamp}`);
       if (item.excerpt) lines.push(`  excerpt: ${quoteEvidence(item.excerpt)}`);
       if (item.sessionFile) lines.push(`  rawRef: ${item.sessionFile}`);

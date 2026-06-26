@@ -988,9 +988,31 @@ session summaries
 metrics
 selected redacted excerpts
 evidence refs
+evidence kind/reason
+target routing guide
+optional likelyTargets/targetGuidance
 ```
 
 Không nhận raw full session mặc định.
+
+Prompt reflection phải giúp model route target thay vì tự đoán từ schema. Ví dụ:
+
+```txt
+tool_error:edit repeated
+  → likelyTargets: agents, rules, eval
+  → agents nếu chỉ thêm AGENTS.md workflow note
+  → rules nếu thêm detector config/code
+```
+
+Importer phải giữ evidence structure:
+
+```txt
+kind: tool_result
+reason: tool_error:edit
+excerpt: ...
+```
+
+và normalize/reject target mismatch như `target=rules` nhưng chỉ sửa `AGENTS.md`.
 
 ---
 

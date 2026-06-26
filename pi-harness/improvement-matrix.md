@@ -976,7 +976,81 @@ provider auth config
 
 ---
 
-## 19. Improvement proposal fields by target
+## 19. LLM reflection target routing contract
+
+LLM reflection không được tự đoán target chỉ từ tên target trong JSON schema. Reflection prompt phải nhúng một guide ngắn từ improvement matrix và runtime import vẫn phải validate/normalize target.
+
+### 19.1 Target routing guide trong prompt
+
+Prompt `/harness-reflect-pi` nên hướng dẫn model chọn target theo nguyên tắc **least risky target that fits the evidence**:
+
+| Target | Khi chọn | Không chọn khi |
+|---|---|---|
+| `memory` | Evidence là project fact/preference/decision ổn định, lặp lại và nên nhớ cho future sessions. | One-off task detail, secret, raw output, hoặc workflow chưa ổn định. |
+| `rules` | Cần detector deterministic cho pattern lặp lại trong future scans. Target files là `harness/rules/**` hoặc `src/analysis/rules/**`. | Proposed change chỉ sửa `AGENTS.md` hoặc docs. |
+| `agents` | Cần instruction/checklist ngắn cho coding agent trong project. Target file thường là `AGENTS.md`. | Workflow dài/phức tạp hơn checklist ngắn. |
+| `skill` | Workflow nhiều bước lặp lại, cần ordering/checks/tool usage riêng. Target file là `skills/**/SKILL.md` hoặc path skill tương ứng. | Chỉ cần một câu rule ngắn trong `AGENTS.md`. |
+| `docs` | Repeated conceptual confusion hoặc docs gap. Target file là `docs/**`/README. | Rule vận hành cho agent hoặc detector runtime. |
+| `parser` | Repeated `warnings.jsonl` parser/normalizer warning hoặc format drift. | Không có parser warning/evidence format drift. |
+| `redaction` | Evidence cho thấy secret/token/path chưa được redact hoặc sensitive policy thiếu. Target files là redaction code/tests. | Chỉ muốn thêm note an toàn vào `AGENTS.md`; khi đó chọn `agents`. |
+| `eval` | Failure/accepted proposal cần regression coverage. Target files là `harness/evals/**` hoặc eval fixtures. | Chưa có behavior đủ rõ để check. |
+| `tool` | Cần thay đổi tool/extension wrapper behavior. | Chỉ document workflow note trong `AGENTS.md`; khi đó chọn `agents`. |
+
+Priority khi nhiều target đều hợp lý:
+
+```txt
+docs/memory → agents/prompt → rules/skill → eval → tool/extension → parser/redaction → settings
+```
+
+### 19.2 Evidence enrichment trước LLM
+
+Runtime nên enrich mỗi evidence item bằng routing hints để giảm hallucination:
+
+```json
+{
+  "kind": "tool_result",
+  "reason": "tool_error:edit",
+  "likelyTargets": ["agents", "rules", "eval"],
+  "targetGuidance": "Prefer agents for a workflow note; use rules only if adding detector config/code."
+}
+```
+
+Mapping khuyến nghị:
+
+| Evidence reason | likelyTargets |
+|---|---|
+| `tool_error:edit` lặp lại | `agents`, `rules`, `eval` |
+| `tool_error:bash`/Gradle permission lặp lại | `agents`, `rules` |
+| `safety_sensitive` + actual leaked/unredacted value | `redaction`, `agents` |
+| `user_correction` lặp lại | `memory`, `agents`, `docs` |
+| `parser_warning:*` | `parser`, `rules`, `eval` |
+| repeated conceptual explanations | `docs`, `memory`, `skill` |
+| repeated multi-step command workflow | `skill`, `agents`, `docs` |
+
+### 19.3 Import validation/normalization
+
+Importer phải giữ audit trail và chặn/normalize mismatch phổ biến:
+
+```txt
+target=rules + targetFiles=[AGENTS.md]      → normalize/reject to agents
+target=tool + targetFiles=[AGENTS.md]       → normalize/reject to agents
+target=redaction + no redaction code/tests  → normalize/reject to agents/docs
+target=parser + no parser files/tests       → reject or require revision
+```
+
+Proposal markdown nên giữ evidence fields riêng:
+
+```txt
+kind: tool_result
+reason: tool_error:edit
+excerpt: ...
+```
+
+Không dùng prose chẩn đoán làm `kind`.
+
+---
+
+## 20. Improvement proposal fields by target
 
 Every proposal should include target-specific fields.
 
@@ -1055,7 +1129,7 @@ deterministic checks
 
 ---
 
-## 20. Priority rules
+## 21. Priority rules
 
 When one signal can map to many targets, choose least risky target first.
 
@@ -1092,7 +1166,7 @@ Parser warning:
 
 ---
 
-## 21. Final policy
+## 22. Final policy
 
 ```txt
 Harness improves components through evidence-backed proposals.

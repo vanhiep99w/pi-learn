@@ -820,11 +820,38 @@ LLM phải tuân thủ:
 - Không tự sửa file.
 - Không tạo proposal nếu evidence yếu.
 - Mọi proposal phải có rollback.
+- Chọn target theo target routing guide từ `improvement-matrix.md`, không đoán tự do từ tên target trong schema.
+- Giữ `kind`, `reason`, `excerpt` của evidence tách biệt; không nhét câu chẩn đoán vào `kind`.
+
+### Target routing trong LLM reflection
+
+Prompt `/harness-reflect-pi` phải giải thích ngắn khi nào chọn từng target:
+
+```txt
+memory    = fact/preference/decision ổn định cần nhớ
+rules     = detector deterministic; target files là harness/rules hoặc analysis/rules
+agents    = instruction/checklist ngắn trong AGENTS.md
+skill     = workflow nhiều bước lặp lại
+docs      = repeated conceptual confusion hoặc docs gap
+parser    = parser/normalizer warning hoặc session format drift
+redaction = redaction code/tests khi có leak hoặc pattern thiếu
+eval      = regression fixture cho known failure/accepted proposal
+tool      = thay đổi tool/extension wrapper, không phải AGENTS note
+```
+
+Runtime cũng nên enrich evidence bằng `likelyTargets`/`targetGuidance` và importer phải validate/normalize mismatch, ví dụ:
+
+```txt
+target=rules + targetFiles=AGENTS.md     → agents
+target=tool + targetFiles=AGENTS.md      → agents
+target=redaction + no redaction code     → agents/docs hoặc reject
+```
 
 ### Definition of Done
 
 - LLM tạo proposal có cấu trúc.
 - Proposal references session/entry IDs.
+- Proposal target khớp với target files hoặc bị importer normalize/reject.
 - User có thể reject/approve thủ công.
 
 ---

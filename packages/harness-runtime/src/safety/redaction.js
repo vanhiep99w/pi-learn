@@ -5,6 +5,9 @@ const SECRET_PATTERNS = [
   { name: "tavily_key", regex: /tvly-[A-Za-z0-9_-]{8,}/gi },
   { name: "authorization_bearer", regex: /(Authorization\s*:\s*Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, replacement: "$1<REDACTED_SECRET>" },
   { name: "env_secret_assignment", regex: /((?:API|TOKEN|SECRET|KEY|PASSWORD)[A-Z0-9_]*\s*=\s*)[^\s]+/gi, replacement: "$1<REDACTED_SECRET>" },
+  { name: "sensitive_env_assignment", regex: /([A-Z0-9_]*(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_?KEY|CREDENTIAL)[A-Z0-9_]*\s*=\s*)[^\s]*/gi, replacement: "$1<REDACTED_SECRET>" },
+  { name: "sensitive_yaml_assignment", regex: /([A-Z0-9_.-]*(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_?KEY|CREDENTIAL)[A-Z0-9_.-]*\s*:\s*)[^\s#]+/gi, replacement: "$1<REDACTED_SECRET>" },
+  { name: "long_opaque_token", regex: /\b(?=[A-Za-z0-9_-]{80,}\b)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]+\b/g, replacement: "<REDACTED_SECRET>" },
 ];
 
 const SENSITIVE_PATH_PATTERNS = [

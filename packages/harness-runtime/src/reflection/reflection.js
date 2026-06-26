@@ -39,6 +39,7 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
     const warnings = result.warnings ?? readJsonlSafe(result.paths?.warnings);
 
     for (const warning of warnings) {
+      const reason = `parser_warning:${warning.code ?? "unknown"}`;
       candidates.push({
         score: 95,
         source: "warning",
@@ -47,8 +48,9 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
         entryId: warning.entryId,
         timestamp: warning.timestamp,
         kind: warning.code ?? "warning",
-        reason: `parser_warning:${warning.code ?? "unknown"}`,
+        reason,
         excerpt: warning.message,
+        ...targetHintsForEvidence({ reason, kind: warning.code ?? "warning" }),
       });
     }
 
@@ -67,13 +69,14 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
           reason: reason.reason,
           tool: event.tool?.name,
           excerpt: firstNonEmpty(event.excerpt, event.summary, event.bash?.errorLines?.join(" | ")),
+          ...targetHintsForEvidence({ reason: reason.reason, kind: event.kind, toolName: event.tool?.name, excerpt: firstNonEmpty(event.excerpt, event.summary, event.bash?.errorLines?.join(" | ")) }),
         });
       }
     }
   }
 
   const seen = new Set();
-  return candidates
+  const deduped = candidates
     .map((item) => sanitizeEvidence(item, maxExcerptChars))
     .filter((item) => {
       const key = `${item.sessionId}:${item.entryId}:${item.reason}`;
@@ -81,8 +84,8 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
       seen.add(key);
       return true;
     })
-    .sort((a, b) => b.score - a.score || String(a.timestamp ?? "").localeCompare(String(b.timestamp ?? "")))
-    .slice(0, maxEvents);
+    .sort((a, b) => b.score - a.score || String(a.timestamp ?? "").localeCompare(String(b.timestamp ?? "")));
+  return pickBalancedEvidence(deduped, maxEvents);
 }
 
 export function renderReflectionPrompt({ project, generatedAt = new Date(), evidence, metrics, maxExcerptChars = DEFAULT_MAX_EXCERPT_CHARS }) {
@@ -109,12 +112,12 @@ export function renderReflectionPrompt({ project, generatedAt = new Date(), evid
   lines.push(JSON.stringify({
     proposals: [{
       title: "Short actionable title",
-      target: "memory|rules|parser|redaction|docs|eval|agents|tool",
+      target: "memory|rules|parser|redaction|docs|eval|agents|skill|tool",
       targetFiles: ["relative/path"],
       risk: "low|medium|high",
       problem: "Evidence-backed problem statement",
       proposedChange: "Concrete change to make",
-      evidence: [{ sessionId: "...", entryId: "...", reason: "..." }],
+      evidence: [{ sessionId: "...", entryId: "...", kind: "tool_result|assistant_message|user_message|warning", reason: "...", excerpt: "short redacted excerpt or summary" }],
       testPlan: ["Concrete command or verification"],
       rollbackPlan: "How to undo the change",
     }],
@@ -122,12 +125,31 @@ export function renderReflectionPrompt({ project, generatedAt = new Date(), evid
   lines.push("```");
   lines.push("");
   lines.push("Reject a proposal if it lacks evidence refs, target files, risk, test plan, or rollback plan.");
+  lines.push("Use the original evidence kind/reason/excerpt when citing evidence; do not put diagnostic prose in `kind`.");
+  lines.push("");
+  lines.push("## Target routing guide");
+  lines.push("Choose the least risky target that fits the evidence and target files:");
+  lines.push("- memory: stable project facts, preferences, or decisions worth remembering; not one-off details or secrets.");
+  lines.push("- rules: deterministic detector/config/code for repeated patterns; target files should be harness/rules/** or src/analysis/rules/**, not only AGENTS.md.");
+  lines.push("- agents: short project instruction/checklist for coding agents; target file is usually AGENTS.md.");
+  lines.push("- skill: repeated multi-step workflow too long for AGENTS.md; target files should be skills/**/SKILL.md or an explicit skill path.");
+  lines.push("- docs: repeated conceptual confusion or project documentation gap; target files should be docs/** or README.md.");
+  lines.push("- parser: repeated parser/normalizer warnings or Pi session format drift; target parser/normalizer code and tests.");
+  lines.push("- redaction: unredacted secret/token/path pattern or sensitive policy gap; target redaction code/tests. Use agents/docs for safety notes only.");
+  lines.push("- eval: regression scenario for a known failure or accepted proposal; target harness/evals/** or eval fixtures.");
+  lines.push("- tool: tool/extension wrapper behavior change; do not use tool for AGENTS.md workflow notes.");
+  lines.push("Priority when several targets fit: docs/memory → agents → rules/skill → eval → tool → parser/redaction.");
+  lines.push("Use each evidence item's likelyTargets/targetGuidance when present; if targetFiles are only AGENTS.md, prefer target=agents.");
+  if (!project?.gitRoot) {
+    lines.push("Project root has no enclosing git repository. Prefer proposal changes that can be reviewed manually, and mention if target files are outside nested service repos.");
+  }
   lines.push("");
   lines.push("## Project");
   lines.push("```json");
   lines.push(JSON.stringify({
     projectKey: safeProject.projectKey,
     projectRoot: safeProject.projectRoot,
+    gitRoot: safeProject.gitRoot,
     name: safeProject.name,
   }, null, 2));
   lines.push("```");
@@ -156,17 +178,20 @@ function normalizeReflectionProposal({ proposal, project, index }) {
   if (!["low", "medium", "high"].includes(proposal.risk)) throw new Error(`LLM reflection proposal ${index + 1} has invalid risk: ${proposal.risk}`);
 
   const redacted = redactValue(proposal).value;
+  const targetFiles = redacted.targetFiles.map(String);
+  const target = normalizeProposalTarget(String(redacted.target), targetFiles);
   const evidence = redacted.evidence.map((item) => ({
     sessionId: item.sessionId,
     entryId: item.entryId,
-    kind: item.reason ?? item.kind ?? "llm_reflection",
+    kind: item.kind ?? "llm_reflection",
+    reason: item.reason,
     excerpt: truncateString(String(item.excerpt ?? item.reason ?? ""), 500).value,
   }));
   return {
     ruleId: "LLM-REFLECT",
     title: String(redacted.title),
-    target: String(redacted.target),
-    targetFiles: redacted.targetFiles.map(String),
+    target,
+    targetFiles,
     risk: redacted.risk,
     problem: String(redacted.problem),
     proposedChange: String(redacted.proposedChange),
@@ -175,7 +200,7 @@ function normalizeReflectionProposal({ proposal, project, index }) {
     evidence,
     status: "draft",
     createdAt: new Date().toISOString(),
-    fingerprint: stableHash(["LLM-REFLECT", project?.projectKey, redacted.title, redacted.target, evidence.map((item) => `${item.sessionId}:${item.entryId}:${item.kind}`).join("|")].join("|")),
+    fingerprint: stableHash(["LLM-REFLECT", project?.projectKey, redacted.title, target, evidence.map((item) => `${item.sessionId}:${item.entryId}:${item.kind}:${item.reason ?? ""}`).join("|")].join("|")),
   };
 }
 
@@ -192,6 +217,93 @@ function parseLooseJson(text) {
     if (start >= 0 && end > start) return JSON.parse(value.slice(start, end + 1));
     throw _error;
   }
+}
+
+function pickBalancedEvidence(items, maxEvents) {
+  const limit = Number(maxEvents) || DEFAULT_MAX_EVENTS;
+  const perReasonLimit = Math.max(3, Math.ceil(limit * 0.3));
+  const selected = [];
+  const reasonCounts = new Map();
+
+  for (const item of items) {
+    const reason = item.reason ?? "unknown";
+    const count = reasonCounts.get(reason) ?? 0;
+    if (count < perReasonLimit) {
+      selected.push(item);
+      reasonCounts.set(reason, count + 1);
+    }
+    if (selected.length >= limit) return selected;
+  }
+
+  return selected;
+}
+
+function normalizeProposalTarget(target, targetFiles) {
+  const files = targetFiles.map((file) => String(file));
+  const onlyAgents = files.length > 0 && files.every((file) => file === "AGENTS.md" || file.endsWith("/AGENTS.md"));
+  const hasDocs = files.some((file) => file.startsWith("docs/") || file.endsWith(".md"));
+  const hasHarnessRule = files.some((file) => file.includes("harness/rules/") || file.includes("src/analysis/rules"));
+  const hasRedactionCode = files.some((file) => file.includes("redaction") || file.includes("safety/"));
+
+  if (onlyAgents && ["rules", "redaction", "tool"].includes(target)) return "agents";
+  if (target === "rules" && !hasHarnessRule && onlyAgents) return "agents";
+  if (target === "redaction" && !hasRedactionCode && onlyAgents) return "agents";
+  if (target === "tool" && !files.some((file) => file.includes("tools") || file.includes("extensions")) && onlyAgents) return "agents";
+  if (target === "docs" || (hasDocs && !hasHarnessRule && !hasRedactionCode)) return target;
+  return target;
+}
+
+function targetHintsForEvidence({ reason, kind, toolName, excerpt }) {
+  const text = String(excerpt ?? "");
+  if (String(reason).startsWith("parser_warning:")) {
+    return {
+      likelyTargets: ["parser", "rules", "eval"],
+      targetGuidance: "Use parser for session format/normalizer fixes; use rules only for detector tuning; add eval if this should become regression coverage.",
+    };
+  }
+  if (reason === "tool_error:edit") {
+    return {
+      likelyTargets: ["agents", "rules", "eval"],
+      targetGuidance: "Prefer agents for exact-text edit workflow guidance; use rules only if adding detector config/code; add eval for repeated regression coverage.",
+    };
+  }
+  if (reason === "tool_error:bash" || reason === "bash_failure") {
+    const gradlePermission = /gradlew.*permission denied|permission denied.*gradlew/i.test(text);
+    return {
+      likelyTargets: gradlePermission ? ["agents", "rules"] : ["agents", "rules", "eval"],
+      targetGuidance: gradlePermission
+        ? "Prefer agents for a Gradle wrapper fallback note; use rules only if adding a detector for repeated wrapper permission failures."
+        : "Prefer agents for command checklist guidance; use rules for deterministic repeated failure detection; use eval for known regression coverage.",
+    };
+  }
+  if (reason === "safety_sensitive") {
+    return {
+      likelyTargets: ["redaction", "agents"],
+      targetGuidance: "Use redaction only for missing redaction code/tests; use agents/docs for safe handling notes when values are already redacted.",
+    };
+  }
+  if (reason === "user_correction") {
+    return {
+      likelyTargets: ["memory", "agents", "docs"],
+      targetGuidance: "Use memory for stable repeated facts/preferences; agents for short workflow rules; docs for repeated conceptual confusion.",
+    };
+  }
+  if (reason === "compaction") {
+    return {
+      likelyTargets: ["memory", "agents", "eval"],
+      targetGuidance: "Use memory for stable context facts, agents for handoff/checklist rules, eval for long-session regression coverage.",
+    };
+  }
+  if (kind === "assistant_message" && /workflow|checklist|profile|guide|step|bước|quy trình/i.test(text)) {
+    return {
+      likelyTargets: ["docs", "memory", "skill"],
+      targetGuidance: "Use docs for repeated explanations, memory for stable facts, and skill for repeated multi-step workflows.",
+    };
+  }
+  return {
+    likelyTargets: ["agents", "docs"],
+    targetGuidance: `Use the target routing guide; do not choose ${toolName ? `tool for ${toolName} notes` : "tool/rules/redaction"} unless target files match that component.`,
+  };
 }
 
 function scoreEvent(event) {

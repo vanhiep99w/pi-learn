@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Current status — 2026-06-14
+## 1. Current status — 2026-06-26
 
 Trạng thái hiện tại của `pi-harness` trong repo này:
 
@@ -28,6 +28,8 @@ Pi wrapper: implemented `/harness-report`, `/harness-last`, `/harness-warnings`,
 Apply loop: controlled MVP implemented with approval, proposal history, target allowlist, git branch, patch apply and rollback
 Eval loop: deterministic MVP implemented with private JSON/Markdown reports
 Gated automation: opt-in MVP implemented for scan/report/draft proposals/eval only; no apply/push
+Reflection hardening: redaction strengthened for env/yaml/long opaque tokens; evidence selection caps one reason so safety evidence does not dominate; proposal import preserves evidence kind/reason and normalizes AGENTS-only target mismatches
+Reflection target routing implemented: prompt includes explicit target routing guide, selected evidence includes likelyTargets/targetGuidance, and import preserves evidence kind/reason plus normalizes common AGENTS-only target mismatches
 ```
 
 Docs/spec đã có:
@@ -64,6 +66,7 @@ Runtime:
 
 LLM:
   chỉ optional sau normalized data, để reflect/propose
+  phải có target routing guide; không để model tự đoán target từ schema
 
 Improve:
   evidence → proposal → review → apply → eval/test → commit/rollback
@@ -763,6 +766,12 @@ Pi:
 - [x] Enforce max excerpt chars.
 - [x] Enforce redaction.
 - [x] Prompt LLM to avoid weak proposals.
+- [x] Preserve evidence refs and require structured evidence fields.
+- [x] Normalize common target mismatch on import when `AGENTS.md`-only proposal is labeled `rules`/`tool`/`redaction`.
+- [x] Cap one evidence reason during selection so `safety_sensitive` does not dominate all prompt slots.
+- [x] Strengthen redaction for env/yaml secret assignments and long opaque token-like values before reflection.
+- [x] Add explicit target routing guide to reflection prompt (`memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`).
+- [x] Enrich selected evidence with `likelyTargets` and `targetGuidance` before sending to LLM.
 - [x] Save reflection prompt under private harness home.
 - [x] Pi extension path using the current Pi session model via `/harness-reflect-pi` + `harness_import_llm_reflection` tool.
 - [x] Runtime stays API-key free; no separate LLM provider credentials in harness runtime.
@@ -786,11 +795,20 @@ LLM-assisted proposal import requires:
 
 ```txt
 - has evidence refs
+- preserves evidence kind/reason/excerpt separately
 - has target files
+- target matches target files or is normalized/rejected
 - has risk
 - has test plan
 - has rollback
 - does not include secrets/raw full logs
+```
+
+Remaining Phase 8 hardening:
+
+```txt
+- Stricter rejection for parser/redaction/tool targets that lack matching code/test target files
+- Live-test proposal quality on more projects after target routing prompt change
 ```
 
 ---
@@ -1012,11 +1030,10 @@ Do not enter next phase unless gate passes.
 Immediate recommended next steps:
 
 ```txt
-1. Live-test `/harness-automation-status` and `/harness-automate` inside Pi after `/reload`.
-2. Decide whether Phase 12 should be dashboard/status UI or richer automation scheduling.
-3. Keep automation opt-in and proposal-first.
-4. Use eval results as the gate before any broader automation.
-5. Do not add silent auto-apply or auto-push.
+1. Live-test `/harness-reflect-pi` on `prasac` and verify targets match target files.
+2. Live-test `/harness-automation-status` and `/harness-automate` inside Pi after `/reload`.
+3. Decide whether Phase 12 should be dashboard/status UI or richer automation scheduling.
+4. Keep automation opt-in and proposal-first; do not add silent auto-apply or auto-push.
 ```
 
 Current implementation choice:
@@ -1050,7 +1067,7 @@ Reason:
 | Memory becomes junk | review/approval required |
 | AGENTS.md bloats | prefer memory/prompt/rule first |
 | Extension slows Pi startup | extension calls runtime on-demand only |
-| LLM hallucinates proposals | evidence refs required; no apply automatically |
+| LLM hallucinates proposals | evidence refs + target routing guide required; import validates/normalizes target mismatch; no apply automatically |
 | Apply damages worktree | git clean check + target file allowlist + branch |
 | Automation surprises user | opt-in only; autoPush false |
 

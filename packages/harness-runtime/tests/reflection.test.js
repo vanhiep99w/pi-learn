@@ -24,9 +24,41 @@ test("selectReflectionEvidence uses normalized redacted events and truncates exc
 
   assert.equal(evidence.length, 1);
   assert.equal(evidence[0].reason, "tool_error:edit");
+  assert.deepEqual(evidence[0].likelyTargets, ["agents", "rules", "eval"]);
+  assert.match(evidence[0].targetGuidance, /Prefer agents/);
   assert.match(evidence[0].excerpt, /<REDACTED_SECRET>/);
   assert.doesNotMatch(evidence[0].excerpt, /sk-abcdefghijklmnopqrstuvwxyz/);
   assert.equal(evidence[0].excerpt.length <= 160, true);
+});
+
+test("selectReflectionEvidence caps one reason so safety evidence does not dominate", () => {
+  const fixture = createFixture();
+  const events = [];
+  for (let index = 0; index < 20; index++) {
+    events.push({
+      eventId: `safe-${index}`,
+      entryId: `safe-${index}`,
+      kind: "tool_result",
+      excerpt: `secret event ${index} sk-abcdefghijklmnopqrstuvwxyz`,
+      tool: { name: "read", isError: false },
+      safety: { redacted: true, sensitivePath: false, secretDetected: true },
+      activePath: true,
+    });
+  }
+  events.push({
+    eventId: "edit-1",
+    entryId: "edit-1",
+    kind: "tool_result",
+    excerpt: "oldText did not match",
+    tool: { name: "edit", isError: true },
+    activePath: true,
+  });
+  const session = writeCachedSession(fixture, { sessionId: "s1", events });
+
+  const evidence = selectReflectionEvidence({ sessionResults: [session], maxEvents: 10 });
+
+  assert.equal(evidence.some((item) => item.reason === "tool_error:edit"), true);
+  assert.equal(evidence.filter((item) => item.reason === "safety_sensitive").length <= 3, true);
 });
 
 test("buildReflection renders safety rules, schema, metrics and evidence refs", () => {
@@ -50,6 +82,9 @@ test("buildReflection renders safety rules, schema, metrics and evidence refs", 
   assert.match(reflection.prompt, /Return JSON only/);
   assert.match(reflection.prompt, /targetFiles/);
   assert.match(reflection.prompt, /rollbackPlan/);
+  assert.match(reflection.prompt, /## Target routing guide/);
+  assert.match(reflection.prompt, /skill: repeated multi-step workflow/);
+  assert.match(reflection.prompt, /likelyTargets/);
   assert.match(reflection.prompt, /"entryId": "e1"/);
   assert.equal(reflection.metrics.sessions, 1);
 });
@@ -66,7 +101,7 @@ test("reflectionResponseToProposals validates required proposal shape", () => {
         risk: "medium",
         problem: "Parser warning repeated.",
         proposedChange: "Add fixture for the warning.",
-        evidence: [{ sessionId: "s1", entryId: "e1", reason: "parser_warning" }],
+        evidence: [{ sessionId: "s1", entryId: "e1", kind: "warning", reason: "parser_warning", excerpt: "unknown entry" }],
         testPlan: ["Run `npm --prefix packages/harness-runtime test`."],
         rollbackPlan: "Revert the fixture.",
       }],
@@ -76,7 +111,31 @@ test("reflectionResponseToProposals validates required proposal shape", () => {
   assert.equal(proposals.length, 1);
   assert.equal(proposals[0].ruleId, "LLM-REFLECT");
   assert.equal(proposals[0].evidence[0].entryId, "e1");
+  assert.equal(proposals[0].evidence[0].kind, "warning");
+  assert.equal(proposals[0].evidence[0].reason, "parser_warning");
   assert.equal(Boolean(proposals[0].fingerprint), true);
+});
+
+test("reflectionResponseToProposals normalizes AGENTS-only target mismatches", () => {
+  const fixture = createFixture();
+  const proposals = reflectionResponseToProposals({
+    project: fixture.project,
+    response: JSON.stringify({
+      proposals: [{
+        title: "Add edit workflow note",
+        target: "tool",
+        targetFiles: ["AGENTS.md"],
+        risk: "low",
+        problem: "Edit failures repeated.",
+        proposedChange: "Document exact-text edit retry workflow.",
+        evidence: [{ sessionId: "s1", entryId: "e1", kind: "tool_result", reason: "tool_error:edit", excerpt: "oldText mismatch" }],
+        testPlan: ["Review AGENTS.md."],
+        rollbackPlan: "Remove the note.",
+      }],
+    }),
+  });
+
+  assert.equal(proposals[0].target, "agents");
 });
 
 test("writeReflectionPrompt writes latest and dated prompt under private harness home", () => {

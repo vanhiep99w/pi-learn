@@ -954,6 +954,8 @@ selected events
 warnings summary
 evidence refs
 redacted excerpts
+target routing guide
+optional likelyTargets/targetGuidance per evidence item
 ```
 
 Not:
@@ -963,6 +965,55 @@ entire raw JSONL
 full bash output
 full assistant history
 secrets/auth files
+```
+
+### 13.1 LLM target routing is explicit
+
+Reflection prompt phải dạy model cách chọn target. Không nên chỉ đưa schema:
+
+```json
+{ "target": "memory|rules|parser|redaction|docs|eval|agents|tool" }
+```
+
+vì model sẽ đoán và có thể tạo mismatch như:
+
+```txt
+target=rules nhưng targetFiles=AGENTS.md
+target=tool nhưng targetFiles=AGENTS.md
+target=redaction nhưng chỉ thêm security note vào AGENTS.md
+```
+
+Prompt phải include routing guide rút gọn từ `improvement-matrix.md`:
+
+```txt
+memory    -> stable facts/preferences/decisions
+rules     -> deterministic detector/config/code
+agents    -> short AGENTS.md instruction/checklist
+skill     -> repeated multi-step workflow
+docs      -> repeated confusion/docs gap
+parser    -> parser warning/session format drift
+redaction -> redaction policy/code/tests
+eval      -> regression scenario/tooling fixture
+tool      -> tool/extension wrapper behavior
+```
+
+Runtime nên enrich evidence trước LLM:
+
+```json
+{
+  "kind": "tool_result",
+  "reason": "tool_error:edit",
+  "likelyTargets": ["agents", "rules", "eval"],
+  "targetGuidance": "Prefer agents for a workflow note; use rules only if adding detector config/code."
+}
+```
+
+Importer vẫn là guard cuối cùng:
+
+```txt
+- normalize/reject target ↔ targetFiles mismatch
+- preserve evidence kind/reason/excerpt separately
+- require target files, risk, test plan and rollback
 ```
 
 ---
