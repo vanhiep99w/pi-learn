@@ -38,6 +38,19 @@ test("renderProposalMarkdown includes required evidence/test/rollback sections",
   assert.match(markdown, /## Rollback/);
 });
 
+test("renderProposalMarkdown includes machine-applicable patch section when provided", () => {
+  const markdown = renderProposalMarkdown({
+    id: "P-9998",
+    status: "draft",
+    ...createProposal({ fingerprint: "fp-3" }),
+    patch: [{ path: "AGENTS.md", oldText: "before", newText: "after" }],
+  });
+
+  assert.match(markdown, /## Patch/);
+  assert.match(markdown, /```json/);
+  assert.match(markdown, /"path": "AGENTS.md"/);
+});
+
 function createFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-proposals-"));
   return {

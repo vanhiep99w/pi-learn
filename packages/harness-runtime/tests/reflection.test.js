@@ -82,6 +82,7 @@ test("buildReflection renders safety rules, schema, metrics and evidence refs", 
   assert.match(reflection.prompt, /Return JSON only/);
   assert.match(reflection.prompt, /targetFiles/);
   assert.match(reflection.prompt, /rollbackPlan/);
+  assert.match(reflection.prompt, /`oldText` must be an exact unique substring/);
   assert.match(reflection.prompt, /## Target routing guide/);
   assert.match(reflection.prompt, /skill: repeated multi-step workflow/);
   assert.match(reflection.prompt, /likelyTargets/);
@@ -104,6 +105,7 @@ test("reflectionResponseToProposals validates required proposal shape", () => {
         evidence: [{ sessionId: "s1", entryId: "e1", kind: "warning", reason: "parser_warning", excerpt: "unknown entry" }],
         testPlan: ["Run `npm --prefix packages/harness-runtime test`."],
         rollbackPlan: "Revert the fixture.",
+        patch: [{ path: "packages/harness-runtime/tests/parse-tree.test.js", oldText: "old", newText: "new" }],
       }],
     }),
   });
@@ -113,6 +115,7 @@ test("reflectionResponseToProposals validates required proposal shape", () => {
   assert.equal(proposals[0].evidence[0].entryId, "e1");
   assert.equal(proposals[0].evidence[0].kind, "warning");
   assert.equal(proposals[0].evidence[0].reason, "parser_warning");
+  assert.deepEqual(proposals[0].patch, [{ path: "packages/harness-runtime/tests/parse-tree.test.js", oldText: "old", newText: "new" }]);
   assert.equal(Boolean(proposals[0].fingerprint), true);
 });
 

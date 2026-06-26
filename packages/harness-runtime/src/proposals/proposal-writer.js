@@ -95,6 +95,14 @@ export function renderProposalMarkdown(proposal) {
   for (const file of proposal.targetFiles ?? []) lines.push(`- ${file}`);
   if (!proposal.targetFiles?.length) lines.push("- TBD");
   lines.push("");
+  const patches = normalizePatchesForRender(proposal.patch ?? proposal.patches);
+  if (patches.length) {
+    lines.push("## Patch");
+    lines.push("```json");
+    lines.push(JSON.stringify(patches, null, 2));
+    lines.push("```");
+    lines.push("");
+  }
   lines.push("## Risk");
   lines.push(proposal.risk ?? "unknown");
   lines.push("");
@@ -110,6 +118,16 @@ export function renderProposalMarkdown(proposal) {
 
 export function proposalsDraftDir(config, projectKey) {
   return path.join(projectCacheDir(resolveHarnessHome(config), projectKey), "proposals", "draft");
+}
+
+function normalizePatchesForRender(value) {
+  if (!value) return [];
+  const patches = Array.isArray(value) ? value : [value];
+  return patches.filter((patch) => patch && typeof patch === "object").map((patch) => ({
+    path: String(patch.path ?? ""),
+    oldText: String(patch.oldText ?? ""),
+    newText: String(patch.newText ?? ""),
+  })).filter((patch) => patch.path && patch.oldText);
 }
 
 function nextProposalNumber(existing) {

@@ -120,11 +120,14 @@ export function renderReflectionPrompt({ project, generatedAt = new Date(), evid
       evidence: [{ sessionId: "...", entryId: "...", kind: "tool_result|assistant_message|user_message|warning", reason: "...", excerpt: "short redacted excerpt or summary" }],
       testPlan: ["Concrete command or verification"],
       rollbackPlan: "How to undo the change",
+      patch: [{ path: "relative/path", oldText: "exact text to replace", newText: "replacement text" }],
     }],
   }, null, 2));
   lines.push("```");
   lines.push("");
   lines.push("Reject a proposal if it lacks evidence refs, target files, risk, test plan, or rollback plan.");
+  lines.push("If the proposed change is a concrete edit to an existing text file, include `patch` as JSON-patch-like text replacements: `{ path, oldText, newText }`. `oldText` must be an exact unique substring from the target file, and `path` must appear in `targetFiles`.");
+  lines.push("If exact source text is unavailable from the evidence, omit `patch` and make clear the proposal is review/manual-only rather than machine-applicable.");
   lines.push("Use the original evidence kind/reason/excerpt when citing evidence; do not put diagnostic prose in `kind`.");
   lines.push("");
   lines.push("## Target routing guide");
@@ -197,11 +200,28 @@ function normalizeReflectionProposal({ proposal, project, index }) {
     proposedChange: String(redacted.proposedChange),
     testPlan: redacted.testPlan.map(String),
     rollbackPlan: String(redacted.rollbackPlan),
+    patch: normalizePatch(redacted.patch, targetFiles),
     evidence,
     status: "draft",
     createdAt: new Date().toISOString(),
     fingerprint: stableHash(["LLM-REFLECT", project?.projectKey, redacted.title, target, evidence.map((item) => `${item.sessionId}:${item.entryId}:${item.kind}:${item.reason ?? ""}`).join("|")].join("|")),
   };
+}
+
+function normalizePatch(value, targetFiles) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const items = Array.isArray(value) ? value : [value];
+  const allowed = new Set(targetFiles.map((file) => String(file).replace(/\\/g, "/").replace(/^\.\//, "")));
+  const normalized = [];
+  for (const item of items) {
+    if (!item || typeof item !== "object") throw new Error("LLM reflection patch entries must be objects.");
+    const patchPath = String(item.path ?? "").replace(/\\/g, "/").replace(/^\.\//, "");
+    if (!patchPath || patchPath.includes("../") || patchPath.startsWith("/") || patchPath === "..") throw new Error(`LLM reflection patch has unsafe path: ${item.path}`);
+    if (!allowed.has(patchPath)) throw new Error(`LLM reflection patch path must be listed in targetFiles: ${patchPath}`);
+    if (typeof item.oldText !== "string" || typeof item.newText !== "string") throw new Error("LLM reflection patch entries must include string oldText and newText.");
+    normalized.push({ path: patchPath, oldText: item.oldText, newText: item.newText });
+  }
+  return normalized.length ? normalized : undefined;
 }
 
 function parseLooseJson(text) {
