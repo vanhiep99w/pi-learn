@@ -177,7 +177,7 @@ function fileProtectionChecks() {
   let blocked = false;
   let message = "";
   try {
-    applyProposal({ config: fixture.config, project: fixture.project, id: proposal.id, skipTests: true });
+    applyProposal({ config: fixture.config, project: fixture.project, id: proposal.id });
   } catch (error) {
     blocked = /not listed in proposal target files|target/i.test(error.message);
     message = error.message;
@@ -197,7 +197,7 @@ function smartCommitBasicChecks() {
     patch: [{ path: "AGENTS.md", oldText: "Existing note.", newText: "Existing note.\n- Validate harness eval before automation." }],
   });
   approveProposal({ config: fixture.config, project: fixture.project, id: proposal.id });
-  const applied = applyProposal({ config: fixture.config, project: fixture.project, id: proposal.id, skipTests: true });
+  const applied = applyProposal({ config: fixture.config, project: fixture.project, id: proposal.id });
   const branch = git(fixture.projectRoot, ["branch", "--show-current"]).stdout.trim();
   const content = fs.readFileSync(path.join(fixture.projectRoot, "AGENTS.md"), "utf8");
   return [

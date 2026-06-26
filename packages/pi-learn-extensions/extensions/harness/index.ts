@@ -283,12 +283,12 @@ export default function harnessExtension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("harness-apply", {
-    description: "Apply an approved Harness proposal with a JSON Patch section. Usage: /harness-apply P-0001 [--allow-dirty] [--skip-tests] [--commit]",
+    description: "Apply an approved Harness proposal with a JSON Patch section. Usage: /harness-apply P-0001 [--allow-dirty] [--commit]",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
       const parts = splitArgs(args ?? "");
       const id = parts[0];
       const flags = parts.slice(1);
-      if (!id) return notifyOrLog(ctx, "Usage: /harness-apply P-0001 [--allow-dirty] [--skip-tests] [--commit]", "warning");
+      if (!id) return notifyOrLog(ctx, "Usage: /harness-apply P-0001 [--allow-dirty] [--commit]", "warning");
       if (ctx.hasUI && ctx.ui?.confirm) {
         const dirty = flags.includes("--allow-dirty") ? " with dirty-worktree override" : "";
         const ok = await ctx.ui.confirm("Apply Harness proposal", `Apply ${id}${dirty} on a harness/* branch? This may edit files listed in the proposal patch.`);
@@ -300,7 +300,6 @@ export default function harnessExtension(pi: ExtensionAPI) {
         `${output?.proposal?.id ?? id}: ${output?.proposal?.status ?? "applied"}`,
         output?.branchName ? `branch: ${output.branchName}` : undefined,
         output?.changedPaths?.length ? `changed: ${output.changedPaths.join(", ")}` : undefined,
-        output?.testResults?.length ? `tests: ${output.testResults.length}` : undefined,
         output?.diff ? `\nDiff\n${output.diff}` : undefined,
       ].filter(Boolean).join("\n");
       await showText(ctx, `🧩 Harness apply ${id}`, lines);
@@ -464,9 +463,6 @@ function parseHarnessArgs(args: string[], cwd: string) {
         break;
       case "--allow-dirty":
         options.allowDirty = true;
-        break;
-      case "--skip-tests":
-        options.skipTests = true;
         break;
       case "--commit":
         options.commit = true;

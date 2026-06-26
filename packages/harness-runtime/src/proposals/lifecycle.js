@@ -49,7 +49,7 @@ export function rollbackProposal({ config, project, id, logger }) {
   return { proposal: updated, historyEvent: event };
 }
 
-export function applyProposal({ config, project, id, allowDirty = false, skipTests = false, commit = false, logger }) {
+export function applyProposal({ config, project, id, allowDirty = false, commit = false, logger }) {
   const proposal = requireProposal({ config, project, id });
   if (proposal.status !== "approved") {
     throw cliLikeError(`Proposal must be approved before apply: ${id} (status: ${proposal.status ?? "unknown"})`);
@@ -68,7 +68,6 @@ export function applyProposal({ config, project, id, allowDirty = false, skipTes
   checkoutBranch(git, branchName);
 
   const changedPaths = applyTextPatches({ projectRoot: project.projectRoot, targetFiles, patches });
-  const testResults = skipTests ? [] : runProposalTests({ git, markdown });
   const diff = runGit(git, ["diff", "--", ...changedPaths]).stdout;
 
   let commitHash;
@@ -86,10 +85,10 @@ export function applyProposal({ config, project, id, allowDirty = false, skipTes
     project,
     proposal: updated,
     event: "proposal_applied",
-    data: { branchName, changedPaths, testResults, committed: Boolean(commit), commitHash },
+    data: { branchName, changedPaths, committed: Boolean(commit), commitHash },
   });
   logLifecycle(logger, project, event);
-  return { proposal: updated, historyEvent: event, branchName, changedPaths, testResults, diff, commitHash };
+  return { proposal: updated, historyEvent: event, branchName, changedPaths, diff, commitHash };
 }
 
 export function readProposalHistory({ config, project, id } = {}) {
@@ -251,28 +250,6 @@ function normalizeRelativePath(value) {
   return normalized;
 }
 
-function runProposalTests({ git, markdown }) {
-  const commands = extractTestCommands(markdown);
-  const results = [];
-  for (const command of commands) {
-    const result = spawnSync(command, { cwd: git.cwd, shell: true, encoding: "utf8", timeout: 120_000 });
-    const summary = { command, status: result.status, stdout: tail(result.stdout), stderr: tail(result.stderr) };
-    results.push(summary);
-    if (result.status !== 0) throw cliLikeError(`Proposal test failed: ${command}\n${result.stderr || result.stdout}`);
-  }
-  return results;
-}
-
-function extractTestCommands(markdown) {
-  const section = extractSection(markdown, "Test plan");
-  const commands = [];
-  for (const match of section.matchAll(/`([^`\n]+)`/g)) {
-    const command = match[1].trim();
-    if (/^(npm|node|bun|pnpm|yarn|git)\b/.test(command)) commands.push(command);
-  }
-  return [...new Set(commands)];
-}
-
 function extractSection(markdown, heading) {
   const pattern = new RegExp(`^## ${escapeRegExp(heading)}\\s*$`, "mi");
   const match = pattern.exec(markdown);
@@ -337,11 +314,6 @@ function logLifecycle(logger, project, event) {
     proposalId: event.proposalId,
     data: event.data,
   });
-}
-
-function tail(value, max = 2000) {
-  const text = String(value ?? "");
-  return text.length <= max ? text : text.slice(-max);
 }
 
 function escapeRegExp(value) {

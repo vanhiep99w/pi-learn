@@ -842,14 +842,12 @@ Pi:
 
 ```txt
 1. Check proposal status approved.
-2. Check git clean or ask explicit confirmation.
+2. Check git clean or require explicit `--allow-dirty` override.
 3. Create branch harness/P-0001.
 4. Apply patch to target files only.
-5. Run test plan.
-6. Show diff.
-7. Ask final confirmation.
-8. Commit if approved.
-9. Never push unless user explicitly asks.
+5. Show diff.
+6. Commit only if `--commit` is passed.
+7. Never push unless user explicitly asks.
 ```
 
 ### Tasks
@@ -861,7 +859,7 @@ Pi:
 - [x] Create/use branch `harness/P-0001` before applying.
 - [x] Apply only machine-readable `## Patch` JSON entries.
 - [x] Enforce proposal target file allowlist and project-root containment.
-- [x] Run extracted backticked test commands from `## Test plan` unless `--skip-tests` is passed.
+- [x] Do not execute `## Test plan` commands during apply; test plans remain review/eval guidance only.
 - [x] Support optional `--commit` with proposal id in commit message.
 - [x] Support rollback for uncommitted applies and committed applies.
 - [x] Add Pi wrapper commands: `/harness-approve`, `/harness-reject`, `/harness-apply`, `/harness-history`.
@@ -869,7 +867,7 @@ Pi:
 ### Definition of Done
 
 - [x] Apply cannot touch files outside proposal target list.
-- [x] Failed tests prevent commit.
+- [x] Apply does not run proposal test commands implicitly.
 - [x] Rollback command documented.
 - [x] Commit references proposal id and evidence.
 

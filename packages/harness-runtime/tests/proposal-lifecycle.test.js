@@ -34,7 +34,7 @@ test("applyProposal requires approved status and machine patch", () => {
   const written = writeProposalWithPatch(fixture);
 
   assert.throws(
-    () => applyProposal({ config: fixture.config, project: fixture.project, id: written.id, skipTests: true }),
+    () => applyProposal({ config: fixture.config, project: fixture.project, id: written.id }),
     /must be approved/,
   );
 });
@@ -44,7 +44,7 @@ test("applyProposal applies only target files and rollback restores uncommitted 
   const written = writeProposalWithPatch(fixture);
   approveProposal({ config: fixture.config, project: fixture.project, id: written.id });
 
-  const applied = applyProposal({ config: fixture.config, project: fixture.project, id: written.id, skipTests: true });
+  const applied = applyProposal({ config: fixture.config, project: fixture.project, id: written.id });
   assert.equal(applied.proposal.status, "applied");
   assert.equal(applied.branchName, `harness/${written.id}`);
   assert.deepEqual(applied.changedPaths, ["AGENTS.md"]);

@@ -230,7 +230,7 @@ export function rollback(options = {}) {
   return lifecycle("rollback", options, ({ config, project, logger }) => rollbackProposal({ config, project, id: options.id, logger }));
 }
 export function apply(options = {}) {
-  return lifecycle("apply", options, ({ config, project, logger }) => applyProposal({ config, project, id: options.id, allowDirty: Boolean(options.allowDirty), skipTests: Boolean(options.skipTests), commit: Boolean(options.commit), logger }));
+  return lifecycle("apply", options, ({ config, project, logger }) => applyProposal({ config, project, id: options.id, allowDirty: Boolean(options.allowDirty), commit: Boolean(options.commit), logger }));
 }
 
 export function history(options = {}) {
