@@ -11,7 +11,7 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 - `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
 - `harness` — đọc Pi session logs đã redact/normalize để tạo report, reflection proposals, eval và gated automation.
 - `aurora-ui` — custom input border + ChatGPT usage badge.
-- `openwiki` — Pi-native commands tạo/cập nhật tài liệu repo trong `openwiki/`.
+- `wiki` — Pi-native commands tạo/cập nhật tài liệu repo trong `wiki/`.
 - `midnight-aurora` — theme dark custom.
 
 Pi load package qua root `package.json`:
@@ -123,34 +123,34 @@ Nếu project settings đã có package:
 
 ## Cấu hình tùy chọn
 
-### OpenWiki Pi-native
+### Wiki Pi-native
 
-Extension `openwiki` port cách dùng OpenWiki sang Pi: giữ workflow tài liệu `openwiki/`, git context, `.last-update.json` và no-op update, nhưng dùng chính agent/model/tools hiện tại của Pi thay vì chạy CLI/DeepAgents riêng.
+Extension `wiki` port cách dùng OpenWiki sang Pi với output folder `wiki/` và command prefix `/wiki-*`: giữ workflow tài liệu, git context, `.last-update.json` và no-op update, nhưng dùng chính agent/model/tools hiện tại của Pi thay vì chạy CLI/DeepAgents riêng.
 
 Commands:
 
 ```txt
-/openwiki-init [ghi chú thêm]
-/openwiki-update [ghi chú thêm]
-/openwiki-ask <câu hỏi>
-/openwiki-status
+/wiki-init [ghi chú thêm]
+/wiki-update [ghi chú thêm]
+/wiki-ask <câu hỏi>
+/wiki-status
 ```
 
 Ví dụ:
 
 ```txt
-/openwiki-init
-/openwiki-update Document the new extension commands first
-/openwiki-ask Repo này expose những Pi extension nào?
+/wiki-init
+/wiki-update Document the new extension commands first
+/wiki-ask Repo này expose những Pi extension nào?
 ```
 
 Ghi chú:
 
-- Docs được tạo/cập nhật trong `openwiki/` của repo hiện tại.
-- Metadata do extension ghi tại `openwiki/.last-update.json` sau khi Pi agent kết thúc và nội dung docs thật sự thay đổi.
-- `/openwiki-update` không có ghi chú thêm sẽ skip nếu không phát hiện thay đổi repo đáng kể từ lần update trước.
+- Docs được tạo/cập nhật trong `wiki/` của repo hiện tại.
+- Metadata do extension ghi tại `wiki/.last-update.json` sau khi Pi agent kết thúc và nội dung docs thật sự thay đổi.
+- `/wiki-update` không có ghi chú thêm sẽ skip nếu không phát hiện thay đổi repo đáng kể từ lần update trước.
 - Extension không đọc key OpenWiki riêng; nó dùng model/provider hiện tại của Pi.
-- Base upstream ban đầu: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem checklist nâng cấp trong `packages/pi-learn-extensions/extensions/openwiki/README.md`.
+- Base upstream ban đầu: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem checklist nâng cấp trong `packages/pi-learn-extensions/extensions/wiki/README.md`.
 
 ### Tavily cho `web_search`
 
@@ -366,7 +366,7 @@ mkdir -p packages/pi-learn-extensions/extensions packages/pi-learn-extensions/th
 
 cp -r .pi/extensions/web-tools packages/pi-learn-extensions/extensions/
 cp -r .pi/extensions/chatgpt-usage-status packages/pi-learn-extensions/extensions/
-cp -r .pi/extensions/openwiki packages/pi-learn-extensions/extensions/
+cp -r .pi/extensions/wiki packages/pi-learn-extensions/extensions/
 cp .pi/extensions/prompt-with-model.ts packages/pi-learn-extensions/extensions/
 cp .pi/extensions/aurora-ui.ts packages/pi-learn-extensions/extensions/
 cp .pi/themes/midnight-aurora.json packages/pi-learn-extensions/themes/

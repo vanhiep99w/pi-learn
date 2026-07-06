@@ -1,4 +1,4 @@
-const OPEN_WIKI_DIR = "openwiki";
+const OPEN_WIKI_DIR = "wiki";
 const UPDATE_METADATA_PATH = `${OPEN_WIKI_DIR}/.last-update.json`;
 
 type OpenWikiCommand = "init" | "update" | "chat";
@@ -23,7 +23,7 @@ function formatLastUpdate(lastUpdate: UpdateMetadata | null): string {
   return JSON.stringify(lastUpdate, null, 2);
 }
 
-export function createPiNativeOpenWikiPrompt(
+export function createPiNativeWikiPrompt(
   command: OpenWikiCommand,
   cwd: string,
   context: RunContext,
@@ -82,42 +82,42 @@ Existing documentation discipline:
 - If existing docs conflict with source code or git history, call out the likely stale documentation and prefer current source evidence.
 
 Root agent instruction files:
-- Unless the user explicitly asks you not to, always make sure the repository's top-level agent instruction files reference the OpenWiki quickstart.
+- Unless the user explicitly asks you not to, always make sure the repository's top-level agent instruction files reference the wiki quickstart.
 - Only consider top-level /AGENTS.md and /CLAUDE.md for this step. Do not edit nested AGENTS.md or CLAUDE.md files.
-- If /AGENTS.md or /CLAUDE.md exists, add or update the OpenWiki reference section there. If both exist, ensure the same section is added to both (duplicated).
-- If neither exists, create top-level /AGENTS.md containing only the OpenWiki reference section.
-- During update runs, inspect any existing OpenWiki reference section in /AGENTS.md and/or /CLAUDE.md and refresh it only if the section is missing or semantically stale. This check is required even when the wiki itself is otherwise current.
-- Preserve surrounding instructions in existing files. Replace/update an existing OpenWiki reference section instead of adding duplicates.
-- Do not edit /AGENTS.md or /CLAUDE.md only to normalize formatting, blank lines, wrapping, or punctuation if the existing OpenWiki section is already semantically correct.
+- If /AGENTS.md or /CLAUDE.md exists, add or update the Wiki reference section there. If both exist, ensure the same section is added to both (duplicated).
+- If neither exists, create top-level /AGENTS.md containing only the Wiki reference section.
+- During update runs, inspect any existing Wiki/OpenWiki reference section in /AGENTS.md and/or /CLAUDE.md and refresh it only if the section is missing or semantically stale. This check is required even when the wiki itself is otherwise current.
+- Preserve surrounding instructions in existing files. Replace/update an existing Wiki/OpenWiki reference section instead of adding duplicates.
+- Do not edit /AGENTS.md or /CLAUDE.md only to normalize formatting, blank lines, wrapping, or punctuation if the existing Wiki section is already semantically correct.
 - Use this exact section structure every time:
 
 \`\`\`markdown
-## OpenWiki
+## Wiki
 
-This repository has documentation located in the /openwiki directory.
+This repository has documentation located in the /wiki directory.
 
 Start here:
-- [OpenWiki quickstart](openwiki/quickstart.md)
+- [Wiki quickstart](wiki/quickstart.md)
 
-OpenWiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
+The wiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
 
-When working in this repository, read the OpenWiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
+When working in this repository, read the wiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
 \`\`\`
 
-Pi-native OpenWiki command reference:
-- /openwiki-init [message] initializes OpenWiki documentation for the current repository.
-- /openwiki-update [message] updates existing OpenWiki documentation for the current repository.
-- /openwiki-ask <question> asks a question with OpenWiki/repository context.
-- /openwiki-status reports docs, git, metadata, and no-op update status.
+Pi-native wiki command reference:
+- /wiki-init [message] initializes wiki documentation for the current repository.
+- /wiki-update [message] updates existing wiki documentation for the current repository.
+- /wiki-ask <question> asks a question with wiki/repository context.
+- /wiki-status reports docs, git, metadata, and no-op update status.
 
-If the user asks what OpenWiki can do, asks for commands/options/usage/examples, or asks for more details about this Pi extension, answer from the Pi-native command reference above and mention that this extension uses the current Pi provider/model/tools rather than the upstream OpenWiki CLI runtime.
+If the user asks what this wiki extension can do, asks for commands/options/usage/examples, or asks for more details about this Pi extension, answer from the Pi-native command reference above and mention that this extension uses the current Pi provider/model/tools rather than the upstream OpenWiki CLI runtime.
 
 Security and privacy rules:
 - Do not read or document secret values, credentials, private keys, tokens, .env files, auth files, payload logs, or other sensitive material.
 - Do not read .env files. .env.example and other sample configuration files may be read only if they contain placeholders, not live secrets.
 - If a secret-bearing file appears relevant, document only that such configuration exists and where non-sensitive setup should be described.
 - Keep all generated documentation under ${OPEN_WIKI_DIR}/.
-- Do not modify source code outside ${OPEN_WIKI_DIR}/. The only allowed exceptions are top-level /AGENTS.md and /CLAUDE.md, and only for the OpenWiki reference section described above.
+- Do not modify source code outside ${OPEN_WIKI_DIR}/. The only allowed exceptions are top-level /AGENTS.md and /CLAUDE.md, and only for the Wiki reference section described above.
 - Do not manually edit ${UPDATE_METADATA_PATH}. The Pi extension records successful run metadata after the agent turn if OpenWiki content changed.
 
 Documentation goals:
@@ -159,10 +159,10 @@ ${createModeInstructions(command)}
 function createModeInstructions(command: OpenWikiCommand): string {
   if (command === "chat") {
     return `
-- This is an interactive OpenWiki question turn inside Pi.
+- This is an interactive wiki question turn inside Pi.
 - Answer the user's message directly.
 - Do not create or update OpenWiki documentation unless the user explicitly asks you to modify documentation.
-- If the user asks to initialize or update the wiki, explain that they can run /openwiki-init or /openwiki-update, or ask you to make a specific documentation change in chat.
+- If the user asks to initialize or update the wiki, explain that they can run /wiki-init or /wiki-update, or ask you to make a specific documentation change in chat.
 `.trim();
   }
 
@@ -206,13 +206,13 @@ function createUserPrompt(
   userMessage: string | null = null,
 ): string {
   if (command === "chat") {
-    return userMessage?.trim() || "Start an OpenWiki chat.";
+    return userMessage?.trim() || "Start a wiki chat.";
   }
 
   if (command === "init") {
     return appendUserMessage(
       `
-Initialize OpenWiki documentation for this repository.
+Initialize wiki documentation for this repository.
 
 Inspect the project thoroughly, identify the major technical and business domains, and write the initial documentation under ${OPEN_WIKI_DIR}/.
 
@@ -227,7 +227,7 @@ ${context.gitSummary}
 
   return appendUserMessage(
     `
-Update the existing OpenWiki documentation for this repository.
+Update the existing wiki documentation for this repository.
 
 Inspect ${OPEN_WIKI_DIR}/, identify recent source changes, and refresh only the documentation pages directly affected by those changes. Use the git evidence below when available. Keep edits surgical: do not rewrite accurate sections, do not update source maps or git evidence just to refresh them, and do not make formatting-only changes. If the wiki is already current, do not edit files. The Pi extension will update ${UPDATE_METADATA_PATH} only when OpenWiki content changes.
 

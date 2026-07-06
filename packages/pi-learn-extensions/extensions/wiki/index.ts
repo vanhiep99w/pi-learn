@@ -4,16 +4,16 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createPiNativeOpenWikiPrompt } from "./prompt.js";
+import { createPiNativeWikiPrompt } from "./prompt.js";
 
 const execFileAsync = promisify(execFile);
 
 // Pi-native OpenWiki port.
 // Upstream base: langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
 // See ./README.md for the intentional differences and upgrade checklist.
-const OPEN_WIKI_DIR = "openwiki";
+const OPEN_WIKI_DIR = "wiki";
 const UPDATE_METADATA_PATH = `${OPEN_WIKI_DIR}/.last-update.json`;
-const STATUS_KEY = "openwiki";
+const STATUS_KEY = "wiki";
 
 type OpenWikiCommand = "init" | "update" | "chat";
 
@@ -38,27 +38,27 @@ type PendingRun = {
 
 let pendingRun: PendingRun | null = null;
 
-export default function openWikiPiNativeExtension(pi: ExtensionAPI) {
-  pi.registerCommand("openwiki-init", {
-    description: "Generate initial OpenWiki docs with the current Pi agent",
+export default function wikiPiNativeExtension(pi: ExtensionAPI) {
+  pi.registerCommand("wiki-init", {
+    description: "Generate initial wiki docs with the current Pi agent",
     handler: async (args, ctx) => {
       await startDocumentationRun(pi, ctx, "init", args);
     },
   });
 
-  pi.registerCommand("openwiki-update", {
-    description: "Update OpenWiki docs from repo changes with the current Pi agent",
+  pi.registerCommand("wiki-update", {
+    description: "Update wiki docs from repo changes with the current Pi agent",
     handler: async (args, ctx) => {
       await startDocumentationRun(pi, ctx, "update", args);
     },
   });
 
-  pi.registerCommand("openwiki-ask", {
-    description: "Ask a question using OpenWiki documentation context",
+  pi.registerCommand("wiki-ask", {
+    description: "Ask a question using wiki documentation context",
     handler: async (args, ctx) => {
       const question = args.trim();
       if (!question) {
-        ctx.ui.notify("Usage: /openwiki-ask <question>", "warning");
+        ctx.ui.notify("Usage: /wiki-ask <question>", "warning");
         return;
       }
       if (!ctx.isIdle()) {
@@ -67,12 +67,12 @@ export default function openWikiPiNativeExtension(pi: ExtensionAPI) {
       }
 
       const context = await createRunContext("chat", ctx.cwd);
-      pi.sendUserMessage(createPiNativeOpenWikiPrompt("chat", ctx.cwd, context, question));
+      pi.sendUserMessage(createPiNativeWikiPrompt("chat", ctx.cwd, context, question));
     },
   });
 
-  pi.registerCommand("openwiki-status", {
-    description: "Show OpenWiki docs/update status for this repository",
+  pi.registerCommand("wiki-status", {
+    description: "Show wiki docs/update status for this repository",
     handler: async (_args, ctx) => {
       const status = await createStatusReport(ctx.cwd);
       ctx.ui.notify(status, "info");
@@ -91,12 +91,12 @@ export default function openWikiPiNativeExtension(pi: ExtensionAPI) {
       const snapshotAfter = await createOpenWikiContentSnapshot(run.cwd);
       if (snapshotAfter !== run.snapshotBefore) {
         await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx));
-        ctx.ui.notify(`OpenWiki ${run.command} completed; metadata updated.`, "success");
+        ctx.ui.notify(`Wiki ${run.command} completed; metadata updated.`, "success");
       } else {
-        ctx.ui.notify(`OpenWiki ${run.command} completed with no documentation changes.`, "info");
+        ctx.ui.notify(`Wiki ${run.command} completed with no documentation changes.`, "info");
       }
     } catch (error) {
-      ctx.ui.notify(`OpenWiki metadata finalization failed: ${formatError(error)}`, "error");
+      ctx.ui.notify(`Wiki metadata finalization failed: ${formatError(error)}`, "error");
     } finally {
       ctx.ui.setStatus(STATUS_KEY, "");
     }
@@ -119,7 +119,7 @@ async function startDocumentationRun(
   if (command === "update" && !userMessage) {
     const noop = await getUpdateNoopStatus(ctx.cwd);
     if (noop.shouldSkip) {
-      ctx.ui.notify("No repository changes detected since the last OpenWiki update; skipping.", "info");
+      ctx.ui.notify("No repository changes detected since the last wiki update; skipping.", "info");
       return;
     }
   }
@@ -134,7 +134,7 @@ async function startDocumentationRun(
   };
 
   ctx.ui.setStatus(STATUS_KEY, command === "init" ? "Generating docs..." : "Updating docs...");
-  pi.sendUserMessage(createPiNativeOpenWikiPrompt(command, ctx.cwd, context, userMessage || null));
+  pi.sendUserMessage(createPiNativeWikiPrompt(command, ctx.cwd, context, userMessage || null));
 }
 
 async function createRunContext(command: OpenWikiCommand, cwd: string): Promise<RunContext> {
@@ -160,10 +160,10 @@ async function createGitSummary(
   lines.push(await runGitOrFallback(cwd, ["rev-parse", "HEAD"]));
 
   if (command === "update" && lastUpdate?.gitHead) {
-    lines.push(`\n## Changes since last OpenWiki git head (${lastUpdate.gitHead})`);
+    lines.push(`\n## Changes since last wiki git head (${lastUpdate.gitHead})`);
     lines.push(await runGitOrFallback(cwd, ["log", `${lastUpdate.gitHead}..HEAD`, "--name-status", "--oneline"]));
   } else if (command === "update" && lastUpdate?.updatedAt) {
-    lines.push(`\n## Changes since last OpenWiki timestamp (${lastUpdate.updatedAt})`);
+    lines.push(`\n## Changes since last wiki timestamp (${lastUpdate.updatedAt})`);
     lines.push(await runGitOrFallback(cwd, ["log", "--since", lastUpdate.updatedAt, "--name-status", "--oneline"]));
   } else {
     lines.push("\n## Recent commits");
@@ -278,7 +278,7 @@ async function createStatusReport(cwd: string): Promise<string> {
   const noop = await getUpdateNoopStatus(cwd);
 
   return [
-    "OpenWiki status",
+    "Wiki status",
     `- cwd: ${cwd}`,
     `- docs: ${docsExists ? `/${OPEN_WIKI_DIR} exists` : `/${OPEN_WIKI_DIR} missing`}`,
     `- git head: ${head ?? "unavailable"}`,

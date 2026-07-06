@@ -1,6 +1,6 @@
-# OpenWiki Pi-native extension
+# Wiki Pi-native extension
 
-Pi-native port of OpenWiki usage. It keeps the OpenWiki documentation workflow (`openwiki/`, git context, no-op update detection, `.last-update.json`) but delegates the actual documentation work to the current Pi agent/model/tools instead of running the OpenWiki CLI/DeepAgents runtime.
+Pi-native port of OpenWiki usage with a shorter `wiki/` output folder and `/wiki-*` commands. It keeps the documentation workflow (`wiki/`, git context, no-op update detection, `.last-update.json`) but delegates the actual documentation work to the current Pi agent/model/tools instead of running the OpenWiki CLI/DeepAgents runtime.
 
 ## Upstream base
 
@@ -34,19 +34,19 @@ src/commands.ts
 ## Commands
 
 ```txt
-/openwiki-init [extra instructions]
-/openwiki-update [extra instructions]
-/openwiki-ask <question>
-/openwiki-status
+/wiki-init [extra instructions]
+/wiki-update [extra instructions]
+/wiki-ask <question>
+/wiki-status
 ```
 
 ## Behavior
 
-- `/openwiki-init` asks Pi to generate initial docs under `openwiki/`.
-- `/openwiki-update` asks Pi to refresh docs based on git changes. With no extra instructions, it skips if the repo appears unchanged since the last OpenWiki metadata entry.
-- `/openwiki-ask` sends a repository/OpenWiki question to Pi with lightweight OpenWiki context.
-- `/openwiki-status` reports docs presence, git head, last metadata, and no-op status via Pi UI notification.
-- After an init/update agent turn ends, the extension snapshots `openwiki/`; if content changed, it writes `openwiki/.last-update.json`.
+- `/wiki-init` asks Pi to generate initial docs under `wiki/`.
+- `/wiki-update` asks Pi to refresh docs based on git changes. With no extra instructions, it skips if the repo appears unchanged since the last wiki metadata entry.
+- `/wiki-ask` sends a repository/wiki question to Pi with lightweight wiki context.
+- `/wiki-status` reports docs presence, git head, last metadata, and no-op status via Pi UI notification.
+- After an init/update agent turn ends, the extension snapshots `wiki/`; if content changed, it writes `wiki/.last-update.json`.
 
 ## Differences from upstream OpenWiki
 
@@ -54,16 +54,16 @@ This is **not** a 1:1 runtime port. It is the Pi-native variant.
 
 Kept/adapted from upstream:
 
-- `openwiki/` remains the documentation output directory.
-- `openwiki/.last-update.json` remains the update metadata file.
+- `wiki/` is the documentation output directory instead of upstream `openwiki/`.
+- `wiki/.last-update.json` is the update metadata file instead of upstream `openwiki/.last-update.json`.
 - Init/update/chat concepts are preserved as Pi slash commands.
 - Git evidence collection mirrors upstream at a high level:
   - `git status --short --untracked-files=all`
   - `git rev-parse HEAD`
   - recent commits or changes since previous `gitHead`/`updatedAt`
   - `git diff --name-status HEAD`
-- Update no-op detection is preserved in spirit: skip `/openwiki-update` when there are no meaningful repo changes.
-- Content snapshot behavior is preserved in spirit: hash `openwiki/` and exclude `.last-update.json` so metadata-only changes do not churn updates.
+- Update no-op detection is preserved in spirit: skip `/wiki-update` when there are no meaningful repo changes.
+- Content snapshot behavior is preserved in spirit: hash `wiki/` and exclude `.last-update.json` so metadata-only changes do not churn updates.
 - Metadata is written only when docs content changes.
 
 Intentionally different:

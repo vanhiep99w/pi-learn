@@ -307,7 +307,7 @@ extensions/
 ├── chatgpt-usage-status/
 ├── harness/             # Pi Harness commands and reflection import tool
 ├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
-├── openwiki/            # Pi-native OpenWiki documentation commands
+├── wiki/                # Pi-native wiki documentation commands
 ├── prompt-with-model.ts # model-aware prompt template commands
 └── aurora-ui.ts         # fixed input cluster + bordered editor
 
