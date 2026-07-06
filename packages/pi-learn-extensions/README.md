@@ -46,6 +46,7 @@ extensions/
 ├── web-tools/
 ├── chatgpt-usage-status/
 ├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
+├── openwiki/            # Pi-native OpenWiki documentation commands
 └── aurora-ui.ts         # fixed input cluster + bordered editor
 
 themes/
