@@ -77,7 +77,7 @@ Intentionally different:
 - No SQLite LangGraph checkpointer is used.
 - No OpenRouter fallback route/model retry logic is used.
 - The current Pi provider/model/tools perform the actual documentation work.
-- Prompt text is adapted for Pi-native execution and is **not currently byte-for-byte identical** to upstream `src/agent/prompt.ts`.
+- Prompt text is adapted for Pi-native execution and is **not byte-for-byte identical** to upstream `src/agent/prompt.ts`, but local `prompt.ts` ports most upstream documentation discipline, git discipline, security, AGENTS/CLAUDE guidance, init/update behavior, and quality rules.
 - The extension tells Pi not to edit `.last-update.json`; it writes metadata itself after `agent_end`.
 - Output/status uses Pi `ctx.ui` notifications/status instead of OpenWiki streaming UI.
 
@@ -111,7 +111,7 @@ Intentionally different:
 
 3. Port only changes relevant to this Pi-native extension:
 
-   - Prompt/product rules from `src/agent/prompt.ts`.
+   - Prompt/product rules from `src/agent/prompt.ts` into local `prompt.ts`, while preserving Pi-native wording.
    - Git evidence, no-op update, snapshot, metadata semantics from `src/agent/utils.ts`.
    - Command semantics from `src/commands.ts`/README if new user-facing modes are added.
    - Documentation structure expectations from upstream generated `openwiki/` docs.
@@ -128,3 +128,11 @@ Intentionally different:
 ## Notes
 
 This extension intentionally does not use `~/.openwiki/.env`, LangChain, or DeepAgents. It uses the current Pi provider/model and Pi tools.
+
+Current local implementation files:
+
+```txt
+index.ts   # Pi slash commands, git context, no-op checks, snapshots, metadata writes
+prompt.ts  # Pi-native adaptation of upstream OpenWiki prompt rules
+README.md  # base commit, differences, and upgrade checklist
+```

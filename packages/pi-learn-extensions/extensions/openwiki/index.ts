@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createPiNativeOpenWikiPrompt } from "./prompt.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -134,59 +135,6 @@ async function startDocumentationRun(
 
   ctx.ui.setStatus(STATUS_KEY, command === "init" ? "Generating docs..." : "Updating docs...");
   pi.sendUserMessage(createPiNativeOpenWikiPrompt(command, ctx.cwd, context, userMessage || null));
-}
-
-function createPiNativeOpenWikiPrompt(
-  command: OpenWikiCommand,
-  cwd: string,
-  context: RunContext,
-  userMessage: string | null,
-): string {
-  const task =
-    command === "init"
-      ? "Generate initial OpenWiki documentation for this repository."
-      : command === "update"
-        ? "Update the existing OpenWiki documentation for this repository."
-        : "Answer the user's OpenWiki-related question using repository evidence.";
-
-  const extra = userMessage?.trim()
-    ? `\n\nAdditional user request:\n${userMessage.trim()}`
-    : "";
-
-  return `You are OpenWiki running as a Pi-native extension.
-
-Task: ${task}
-Repository root: ${cwd}
-Documentation directory: /${OPEN_WIKI_DIR}
-Metadata file: /${UPDATE_METADATA_PATH}
-
-OpenWiki operating rules:
-- Inspect the current codebase and existing /${OPEN_WIKI_DIR} docs before making claims.
-- Use repository files, git context, and current implementation as evidence. Do not invent facts.
-- Keep documentation useful for both humans and future coding agents.
-- Keep the wiki focused and navigable. Prefer a small set of substantive pages over many thin stubs.
-- Avoid reading secrets, credential files, .env files, auth files, payload logs, or unrelated private data.
-- Treat the current repository root as the only project in scope.
-- Use repository-local paths in docs, for example /README.md and /${OPEN_WIKI_DIR}/quickstart.md.
-- Ensure top-level AGENTS.md and/or CLAUDE.md mention that OpenWiki docs live in /${OPEN_WIKI_DIR} and that future agents should start from /${OPEN_WIKI_DIR}/quickstart.md.
-- Do not manually edit /${UPDATE_METADATA_PATH}; the Pi extension updates it after the run if documentation content changed.
-
-Documentation quality rules:
-- For init: create /${OPEN_WIKI_DIR}/quickstart.md plus a compact documentation map for architecture, workflows, operations, integrations, testing, and source maps as relevant to this repo.
-- For update: refresh only docs affected by repository changes; preserve useful existing structure.
-- Include concrete file paths and commands where helpful.
-- If a page would be too thin, merge it into a broader page.
-- Prefer accurate concise documentation over exhaustive but generic text.
-- Include source maps in docs so future agents can jump to relevant source files.
-
-Run context:
-Last update metadata:
-${context.lastUpdate ? JSON.stringify(context.lastUpdate, null, 2) : "None"}
-
-Git summary:
-${context.gitSummary}${extra}
-
-Now perform the task. Read files as needed, then create or edit files under /${OPEN_WIKI_DIR} and update AGENTS.md/CLAUDE.md guidance when appropriate.`;
 }
 
 async function createRunContext(command: OpenWikiCommand, cwd: string): Promise<RunContext> {
