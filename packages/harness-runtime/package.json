@@ -1,0 +1,16 @@
+{
+  "name": "@pi-learn/harness-runtime",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pi session miner and improvement proposal runtime API for the Pi extension.",
+  "exports": {
+    ".": "./src/api.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

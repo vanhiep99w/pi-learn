@@ -1,0 +1,268 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  VERSION,
+  projectResolve,
+  sessions,
+  scan,
+  report,
+  reflect,
+  importReflection,
+  importReflectionResponse,
+  propose,
+  proposals,
+  showProposal,
+  approve,
+  reject,
+  history,
+  evalHarness,
+  automationStatus,
+  automate,
+  inspect,
+} from "../src/api.js";
+
+const packageCwd = path.resolve(new URL("..", import.meta.url).pathname);
+
+test("api exposes package version", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(packageCwd, "package.json"), "utf8"));
+  assert.equal(VERSION, pkg.version);
+});
+
+test("api projectResolve emits project shape and logs lifecycle", () => {
+  const fixture = createFixture();
+  const output = projectResolve(baseOptions(fixture));
+
+  assert.equal(output.projectRoot, fs.realpathSync(fixture.project));
+  assert.match(output.projectKey, /^project-[a-f0-9]{6}$/);
+  assertEventSequenceIncludes(readRuntimeLogEvents(fixture.harnessHome), ["command_start", "config_loaded", "project_resolved", "command_end"]);
+});
+
+test("api sessions lists project sessions", () => {
+  const fixture = createFixture();
+  writeSession(path.join(fixture.sessionDir, "session.jsonl"), { id: "s1", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+
+  const output = sessions(baseOptions(fixture));
+
+  assert.equal(output.count, 1);
+  assert.equal(output.sessions[0].sessionId, "s1");
+});
+
+test("api scan writes cache files", async () => {
+  const fixture = createFixture();
+  writeSession(path.join(fixture.sessionDir, "session.jsonl"), { id: "s1", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+
+  const output = await scan(baseOptions(fixture));
+
+  assert.equal(output.count, 1);
+  assert.equal(fs.existsSync(path.join(output.results[0].outDir, "manifest.json")), true);
+  assert.equal(fs.existsSync(path.join(output.results[0].outDir, "events.jsonl")), true);
+});
+
+test("api report writes latest Markdown report", async () => {
+  const fixture = createFixture();
+  writeSession(path.join(fixture.sessionDir, "session.jsonl"), { id: "s1", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+
+  const output = await report(baseOptions(fixture));
+
+  assert.equal(output.count, 1);
+  assert.equal(fs.existsSync(output.report.latestPath), true);
+  assert.match(fs.readFileSync(output.report.latestPath, "utf8"), /# Pi Harness Report/);
+});
+
+test("api reflect writes redacted LLM reflection prompt", async () => {
+  const fixture = createFixture();
+  writeErrorSession(path.join(fixture.sessionDir, "error-session.jsonl"), { id: "s-reflect", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+
+  const output = await reflect(baseOptions(fixture));
+
+  assert.equal(output.mode, "reflect");
+  assert.equal(output.evidenceCount >= 1, true);
+  assert.equal(fs.existsSync(output.reflection.latestPath), true);
+  assert.match(fs.readFileSync(output.reflection.latestPath, "utf8"), /Return JSON only/);
+});
+
+test("api importReflectionResponse writes LLM draft proposals without temp file", () => {
+  const fixture = createFixture();
+
+  const output = importReflectionResponse({
+    ...baseOptions(fixture),
+    response: JSON.stringify({ proposals: [reflectionProposal()] }),
+  });
+
+  assert.equal(output.mode, "reflect_import");
+  assert.equal(output.written.length, 1);
+  assert.equal(output.written[0].ruleId, "LLM-REFLECT");
+});
+
+test("api importReflection writes LLM draft proposals", () => {
+  const fixture = createFixture();
+  const responsePath = path.join(fixture.root, "llm-response.json");
+  fs.writeFileSync(responsePath, JSON.stringify({ proposals: [reflectionProposal()] }));
+
+  const output = importReflection({ ...baseOptions(fixture), importFile: responsePath });
+
+  assert.equal(output.mode, "reflect_import");
+  assert.equal(output.written.length, 1);
+  assert.equal(output.written[0].ruleId, "LLM-REFLECT");
+});
+
+test("api propose writes deterministic draft proposals and dedupes", async () => {
+  const fixture = createFixture();
+  writeErrorSession(path.join(fixture.sessionDir, "error-session.jsonl"), { id: "s-propose", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+
+  const first = await propose({ ...baseOptions(fixture), rules: true });
+  assert.equal(first.written.length >= 1, true);
+
+  const second = await propose({ ...baseOptions(fixture), rules: true });
+  assert.equal(second.written.length, 0);
+  assert.equal(second.skipped.length >= 1, true);
+
+  const list = proposals(baseOptions(fixture));
+  assert.equal(list.count >= 1, true);
+  const shown = showProposal({ ...baseOptions(fixture), id: list.proposals[0].id });
+  assert.match(fs.readFileSync(shown.filePath, "utf8"), /## Evidence/);
+});
+
+test("api approve reject and history track proposal lifecycle", async () => {
+  const fixture = createFixture();
+  writeErrorSession(path.join(fixture.sessionDir, "error-session.jsonl"), { id: "s-lifecycle", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const proposed = await propose({ ...baseOptions(fixture), rules: true });
+  const id = proposed.written[0].id;
+
+  assert.equal(approve({ ...baseOptions(fixture), id }).proposal.status, "approved");
+  assert.equal(reject({ ...baseOptions(fixture), id }).proposal.status, "rejected");
+  assert.deepEqual(history({ ...baseOptions(fixture), id }).history.map((event) => event.event), ["proposal_approved", "proposal_rejected"]);
+});
+
+test("api propose target memory writes memory draft and proposal", async () => {
+  const fixture = createFixture();
+  writeSession(path.join(fixture.sessionDir, "memory-session.jsonl"), {
+    id: "s-memory",
+    cwd: fixture.project,
+    timestamp: "2026-06-14T01:00:00.000Z",
+    userContent: "harness runtime nằm ở packages/harness-runtime còn pi-harness là docs spec",
+  });
+
+  const output = await propose({ ...baseOptions(fixture), target: "memory" });
+
+  assert.equal(output.mode, "target:memory");
+  assert.equal(output.memory.written.length >= 1, true);
+  assert.equal(fs.existsSync(output.memory.draftPath), true);
+});
+
+test("api automation status is disabled by default", () => {
+  const fixture = createFixture();
+  const output = automationStatus(baseOptions(fixture));
+
+  assert.equal(output.status.enabled, false);
+  assert.equal(output.status.allowed, false);
+  assert.equal(output.status.reason, "automation_disabled");
+});
+
+test("api automate runs only gated draft actions when enabled", async () => {
+  const fixture = createFixture();
+  writeSession(path.join(fixture.sessionDir, "session.jsonl"), { id: "s-auto", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  fs.mkdirSync(path.join(fixture.project, "harness"), { recursive: true });
+  fs.writeFileSync(path.join(fixture.project, "harness", "config.json"), JSON.stringify({
+    automation: {
+      enabled: true,
+      maxSessions: 1,
+      scan: true,
+      report: true,
+      proposeRules: false,
+      proposeTargets: [],
+      eval: false,
+      createEvalFixtureDraft: true,
+    },
+  }));
+
+  const output = await automate(baseOptions(fixture));
+
+  assert.equal(output.status, "done");
+  assert.deepEqual(output.actions.map((action) => action.name), ["scan", "report", "draft:eval-fixture"]);
+  assert.equal(output.actions.some((action) => action.name === "apply"), false);
+});
+
+test("api eval runs deterministic scenarios and writes report", async () => {
+  const fixture = createFixture();
+  const output = await evalHarness({ ...baseOptions(fixture), scenario: "redaction-fixture" });
+
+  assert.equal(output.summary.failed, 0);
+  assert.equal(output.results[0].scenario, "redaction-fixture");
+  assert.equal(fs.existsSync(output.paths.latestJsonPath), true);
+});
+
+test("api inspect entry prints redacted full raw entry", async () => {
+  const fixture = createFixture();
+  const sessionFile = path.join(fixture.sessionDir, "session.jsonl");
+  writeSession(sessionFile, { id: "s1", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z", userContent: "token sk-abcdefghijklmnopqrstuvwxyz" });
+
+  const output = await inspect({ ...baseOptions(fixture), sessionFile, entry: "m1", full: true });
+
+  assert.equal(output.entryId, "m1");
+  assert.match(output.excerpt, /<REDACTED_SECRET>/);
+  assert.doesNotMatch(JSON.stringify(output), /sk-abcdefghijklmnopqrstuvwxyz/);
+});
+
+function createFixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-api-"));
+  const project = path.join(root, "project");
+  const sessionDir = path.join(root, "sessions");
+  const harnessHome = path.join(root, "harness-home");
+  fs.mkdirSync(path.join(project, ".git"), { recursive: true });
+  fs.mkdirSync(sessionDir, { recursive: true });
+  return { root, project, sessionDir, harnessHome };
+}
+
+function baseOptions(fixture) {
+  return { project: fixture.project, sessionDir: fixture.sessionDir, harnessHome: fixture.harnessHome };
+}
+
+function readRuntimeLogEvents(harnessHome) {
+  const dir = path.join(harnessHome, "logs", "runtime");
+  const files = fs.readdirSync(dir).sort();
+  return files.flatMap((file) => fs.readFileSync(path.join(dir, file), "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)));
+}
+
+function assertEventSequenceIncludes(events, expected) {
+  const names = events.map((event) => event.event);
+  let cursor = 0;
+  for (const name of names) {
+    if (name === expected[cursor]) cursor++;
+    if (cursor === expected.length) return;
+  }
+  assert.fail(`Expected event sequence ${expected.join(" -> ")} in ${names.join(" -> ")}`);
+}
+
+function writeSession(file, { id, cwd, timestamp, userContent = "hi" }) {
+  fs.writeFileSync(file, `${JSON.stringify({ type: "session", version: 3, id, cwd: fs.realpathSync(cwd), timestamp })}\n${JSON.stringify({ type: "message", id: "m1", parentId: null, timestamp, message: { role: "user", content: userContent } })}\n`);
+}
+
+function writeErrorSession(file, { id, cwd, timestamp }) {
+  const lines = [
+    { type: "session", version: 3, id, cwd: fs.realpathSync(cwd), timestamp },
+    { type: "message", id: "m1", parentId: null, timestamp, message: { role: "user", content: "fix file" } },
+    { type: "message", id: "m2", parentId: "m1", timestamp, message: { role: "assistant", provider: "test", model: "model", content: [{ type: "toolCall", id: "edit1", name: "edit", arguments: { path: "src/a.js", oldText: "x", newText: "y" } }] } },
+    { type: "message", id: "m3", parentId: "m2", timestamp, message: { role: "toolResult", toolCallId: "edit1", toolName: "edit", isError: true, content: [{ type: "text", text: "oldText must match a unique region of the original file" }] } },
+    { type: "message", id: "m4", parentId: "m3", timestamp, message: { role: "assistant", provider: "test", model: "model", content: [{ type: "toolCall", id: "edit2", name: "edit", arguments: { path: "src/a.js", oldText: "x", newText: "y" } }] } },
+    { type: "message", id: "m5", parentId: "m4", timestamp, message: { role: "toolResult", toolCallId: "edit2", toolName: "edit", isError: true, content: [{ type: "text", text: "oldText did not match" }] } },
+  ];
+  fs.writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
+}
+
+function reflectionProposal() {
+  return {
+    title: "Add eval fixture",
+    target: "eval",
+    targetFiles: ["harness/evals/"],
+    risk: "low",
+    problem: "Repeated evidence suggests an eval fixture.",
+    proposedChange: "Add a deterministic eval fixture.",
+    evidence: [{ sessionId: "s1", entryId: "e1", reason: "tool_error" }],
+    testPlan: ["Run `npm --prefix packages/harness-runtime test`."],
+    rollbackPlan: "Remove the fixture.",
+  };
+}
