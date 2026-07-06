@@ -1,5 +1,17 @@
 # AGENTS.md — Pi Learn Project
 
+## Wiki
+
+This repository has documentation located in the /wiki directory.
+
+Start here:
+- [Wiki quickstart](wiki/quickstart.md)
+
+The wiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
+
+When working in this repository, read the wiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
+
+
 ## Tổng quan hiện tại
 
 `pi-learn` là repo học tập + package phân phối cho Pi Coding Agent. Repo hiện tập trung vào:
