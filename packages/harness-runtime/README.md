@@ -46,22 +46,14 @@ Most functions accept the same option shape:
 ## Pi extension commands
 
 ```txt
+/harness-status [last]
 /harness-report [last]
-/harness-last [last]
-/harness-warnings [last]
-/harness-reflect [last]
 /harness-reflect-pi [last]
-/harness-propose [rules|memory|rule-config|parser|redaction|llm] [last]
 /harness-proposals
 /harness-approve P-0001
-/harness-reject P-0001
 /harness-apply P-0001
-/harness-history [P-0001]
 /harness-eval [scenario|P-0001]
-/harness-automation-status
-/harness-automate
-/harness-note <text>
-/harness-tag success|failure <reason>
+/harness-mark success|failure|note <text>
 ```
 
 ## Safety

@@ -106,27 +106,23 @@ Harness đọc Pi session logs đã redact/normalize để tạo report, proposa
 Mặc định các command dùng **5 session gần nhất**. Có thể truyền số khác, ví dụ:
 
 ```txt
+/harness-status 10
 /harness-report 10
 /harness-reflect-pi 10
-/harness-propose rules 10
 ```
 
-### Nhóm read-only/report
+### Command chính khuyến nghị
 
 | Command | Tác dụng | Ví dụ |
 |---|---|---|
+| `/harness-status [last]` | Trạng thái tổng hợp: session gần đây, warning summary, automation state. | `/harness-status` hoặc `/harness-status 10` |
 | `/harness-report [last]` | Scan session gần đây, tạo và preview report Markdown. | `/harness-report` hoặc `/harness-report 10` |
-| `/harness-last [last]` | Liệt kê session gần đây của project hiện tại. | `/harness-last 5` |
-| `/harness-warnings [last]` | Scan và hiển thị parser/normalizer warnings. | `/harness-warnings` |
-
-### Nhóm reflection/proposal
-
-| Command | Tác dụng | Khi nào dùng |
-|---|---|---|
-| `/harness-reflect [last]` | Chỉ build + preview prompt reflection đã redact, chưa gọi model tạo proposal. | Muốn kiểm tra prompt/evidence trước. |
 | `/harness-reflect-pi [last]` | Gửi reflection prompt vào model hiện tại; model phải gọi tool import để tạo draft proposals. | Cách chính để tạo proposal bằng LLM. |
-| `/harness-propose [rules\|memory\|rule-config\|parser\|redaction] [last]` | Tạo proposal deterministic/targeted không cần LLM. | Khi muốn rule-based proposals. |
-| `/harness-proposals` | List + preview draft proposals. | Sau `/harness-reflect-pi` hoặc `/harness-propose`. |
+| `/harness-proposals` | List + preview draft proposals. | Sau `/harness-reflect-pi`. |
+| `/harness-approve P-0001` | Đánh dấu proposal là approved. | `/harness-approve P-0001` |
+| `/harness-apply P-0001` | Apply proposal đã approve nếu proposal có JSON Patch machine-readable. | `/harness-apply P-0001` |
+| `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite hoặc scenario/proposal cụ thể. | `/harness-eval`, `/harness-eval redaction-fixture` |
+| `/harness-mark success\|failure\|note [text]` | Mark current session bằng success/failure hoặc ghi note riêng. | `/harness-mark success fixed Redis config` |
 
 Ghi chú `/harness-reflect-pi`:
 
@@ -134,38 +130,12 @@ Ghi chú `/harness-reflect-pi`:
 - Prompt có target routing guide để chọn đúng `memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`.
 - Tool `harness_import_llm_reflection` chỉ dành cho model gọi tự động sau command này; người dùng thường không cần gọi tay.
 
-### Nhóm lifecycle/apply
-
-| Command | Tác dụng | Ví dụ |
-|---|---|---|
-| `/harness-approve P-0001` | Đánh dấu proposal là approved. | `/harness-approve P-0001` |
-| `/harness-reject P-0001` | Reject proposal. | `/harness-reject P-0001` |
-| `/harness-apply P-0001` | Apply proposal đã approve nếu proposal có JSON Patch machine-readable. | `/harness-apply P-0001` |
-| `/harness-history [P-0001]` | Xem lịch sử approve/reject/apply/rollback. | `/harness-history` |
-
-Apply policy:
+Apply/automation policy:
 
 - Không auto-push.
-- Yêu cầu proposal approved.
-- Chỉ apply file nằm trong target list của proposal.
+- `/harness-apply` yêu cầu proposal approved và chỉ apply file nằm trong target list của proposal.
 - Với project không phải git repo, nên review kỹ vì rollback bằng git có thể không đầy đủ.
-
-### Nhóm eval/automation
-
-| Command | Tác dụng | Ví dụ |
-|---|---|---|
-| `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite hoặc scenario/proposal cụ thể. | `/harness-eval`, `/harness-eval redaction-fixture` |
-| `/harness-automation-status` | Xem automation config có enabled/allowed không. | `/harness-automation-status` |
-| `/harness-automate` | Chạy automation có gate: scan/report/draft/eval only; không apply/push. | `/harness-automate` |
-
-Automation mặc định off. Nếu bật trong `harness/config.json`, vẫn chỉ draft/report/eval, không tự apply.
-
-### Nhóm note/tag
-
-| Command | Tác dụng | Ví dụ |
-|---|---|---|
-| `/harness-note <text>` | Append private note vào Pi session hiện tại. | `/harness-note cần nhớ workflow Redis` |
-| `/harness-tag success\|failure [reason]` | Tag session leaf để làm evidence outcome. | `/harness-tag success fixed redis config` |
+- Automation mặc định off. Nếu bật trong `harness/config.json`, vẫn chỉ draft/report/eval, không tự apply.
 
 ---
 

@@ -32,25 +32,17 @@ Source: `packages/pi-learn-extensions/extensions/harness/index.ts`; runtime: `pa
 
 The harness extension exposes the Pi command surface for session observability and improvement workflows. It delegates core logic to the runtime API rather than implementing parsing/report/proposal logic directly in TypeScript extension code.
 
-Key commands include:
+Recommended commands include:
 
 ```txt
+/harness-status [last]
 /harness-report [last]
-/harness-last [last]
-/harness-warnings [last]
-/harness-reflect [last]
 /harness-reflect-pi [last]
-/harness-propose [rules|memory|rule-config|parser|redaction] [last]
 /harness-proposals
 /harness-approve P-0001
-/harness-reject P-0001
 /harness-apply P-0001
-/harness-history [P-0001]
 /harness-eval [scenario|P-0001]
-/harness-automation-status
-/harness-automate
-/harness-note <text>
-/harness-tag success|failure <reason>
+/harness-mark success|failure|note [text]
 ```
 
 It also registers the `harness_import_llm_reflection` tool, which is intended for model use after `/harness-reflect-pi` queues a reflection prompt. The tool imports JSON proposals into private harness drafts.

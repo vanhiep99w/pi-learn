@@ -49,6 +49,37 @@ export default function harnessExtension(pi: ExtensionAPI) {
     },
   });
 
+  pi.registerCommand("harness-status", {
+    description: "Show consolidated Harness status, recent sessions, warnings, and automation state",
+    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
+      const parts = splitArgs(args ?? "");
+      const last = parts.find((part) => /^\d+$/.test(part)) ?? DEFAULT_LAST;
+      const sessionsOutput = parseJson((await runHarness(ctx, ["sessions", "--project", ctx.cwd, "--last", last, "--json"])).stdout);
+      const scanOutput = parseJson((await runHarness(ctx, ["scan", "--project", ctx.cwd, "--last", last, "--json"])).stdout);
+      const automationOutput = parseJson((await runHarness(ctx, ["automation-status", "--project", ctx.cwd, "--json"])).stdout);
+      const sessions = sessionsOutput?.sessions ?? [];
+      const scanResults = scanOutput?.results ?? [];
+      const warningCount = scanResults.reduce((sum: number, result: any) => sum + (result.warningsCount ?? 0), 0);
+      const status = automationOutput?.status;
+      const lines = [
+        `project: ${sessionsOutput?.project?.projectRoot ?? ctx.cwd}`,
+        `sessionDir: ${sessionsOutput?.sessionDir ?? "(unknown)"}`,
+        `recent sessions: ${sessions.length}/${last}`,
+        `warnings: ${warningCount}`,
+        `automation: ${status?.allowed ? "allowed" : "disabled/skipped"} (${status?.reason ?? "unknown"})`,
+        "",
+        "Recent sessions",
+        ...(sessions.length ? sessions.slice(0, 5).map((s: any) => `- ${s.timestamp ?? s.mtime}  ${s.sessionId}`) : ["- none found"]),
+        "",
+        "Warnings",
+        ...(warningCount
+          ? scanResults.flatMap((result: any) => (result.warnings ?? []).slice(0, 3).map((warning: any) => `- ${result.sessionId}: ${warning.code} — ${warning.message}`)).slice(0, 10)
+          : ["- none found"]),
+      ];
+      await showText(ctx, `🧭 Harness status (${last} sessions)`, lines.join("\n").trimEnd() || "No Harness status available.");
+    }),
+  });
+
   pi.registerCommand("harness-report", {
     description: "Generate and preview latest Pi Harness report",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
@@ -65,78 +96,6 @@ export default function harnessExtension(pi: ExtensionAPI) {
         console.log(markdown);
       }
       notifyOrLog(ctx, `Harness report: ${reportPath}`, "info");
-    }),
-  });
-
-  pi.registerCommand("harness-last", {
-    description: "Show recent Pi sessions for current project",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const last = firstArg(args) ?? DEFAULT_LAST;
-      const run = await runHarness(ctx, ["sessions", "--project", ctx.cwd, "--last", last, "--json"]);
-      const output = parseJson(run.stdout);
-      const sessions = output?.sessions ?? [];
-      const text = sessions.length
-        ? sessions.map((s: any) => `${s.timestamp ?? s.mtime}  ${s.sessionId}\n  ${s.sessionFile}`).join("\n")
-        : "No sessions found for this project.";
-      await showText(ctx, `🧭 Last ${last} harness sessions`, text);
-    }),
-  });
-
-  pi.registerCommand("harness-warnings", {
-    description: "Scan recent sessions and show parser/normalizer warnings",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const last = firstArg(args) ?? DEFAULT_LAST;
-      const run = await runHarness(ctx, ["scan", "--project", ctx.cwd, "--last", last, "--json"]);
-      const output = parseJson(run.stdout);
-      const lines: string[] = [];
-      for (const result of output?.results ?? []) {
-        lines.push(`${result.sessionId}: warnings=${result.warningsCount ?? 0}`);
-        for (const warning of result.warnings ?? []) {
-          lines.push(`  - ${warning.code}: ${warning.message}`);
-        }
-      }
-      await showText(ctx, `⚠️ Harness warnings (${last} sessions)`, lines.join("\n") || "No warnings found.");
-    }),
-  });
-
-  pi.registerCommand("harness-automation-status", {
-    description: "Show Harness gated automation status",
-    handler: async (_args, ctx) => withHarnessErrors(ctx, async () => {
-      const run = await runHarness(ctx, ["automation-status", "--project", ctx.cwd, "--json"]);
-      const output = parseJson(run.stdout);
-      const status = output?.status;
-      const lines = [
-        `enabled: ${status?.enabled ?? false}`,
-        `allowed: ${status?.allowed ?? false}`,
-        `reason: ${status?.reason ?? "unknown"}`,
-        `maxSessions: ${status?.automation?.maxSessions ?? ""}`,
-        `scan: ${status?.automation?.scan ?? false}`,
-        `report: ${status?.automation?.report ?? false}`,
-        `proposeRules: ${status?.automation?.proposeRules ?? false}`,
-        `proposeTargets: ${(status?.automation?.proposeTargets ?? []).join(", ")}`,
-        `eval: ${status?.automation?.eval ?? false}`,
-        `createEvalFixtureDraft: ${status?.automation?.createEvalFixtureDraft ?? false}`,
-      ].join("\n");
-      await showText(ctx, "🧪 Harness automation status", lines);
-    }),
-  });
-
-  pi.registerCommand("harness-automate", {
-    description: "Run gated Harness automation if enabled in harness/config.json",
-    handler: async (_args, ctx) => withHarnessErrors(ctx, async () => {
-      if (ctx.hasUI && ctx.ui?.confirm) {
-        const ok = await ctx.ui.confirm("Run Harness gated automation", "Run scan/report/proposal/eval drafting only? This will not apply or push changes.");
-        if (!ok) return notifyOrLog(ctx, "Harness automation cancelled.", "info");
-      }
-      const run = await runHarness(ctx, ["automate", "--project", ctx.cwd, "--json"]);
-      const output = parseJson(run.stdout);
-      const lines = [
-        `status: ${output?.status ?? "unknown"}`,
-        output?.reason ? `reason: ${output.reason}` : undefined,
-        "",
-        ...(output?.actions ?? []).map((action: any) => `${action.name}: ${action.status}${action.written !== undefined ? ` written=${action.written}` : ""}${action.skipped !== undefined ? ` skipped=${action.skipped}` : ""}`),
-      ].filter(Boolean).join("\n");
-      await showText(ctx, "🤖 Harness gated automation", lines || "No automation actions ran.");
     }),
   });
 
@@ -160,21 +119,6 @@ export default function harnessExtension(pi: ExtensionAPI) {
         ...(output?.results ?? []).map((result: any) => `${result.scenario}: ${result.status} — ${result.message ?? ""}`),
       ].join("\n");
       await showText(ctx, "🧪 Harness eval", lines);
-    }),
-  });
-
-  pi.registerCommand("harness-reflect", {
-    description: "Build and preview a redacted Harness reflection prompt. Usage: /harness-reflect [last]",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const parts = splitArgs(args ?? "");
-      const last = parts.find((part) => /^\d+$/.test(part)) ?? DEFAULT_LAST;
-      const run = await runHarness(ctx, ["reflect", "--project", ctx.cwd, "--last", last, "--json"]);
-      const output = parseJson(run.stdout);
-      const promptPath = output?.reflection?.latestPath;
-      if (!promptPath) return notifyOrLog(ctx, "Harness reflect did not return latestPath.", "warning");
-      const markdown = await readFile(promptPath, "utf8");
-      await showText(ctx, `🪞 Harness reflection prompt: ${promptPath}`, markdown);
-      notifyOrLog(ctx, `Harness reflection prompt ready: ${promptPath}`, "info");
     }),
   });
 
@@ -212,7 +156,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
       const output = parseJson(run.stdout);
       const proposals = output?.proposals ?? [];
       if (!proposals.length) {
-        notifyOrLog(ctx, "No draft Harness proposals found. Run /harness-propose first.", "info");
+        notifyOrLog(ctx, "No draft Harness proposals found. Run /harness-reflect-pi first.", "info");
         return;
       }
 
@@ -232,34 +176,6 @@ export default function harnessExtension(pi: ExtensionAPI) {
     }),
   });
 
-  pi.registerCommand("harness-propose", {
-    description: "Generate Harness draft proposals. Usage: /harness-propose [rules|memory|rule-config|parser|redaction] [last]",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const parts = splitArgs(args ?? "");
-      const mode = parts[0] ?? "rules";
-      const last = parts.find((part, index) => index > 0 && /^\d+$/.test(part)) ?? DEFAULT_LAST;
-      const target = mode === "rule-config" || mode === "target-rules" || mode === "rules-target" ? "rules" : mode;
-      const cliArgs = mode === "rules"
-        ? ["propose", "--project", ctx.cwd, "--last", last, "--rules", "--json"]
-        : mode === "llm"
-          ? ["propose", "--project", ctx.cwd, "--last", last, "--llm", "--json"]
-          : ["propose", "--project", ctx.cwd, "--last", last, "--target", target, "--json"];
-      const run = await runHarness(ctx, cliArgs);
-      const output = parseJson(run.stdout);
-      const lines = [
-        `mode: ${output?.mode ?? mode}`,
-        `sessions: ${output?.sessionsScanned ?? 0}`,
-        `candidates: ${output?.candidates ?? 0}`,
-        `written: ${output?.written?.length ?? 0}`,
-        `skipped: ${output?.skipped?.length ?? 0}`,
-        output?.memory ? `memory drafts: ${output.memory.written?.length ?? 0} (${output.memory.draftPath})` : undefined,
-        "",
-        ...(output?.written ?? []).map((p: any) => `${p.id} [${p.target}/${p.risk}] ${p.title}\n  ${p.filePath}`),
-      ].filter(Boolean).join("\n");
-      await showText(ctx, "🧪 Harness propose", lines || "No proposals generated.");
-    }),
-  });
-
   pi.registerCommand("harness-approve", {
     description: "Approve a Harness proposal. Usage: /harness-approve P-0001",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
@@ -268,17 +184,6 @@ export default function harnessExtension(pi: ExtensionAPI) {
       const run = await runHarness(ctx, ["approve", id, "--project", ctx.cwd, "--json"]);
       const output = parseJson(run.stdout);
       notifyOrLog(ctx, `Harness proposal ${output?.proposal?.id ?? id}: ${output?.proposal?.status ?? "approved"}`, "info");
-    }),
-  });
-
-  pi.registerCommand("harness-reject", {
-    description: "Reject a Harness proposal. Usage: /harness-reject P-0001",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const id = firstArg(args);
-      if (!id) return notifyOrLog(ctx, "Usage: /harness-reject P-0001", "warning");
-      const run = await runHarness(ctx, ["reject", id, "--project", ctx.cwd, "--json"]);
-      const output = parseJson(run.stdout);
-      notifyOrLog(ctx, `Harness proposal ${output?.proposal?.id ?? id}: ${output?.proposal?.status ?? "rejected"}`, "info");
     }),
   });
 
@@ -306,56 +211,45 @@ export default function harnessExtension(pi: ExtensionAPI) {
     }),
   });
 
-  pi.registerCommand("harness-history", {
-    description: "Show proposal lifecycle history. Usage: /harness-history [P-0001]",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const id = firstArg(args);
-      const cliArgs = id ? ["history", id, "--project", ctx.cwd, "--json"] : ["history", "--project", ctx.cwd, "--json"];
-      const run = await runHarness(ctx, cliArgs);
-      const output = parseJson(run.stdout);
-      const lines = (output?.history ?? []).map((event: any) => `${event.timestamp}  ${event.proposalId}  ${event.event}  ${event.status}`);
-      await showText(ctx, `🧾 Harness history${id ? ` ${id}` : ""}`, lines.join("\n") || "No proposal history found.");
-    }),
-  });
-
-  pi.registerCommand("harness-note", {
-    description: "Append a private Harness note to the current Pi session",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const note = args?.trim() || (ctx.hasUI && ctx.ui?.editor ? await ctx.ui.editor("📝 Harness note", "") : "");
-      if (!note?.trim()) return;
-      pi.appendEntry("harness-note", {
-        text: note.trim(),
-        cwd: ctx.cwd,
-        createdAt: new Date().toISOString(),
-      });
-      notifyOrLog(ctx, "Harness note appended to session.", "info");
-    }),
-  });
-
-  pi.registerCommand("harness-tag", {
-    description: "Tag current session leaf. Usage: /harness-tag success|failure [reason]",
+  pi.registerCommand("harness-mark", {
+    description: "Mark the current session. Usage: /harness-mark success|failure|note [text]",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
       const parts = splitArgs(args ?? "");
-      const tag = parts[0] ?? "note";
-      const reason = parts.slice(1).join(" ");
-      const leafId = ctx.sessionManager?.getLeafId?.();
-      if (leafId && (tag === "success" || tag === "failure")) {
-        pi.setLabel(leafId, tag);
+      const kind = parts[0] ?? "note";
+      if (!["success", "failure", "note"].includes(kind)) {
+        return notifyOrLog(ctx, "Usage: /harness-mark success|failure|note [text]", "warning");
       }
-      pi.appendEntry("harness-tag", {
-        tag,
-        reason,
-        leafId,
-        cwd: ctx.cwd,
-        createdAt: new Date().toISOString(),
-      });
-      notifyOrLog(ctx, `Harness tag recorded: ${tag}${reason ? ` — ${reason}` : ""}`, "info");
+      let text = parts.slice(1).join(" ");
+      if (kind === "note" && !text.trim() && ctx.hasUI && ctx.ui?.editor) {
+        text = await ctx.ui.editor("📝 Harness note", "");
+      }
+      const leafId = ctx.sessionManager?.getLeafId?.();
+      if (leafId && (kind === "success" || kind === "failure")) {
+        pi.setLabel(leafId, kind);
+      }
+      if (kind === "note") {
+        if (!text.trim()) return;
+        pi.appendEntry("harness-note", {
+          text: text.trim(),
+          cwd: ctx.cwd,
+          createdAt: new Date().toISOString(),
+        });
+      } else {
+        pi.appendEntry("harness-tag", {
+          tag: kind,
+          reason: text,
+          leafId,
+          cwd: ctx.cwd,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      notifyOrLog(ctx, `Harness mark recorded: ${kind}${text ? ` — ${text}` : ""}`, "info");
     }),
   });
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui?.notify("🧪 Harness commands: /harness-report, /harness-eval, /harness-automate, /harness-reflect-pi", "info");
+    ctx.ui?.notify("🧪 Harness: /harness-status, /harness-report, /harness-reflect-pi, /harness-proposals", "info");
   });
 }
 

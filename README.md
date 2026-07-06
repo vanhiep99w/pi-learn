@@ -257,6 +257,7 @@ Mặc định các lệnh dùng **5 session gần nhất**; có thể truyền s
 ### Workflow khuyến nghị
 
 ```txt
+/harness-status          # xem trạng thái tổng hợp, session gần đây, warnings, automation
 /harness-report          # xem report session gần đây
 /harness-reflect-pi      # dùng model hiện tại tạo draft improvement proposals
 /harness-proposals       # xem proposal đã tạo
@@ -268,22 +269,14 @@ Mặc định các lệnh dùng **5 session gần nhất**; có thể truyền s
 
 | Command | Tác dụng |
 |---|---|
+| `/harness-status [last]` | Hiển thị session gần đây, warning summary và trạng thái automation. |
 | `/harness-report [last]` | Scan session gần đây và preview report Markdown. |
-| `/harness-last [last]` | Liệt kê session gần đây của project. |
-| `/harness-warnings [last]` | Xem parser/normalizer warnings. |
-| `/harness-reflect [last]` | Build + preview reflection prompt đã redact, chưa gọi LLM tạo proposal. |
 | `/harness-reflect-pi [last]` | Gửi prompt vào model hiện tại; model gọi `harness_import_llm_reflection` để tạo draft proposals. |
-| `/harness-propose [rules\|memory\|rule-config\|parser\|redaction] [last]` | Tạo proposal deterministic/targeted không cần LLM. |
 | `/harness-proposals` | List + preview draft proposals. |
 | `/harness-approve P-0001` | Approve proposal. |
-| `/harness-reject P-0001` | Reject proposal. |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu có JSON Patch. Không auto-push. |
-| `/harness-history [P-0001]` | Xem lifecycle history. |
 | `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite/scenario/proposal check. |
-| `/harness-automation-status` | Xem automation config có enabled/allowed không. |
-| `/harness-automate` | Chạy gated automation: scan/report/draft/eval only, không apply/push. |
-| `/harness-note <text>` | Ghi private note vào current session. |
-| `/harness-tag success\|failure [reason]` | Tag outcome cho current session leaf. |
+| `/harness-mark success\|failure\|note [text]` | Ghi note hoặc tag outcome cho current session leaf. |
 
 Ghi chú:
 

@@ -63,12 +63,14 @@ Common package commands documented by the READMEs and extension sources include:
 /wiki-ask <question>
 /wiki-status
 
+/harness-status [last]
 /harness-report [last]
 /harness-reflect-pi [last]
 /harness-proposals
 /harness-approve P-0001
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
+/harness-mark success|failure|note [text]
 
 /chatgpt-login
 /chatgpt-usage

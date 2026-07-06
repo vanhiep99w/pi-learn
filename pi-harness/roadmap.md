@@ -24,7 +24,7 @@ Rules engine: implemented MVP detectors for repeated bash failures, repeated too
 Proposal writer: implemented private draft Markdown proposals with evidence refs, dedupe fingerprints, test and rollback plans
 Memory drafts: implemented private `memory/draft.jsonl` writer for reviewed memory candidates
 Targeted improvements: implemented `propose --target memory|rules|parser|redaction`
-Pi wrapper: implemented `/harness-report`, `/harness-last`, `/harness-warnings`, `/harness-reflect`, `/harness-reflect-pi`, `/harness-propose`, `/harness-proposals`, `/harness-approve`, `/harness-reject`, `/harness-apply`, `/harness-history`, `/harness-eval`, `/harness-note`, `/harness-tag`
+Pi wrapper: implemented compact command set `/harness-status`, `/harness-report`, `/harness-reflect-pi`, `/harness-proposals`, `/harness-approve`, `/harness-apply`, `/harness-eval`, `/harness-mark`
 Apply loop: controlled MVP implemented with approval, proposal history, target allowlist, git branch, patch apply and rollback
 Eval loop: deterministic MVP implemented with private JSON/Markdown reports
 Gated automation: opt-in MVP implemented for scan/report/draft proposals/eval only; no apply/push
