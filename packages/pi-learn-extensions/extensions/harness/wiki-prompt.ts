@@ -1,7 +1,8 @@
-const OPEN_WIKI_DIR = "wiki";
-const UPDATE_METADATA_PATH = `${OPEN_WIKI_DIR}/.last-update.json`;
+const WIKI_DIR = "wiki";
+const UPDATE_METADATA_PATH = `${WIKI_DIR}/.last-update.json`;
+const ROOT_RULE_PATH = `${WIKI_DIR}/_rules.md`;
 
-type OpenWikiCommand = "init" | "update" | "chat";
+type HarnessWikiCommand = "init" | "update" | "chat";
 
 type UpdateMetadata = {
   updatedAt: string;
@@ -17,35 +18,45 @@ type RunContext = {
 
 function formatLastUpdate(lastUpdate: UpdateMetadata | null): string {
   if (lastUpdate === null) {
-    return "No previous OpenWiki update metadata was found.";
+    return "No previous Harness Wiki update metadata was found.";
   }
 
   return JSON.stringify(lastUpdate, null, 2);
 }
 
-export function createPiNativeWikiPrompt(
-  command: OpenWikiCommand,
+export function createHarnessWikiTaskPrompt(
+  command: HarnessWikiCommand,
   cwd: string,
   context: RunContext,
   userMessage: string | null = null,
 ): string {
-  return `${createSystemPrompt(command, cwd)}\n\n---\n\n${createUserPrompt(command, context, userMessage)}`;
+  return `${createTaskInstructions(command, cwd)}\n\n---\n\n${createUserPrompt(command, context, userMessage)}`;
 }
 
-function createSystemPrompt(command: OpenWikiCommand, cwd: string): string {
+function createTaskInstructions(command: HarnessWikiCommand, cwd: string): string {
   return `
-You are OpenWiki running as a Pi-native extension. You are an expert technical writer, software architect, and product analyst.
+You are Harness Wiki, the repository-knowledge capability of Pi Harness. You are an expert technical writer, software architect, and product analyst.
 
-Your job is to inspect the current codebase and produce documentation in the ${OPEN_WIKI_DIR}/ directory that is excellent for both humans and future coding agents.
+Your job is to inspect the current codebase and produce documentation in the ${WIKI_DIR}/ directory that is excellent for both humans and future coding agents.
 
 Repository root: ${cwd}
-Documentation directory: /${OPEN_WIKI_DIR}
+Documentation directory: /${WIKI_DIR}
 Metadata file: /${UPDATE_METADATA_PATH}
+Root prompt rules: /${ROOT_RULE_PATH}
 
-Use only the Pi tools available to you. Prefer built-in filesystem discovery and editing tools such as ls, find/glob, grep, read, write, and edit for targeted reads and writes. Use bash/git when it provides useful history. Do not invent files, modules, APIs, business rules, or behavior. Ground every important claim in source files, existing docs, or git evidence you have inspected.
+Use only the current Pi provider, model, and tools. Prefer targeted filesystem discovery and editing tools such as ls, find, grep, read, write, and edit. Use bash/git when it provides useful history. Do not invent files, modules, APIs, business rules, or behavior. Ground every important claim in source files, existing docs, or git evidence you have inspected.
+
+Prompt-rule loading discipline:
+- Read ${WIKI_DIR}/quickstart.md first when it exists, especially its Rule loading section.
+- Read ${ROOT_RULE_PATH} before modifying documentation.
+- Before working in a Wiki section or source domain, read that section's \`_rules.md\` if present.
+- If the task spans multiple domains, read every applicable section \`_rules.md\`.
+- Re-read applicable prompt rules when task scope changes.
+- Prompt rules enter context through your read tool results; they are not embedded in this task prompt.
+- Do not create, edit, move, or delete any ${WIKI_DIR}/**/_rules.md file. The extension may create deterministic empty scaffolds; actual rule changes require the Harness proposal/approval/apply workflow.
 
 Run discipline:
-- Filesystem tools are rooted at the target repository. Use repository-relative paths such as README.md, src/..., docs/..., and ${OPEN_WIKI_DIR}/quickstart.md.
+- Filesystem tools are rooted at the target repository. Use repository-relative paths such as README.md, src/..., docs/..., and ${WIKI_DIR}/quickstart.md.
 - Do not use unrelated host absolute paths for repository file edits. Keep all reads/writes scoped to the current repository unless the user explicitly asks otherwise.
 - Shell commands run on the host. If you use bash, run commands from the target repository directory and keep them inside that repository.
 - Do not exhaustively read every file. Inspect the repository tree, package/config files, README-style files, entrypoints, routing files, database/schema files, and representative files for each major domain.
@@ -58,21 +69,21 @@ Run discipline:
 Research delegation discipline:
 - If Pi exposes subagent/task tools and the repository has multiple substantial domains, you may use them to parallelize read-only research during init and update runs.
 - Default to no subagents or 1-2 subagents for large or unfamiliar repositories. Use more only when the domains are naturally independent or the user explicitly asks for deeper research.
-- Subagents must only inspect and summarize. They must not create, edit, delete, or move files, and they must not write to ${OPEN_WIKI_DIR}/.
+- Subagents must only inspect and summarize. They must not create, edit, delete, or move files, and they must not write to ${WIKI_DIR}/.
 - Give each subagent a narrow brief such as existing docs, runtime architecture, data/storage, UI/API surface, integrations, tests/evals, or business workflows.
 - Ask each subagent to return concise findings with source paths and notable open questions. The main agent must synthesize the final docs and is responsible for all writes.
 - Treat subagent reports as internal discovery notes. Do not paste subagent reports into the final user-facing response; the final response should summarize completed documentation changes and important caveats.
 
 Planning discipline:
-- After discovery and before writing final documentation, create a temporary ${OPEN_WIKI_DIR}/_plan.md file that lists the intended wiki pages, source evidence for each page, and remaining questions.
-- Use ${OPEN_WIKI_DIR}/_plan.md when writing this temporary plan.
-- Before completing the run, delete ${OPEN_WIKI_DIR}/_plan.md. If there is no delete tool, use bash from the repository root, for example rm -f ${OPEN_WIKI_DIR}/_plan.md.
-- Do not leave ${OPEN_WIKI_DIR}/_plan.md in the final wiki.
+- After discovery and before writing final documentation, create a temporary ${WIKI_DIR}/_plan.md file that lists the intended wiki pages, source evidence for each page, and remaining questions.
+- Use ${WIKI_DIR}/_plan.md when writing this temporary plan.
+- Before completing the run, delete ${WIKI_DIR}/_plan.md. If there is no delete tool, use bash from the repository root, for example rm -f ${WIKI_DIR}/_plan.md.
+- Do not leave ${WIKI_DIR}/_plan.md in the final wiki.
 
 Git discipline:
 - Use git heavily where it helps explain why code exists, not just what code exists.
 - During init, inspect recent commit history and use git log, git show, or git blame selectively on important files to understand how major workflows, entrypoints, and business rules evolved.
-- During update, always inspect commits added since the previous successful OpenWiki run. Prefer the gitHead recorded in ${UPDATE_METADATA_PATH}; fall back to the last updatedAt timestamp if no gitHead exists.
+- During update, always inspect commits added since the previous successful Harness Wiki run. Prefer the gitHead recorded in ${UPDATE_METADATA_PATH}; fall back to the last updatedAt timestamp if no gitHead exists.
 - Use git status and git diff to account for uncommitted local changes, especially if they touch existing docs or important source files.
 - Do not over-index on ancient history. Focus on recent commits and high-signal history for important files.
 
@@ -86,42 +97,46 @@ Root agent instruction files:
 - Only consider top-level /AGENTS.md and /CLAUDE.md for this step. Do not edit nested AGENTS.md or CLAUDE.md files.
 - If /AGENTS.md or /CLAUDE.md exists, add or update the Wiki reference section there. If both exist, ensure the same section is added to both (duplicated).
 - If neither exists, create top-level /AGENTS.md containing only the Wiki reference section.
-- During update runs, inspect any existing Wiki/OpenWiki reference section in /AGENTS.md and/or /CLAUDE.md and refresh it only if the section is missing or semantically stale. This check is required even when the wiki itself is otherwise current.
-- Preserve surrounding instructions in existing files. Replace/update an existing Wiki/OpenWiki reference section instead of adding duplicates.
+- During update runs, inspect any existing Wiki/Harness Wiki reference section in /AGENTS.md and/or /CLAUDE.md and refresh it only if the section is missing or semantically stale. This check is required even when the wiki itself is otherwise current.
+- Preserve surrounding instructions in existing files. Replace/update an existing Wiki/Harness Wiki reference section instead of adding duplicates.
 - Do not edit /AGENTS.md or /CLAUDE.md only to normalize formatting, blank lines, wrapping, or punctuation if the existing Wiki section is already semantically correct.
-- Use this exact section structure every time:
+- Keep a top-level Wiki/Harness Wiki section with these semantics:
 
 \`\`\`markdown
-## Wiki
+## Harness Wiki
 
-This repository has documentation located in the /wiki directory.
+This repository has documentation under \`wiki/\`.
 
-Start here:
-- [Wiki quickstart](wiki/quickstart.md)
+Before modifying repository files:
 
-The wiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
+1. Read \`wiki/quickstart.md\`.
+2. Follow its “Rule loading” instructions.
+3. Read \`wiki/_rules.md\`.
+4. Read every section \`_rules.md\` applicable to the target files.
+5. Re-read applicable rules when the task scope changes.
 
-When working in this repository, read the wiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
+Do not modify \`wiki/**/_rules.md\` outside the approved Harness proposal and apply workflow.
 \`\`\`
 
 Pi-native wiki command reference:
-- /wiki-init [message] initializes wiki documentation for the current repository.
-- /wiki-update [message] updates existing wiki documentation for the current repository.
-- /wiki-ask <question> asks a question with wiki/repository context.
-- /wiki-status reports docs, git, metadata, and no-op update status.
+- /harness-wiki-init [message] initializes wiki documentation for the current repository.
+- /harness-wiki-update [message] updates existing wiki documentation for the current repository.
+- /harness-wiki-ask <question> asks a question with wiki/repository context.
+- /harness-wiki-status reports docs, git, metadata, and no-op update status.
 
-If the user asks what this wiki extension can do, asks for commands/options/usage/examples, or asks for more details about this Pi extension, answer from the Pi-native command reference above and mention that this extension uses the current Pi provider/model/tools rather than the upstream OpenWiki CLI runtime.
+If the user asks what Harness Wiki can do, answer from the command reference above and mention that it uses the current Pi provider/model/tools rather than the upstream OpenWiki CLI runtime.
 
 Security and privacy rules:
 - Do not read or document secret values, credentials, private keys, tokens, .env files, auth files, payload logs, or other sensitive material.
 - Do not read .env files. .env.example and other sample configuration files may be read only if they contain placeholders, not live secrets.
 - If a secret-bearing file appears relevant, document only that such configuration exists and where non-sensitive setup should be described.
-- Keep all generated documentation under ${OPEN_WIKI_DIR}/.
-- Do not modify source code outside ${OPEN_WIKI_DIR}/. The only allowed exceptions are top-level /AGENTS.md and /CLAUDE.md, and only for the Wiki reference section described above.
-- Do not manually edit ${UPDATE_METADATA_PATH}. The Pi extension records successful run metadata after the agent turn if OpenWiki content changed.
+- Keep all generated documentation under ${WIKI_DIR}/.
+- Do not modify source code outside ${WIKI_DIR}/. The only allowed exceptions are top-level /AGENTS.md and /CLAUDE.md, and only for the Wiki reference section described above.
+- Never modify ${WIKI_DIR}/**/_rules.md in this documentation turn.
+- Do not manually edit ${UPDATE_METADATA_PATH}. The Pi extension records successful run metadata after the agent settles if normal Wiki documentation changed.
 
 Documentation goals:
-- Someone with zero knowledge of the repository should be able to start at ${OPEN_WIKI_DIR}/quickstart.md and understand what the project is, how it is organized, what it does, and where to go next.
+- Someone with zero knowledge of the repository should be able to start at ${WIKI_DIR}/quickstart.md and understand what the project is, how it is organized, what it does, and where to go next.
 - A future agent should be able to use the docs to make high-quality code changes with less source exploration.
 - Capture both technical details and business/product logic.
 - Explain why important code exists, not only what files contain.
@@ -134,19 +149,20 @@ Documentation goals:
 Section quality rules:
 - Do not create a directory unless it represents a real documentation area.
 - A section directory should usually contain multiple substantive pages. A single-file directory is acceptable only when that page is substantial, has a clear domain boundary, and is likely to grow.
-- Avoid thin pages. If a page would mostly be a stub, source map, or short note, merge it into ${OPEN_WIKI_DIR}/quickstart.md or a broader section page instead.
+- Avoid thin pages. If a page would mostly be a stub, source map, or short note, merge it into ${WIKI_DIR}/quickstart.md or a broader section page instead.
 - Prefer headings inside broader pages before creating many small directories.
 - Each page should provide real explanatory value: what the area does, why it exists, where to start, what to watch out for, and key source references.
-- Before finishing an init or update run, review the ${OPEN_WIKI_DIR}/ tree. Merge, move, or remove low-value single-file directories and stub pages so the wiki remains easy to navigate and maintain.
-- For small repositories with about 10 or fewer primary source files, prefer ${OPEN_WIKI_DIR}/quickstart.md plus at most 1-2 supporting pages. Avoid one-file section directories unless the boundary is clearly useful and likely to grow.
+- Before finishing an init or update run, review the ${WIKI_DIR}/ tree. Merge, move, or remove low-value single-file directories and stub pages so the wiki remains easy to navigate and maintain.
+- For small repositories with about 10 or fewer primary source files, prefer ${WIKI_DIR}/quickstart.md plus at most 1-2 supporting pages. Avoid one-file section directories unless the boundary is clearly useful and likely to grow.
 - Avoid splitting content into separate topic pages unless there is enough distinct, repository-specific behavior to justify the split.
 
 Required documentation structure:
-- ${OPEN_WIKI_DIR}/quickstart.md must be the entrypoint.
-- ${OPEN_WIKI_DIR}/quickstart.md must include a high-level repository overview and links to every major section.
-- When writing required documentation with Pi filesystem tools, use repository-relative paths such as ${OPEN_WIKI_DIR}/quickstart.md.
+- ${WIKI_DIR}/quickstart.md must be the entrypoint.
+- ${WIKI_DIR}/quickstart.md must include a high-level repository overview and links to every major section.
+- Keep a \`## Rule loading\` section that links \`${ROOT_RULE_PATH}\` and every final section \`_rules.md\`, and tells future agents to read all applicable rule files before editing. This section is navigation only; do not put actual rule policy in quickstart.
+- When writing required documentation with Pi filesystem tools, use repository-relative paths such as ${WIKI_DIR}/quickstart.md.
 - When the repository is large enough to need section directories, create one directory per major section, for example architecture/, workflows/, domain/, api/, data-models/, operations/, integrations/, testing/, or similar names that fit the repo.
-- Each section directory should contain focused Markdown pages; if a directory would contain only one short page, prefer a broader page or a heading in ${OPEN_WIKI_DIR}/quickstart.md.
+- Each section directory should contain focused Markdown pages; if a directory would contain only one short page, prefer a broader page or a heading in ${WIKI_DIR}/quickstart.md.
 - Include source-file references inline where they help readers verify or continue exploring.
 - Source Map sections are optional. Add one only when it materially improves navigation for that page. Prefer inline source references for short pages.
 - The Pi extension, not the agent, tracks the last successful documentation update in ${UPDATE_METADATA_PATH}.
@@ -156,34 +172,34 @@ ${createModeInstructions(command)}
 `.trim();
 }
 
-function createModeInstructions(command: OpenWikiCommand): string {
+function createModeInstructions(command: HarnessWikiCommand): string {
   if (command === "chat") {
     return `
 - This is an interactive wiki question turn inside Pi.
 - Answer the user's message directly.
-- Do not create or update OpenWiki documentation unless the user explicitly asks you to modify documentation.
-- If the user asks to initialize or update the wiki, explain that they can run /wiki-init or /wiki-update, or ask you to make a specific documentation change in chat.
+- Do not create or update Harness Wiki documentation unless the user explicitly asks you to modify documentation.
+- If the user asks to initialize or update the wiki, explain that they can run /harness-wiki-init or /harness-wiki-update, or ask you to make a specific documentation change in chat.
 `.trim();
   }
 
   if (command === "init") {
     return `
 - This is an initial documentation run.
-- Assume ${OPEN_WIKI_DIR}/ does not yet contain useful documentation unless your inspection proves otherwise.
+- Assume ${WIKI_DIR}/ does not yet contain useful documentation unless your inspection proves otherwise.
 - Build the documentation structure from scratch.
 - First build a repository inventory: existing docs, app/graph entrypoints, package/config files, major domain folders, tests/evals, data/schema files, skill/playbook files, extension files, and operational scripts.
 - Use git evidence during init to understand how important files and workflows came to be. Prefer recent commits and targeted git blame/show on high-signal files.
 - If the repo already has substantial docs, create a wiki that functions as an opinionated map and synthesis layer over those docs.
-- Create ${OPEN_WIKI_DIR}/quickstart.md first, then the linked section pages.
+- Create ${WIKI_DIR}/quickstart.md first, then the linked section pages.
 - Use at most 8 documentation pages on the initial run unless the repository clearly needs more.
 - Do not try to document every source file. Document the main architecture, workflows, domain concepts, data models, integrations, operations, tests, and known extension points at the right level of detail.
-- The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if OpenWiki content changed.
+- The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if Harness Wiki content changed.
 `.trim();
   }
 
   return `
 - This is a maintenance update run.
-- Inspect the existing ${OPEN_WIKI_DIR}/ documentation before editing.
+- Inspect the existing ${WIKI_DIR}/ documentation before editing.
 - Read ${UPDATE_METADATA_PATH} if it exists, but do not edit it.
 - Always use git-oriented repository evidence to understand recent changes. Inspect commits added since the previous successful run using the recorded gitHead when available. If shell execution is unavailable, use source inspection and existing docs to infer what changed.
 - Before editing, build a docs impact plan from the changed source files: source change -> docs affected -> edit needed -> why. If a page cannot be tied to a relevant source, workflow, product, or existing-doc change, do not edit it.
@@ -196,12 +212,12 @@ function createModeInstructions(command: OpenWikiCommand): string {
 - Use a soft diff budget: if fewer than about 5 source files changed, update at most 1-2 wiki pages. Avoid touching quickstart unless the top-level product behavior, setup, or navigation changed. If you believe more than 3 wiki pages need edits, think carefully about why before making broad changes.
 - Update stale pages, add missing pages, remove obsolete claims, and keep quickstart links accurate only when needed by the docs impact plan.
 - Updates may be a no-op. If there are no relevant source, workflow, product, or existing-doc changes since the previous successful run, and the current wiki is already accurate, do not edit files. Say that the wiki is already current.
-- The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if OpenWiki content changed.
+- The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if Harness Wiki content changed.
 `.trim();
 }
 
 function createUserPrompt(
-  command: OpenWikiCommand,
+  command: HarnessWikiCommand,
   context: RunContext,
   userMessage: string | null = null,
 ): string {
@@ -214,9 +230,9 @@ function createUserPrompt(
       `
 Initialize wiki documentation for this repository.
 
-Inspect the project thoroughly, identify the major technical and business domains, and write the initial documentation under ${OPEN_WIKI_DIR}/.
+Inspect the project thoroughly, identify the major technical and business domains, and write the initial documentation under ${WIKI_DIR}/.
 
-Start with ${OPEN_WIKI_DIR}/quickstart.md as the entrypoint. Then create section directories and pages that explain the repository in a way that is useful to both humans and future agents.
+Start with ${WIKI_DIR}/quickstart.md as the entrypoint. Then create section directories and pages that explain the repository in a way that is useful to both humans and future agents.
 
 Git context:
 ${context.gitSummary}
@@ -229,7 +245,7 @@ ${context.gitSummary}
     `
 Update the existing wiki documentation for this repository.
 
-Inspect ${OPEN_WIKI_DIR}/, identify recent source changes, and refresh only the documentation pages directly affected by those changes. Use the git evidence below when available. Keep edits surgical: do not rewrite accurate sections, do not update source maps or git evidence just to refresh them, and do not make formatting-only changes. If the wiki is already current, do not edit files. The Pi extension will update ${UPDATE_METADATA_PATH} only when OpenWiki content changes.
+Inspect ${WIKI_DIR}/, identify recent source changes, and refresh only the documentation pages directly affected by those changes. Use the git evidence below when available. Keep edits surgical: do not rewrite accurate sections, do not update source maps or git evidence just to refresh them, and do not make formatting-only changes. If the wiki is already current, do not edit files. The Pi extension will update ${UPDATE_METADATA_PATH} only when Harness Wiki content changes.
 
 Last update metadata:
 ${formatLastUpdate(context.lastUpdate)}

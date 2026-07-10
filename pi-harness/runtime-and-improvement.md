@@ -451,11 +451,11 @@ missing_parent repeated
 
 ---
 
-## 8. Memory/rules are improvement targets, not per-session outputs
+## 8. Memory, prompt rules, and detectors are improvement targets, not per-session outputs
 
 `manifest.json`, `events.jsonl`, `metrics.json`, `warnings.jsonl` are per-session runtime outputs.
 
-`memory` and `rules` are different. They are **harness artifacts** that can be improved from evidence.
+Memory, reviewed prompt rules, and deterministic detector code are different **Harness artifacts** that can be improved from evidence.
 
 ```txt
 Per-session outputs:
@@ -463,15 +463,16 @@ Per-session outputs:
 
 Improvement artifacts:
   harness/memory/
-  harness/rules/
-  src/analysis/rules/
+  wiki/_rules.md
+  wiki/<section>/_rules.md
+  packages/harness-runtime/src/analysis/
   AGENTS.md
   skills/
   prompt templates
   extensions
 ```
 
-Do not auto-update memory/rules from a single session.
+Do not auto-update memory, prompt rules, or detector behavior from a single session.
 
 Correct flow:
 
@@ -599,9 +600,70 @@ Bad candidates:
 
 ---
 
-## 10. Rule improvement
+## 10. Prompt-rule and detector improvement
 
-Rules are deterministic detectors that inspect normalized events/metrics/warnings.
+Harness now separates **reviewed prompt guidance** from **deterministic detector behavior**.
+
+### 10.1 Reviewed prompt rules
+
+Project prompt guidance lives in one Markdown file for root and each final Wiki section:
+
+```txt
+wiki/_rules.md
+wiki/architecture/_rules.md
+wiki/extensions/_rules.md
+wiki/operations/_rules.md
+```
+
+Prompt rules are natural-language instructions/checklists for coding agents. They are loaded lazily:
+
+```txt
+AGENTS.md bootstrap
+  → wiki/quickstart.md
+  → wiki/_rules.md
+  → applicable section/_rules.md
+  → read-tool results enter model context
+```
+
+Harness does not auto-inject every rule, watch/cache rule content, or parse Markdown into detector parameters.
+
+Example:
+
+```md
+## GLOBAL-EDIT-001 — Inspect before exact-text edits
+
+Read the current target block before applying an exact-text edit.
+
+Requirements:
+
+- Confirm oldText is exact and unique.
+- Combine adjacent changes.
+- Inspect the resulting diff.
+
+Origin proposal: `P-0012`
+```
+
+Normal coding/Documentation turns cannot modify `_rules.md`. Changes require:
+
+```txt
+normalized evidence
+  → proposal
+  → human approval
+  → controlled Markdown patch
+  → prompt-rule lint/eval
+  → commit or rollback
+```
+
+### 10.2 Deterministic detectors
+
+Detector implementations/defaults remain executable runtime code:
+
+```txt
+packages/harness-runtime/src/analysis/rules.js
+packages/harness-runtime/src/improve/target-proposals.js
+packages/harness-runtime/src/reflection/reflection.js
+packages/harness-runtime/tests/**
+```
 
 Examples:
 
@@ -609,181 +671,31 @@ Examples:
 Repeated bash failure
 Sensitive path access
 Edit tool failure pattern
-User correction repeated
-Parser warning repeated
-Commit scope risk
-Long session/context rot
-Wrong model/prompt mismatch
+Parser warning pattern
 ```
 
-Rules should generate proposals, not apply changes directly.
+Thresholds such as `minOccurrences`, grouping, fingerprints, and enable/disable behavior are not encoded as prose in `_rules.md`. A change to deterministic detection targets runtime source/tests. If future project-level detector tuning is needed, it requires a separate schemaed config feature outside Wiki prompt rules.
 
-### 10.1 Rule storage
+### 10.3 Proposal routing
 
-Private draft rules:
+`target=rules` means reviewed prompt guidance:
 
 ```txt
-~/.pi/harness/projects/<project-key>/rules/draft/
+cross-cutting workflow     → wiki/_rules.md
+runtime architecture      → wiki/architecture/_rules.md
+Pi extension behavior     → wiki/extensions/_rules.md
+release/test operations   → wiki/operations/_rules.md
 ```
 
-Reviewed config rules in repo:
+Executable changes route separately:
 
 ```txt
-harness/rules/
-├── bash-failure-repeat.json
-├── sensitive-path-access.json
-├── edit-tool-failure.json
-└── parser-warning-patterns.json
+detector threshold/grouping/algorithm
+  → packages/harness-runtime/src/analysis/**
+  → relevant tests/evals
 ```
 
-Code-based detectors:
-
-```txt
-src/analysis/rules/
-├── bash-failure-repeat.ts
-├── sensitive-path-access.ts
-├── edit-tool-failure.ts
-└── parser-warning-patterns.ts
-```
-
-Recommended MVP:
-
-```txt
-rule engine = TypeScript
-rule config = JSON
-```
-
-### 10.2 Rule schema
-
-```ts
-type HarnessRule = {
-  schemaVersion: 1;
-  id: string;
-  name: string;
-  enabled: boolean;
-  scope: "global" | "project";
-  detector: string;
-  params: Record<string, unknown>;
-  proposal: {
-    target:
-      | "agents"
-      | "skill"
-      | "prompt"
-      | "extension"
-      | "tool"
-      | "mcp"
-      | "compaction"
-      | "eval"
-      | "docs"
-      | "settings"
-      | "memory"
-      | "rule"
-      | "parser";
-    risk: "low" | "medium" | "high";
-    titleTemplate: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-};
-```
-
-Example:
-
-```json
-{
-  "schemaVersion": 1,
-  "id": "R-0001",
-  "name": "Repeated bash failure",
-  "enabled": true,
-  "scope": "project",
-  "detector": "bash_failure_repeat",
-  "params": {
-    "minOccurrences": 2,
-    "groupBy": ["command", "errorFingerprint"],
-    "activePathOnly": true
-  },
-  "proposal": {
-    "target": "agents",
-    "risk": "low",
-    "titleTemplate": "Add checklist for repeated bash failure: {{command}}"
-  },
-  "createdAt": "2026-06-14T12:00:00.000Z",
-  "updatedAt": "2026-06-14T12:00:00.000Z"
-}
-```
-
-### 10.3 Rule improvement types
-
-#### Add new rule
-
-Example evidence:
-
-```txt
-User repeatedly warns not to commit .pi/logs.
-```
-
-Proposal:
-
-```txt
-P-0004 — Add rule to detect .pi/logs in git staging
-```
-
-Target:
-
-```txt
-harness/rules/git-sensitive-path.json
-```
-
-#### Tune threshold
-
-Old:
-
-```json
-{ "minOccurrences": 1 }
-```
-
-New:
-
-```json
-{ "minOccurrences": 3 }
-```
-
-Reason:
-
-```txt
-Too many false positives from one-off failures.
-```
-
-#### Improve grouping/fingerprint
-
-Old grouping:
-
-```txt
-full command string
-```
-
-Problem:
-
-```txt
-npm test
-npm test -- --runInBand
-```
-
-New grouping:
-
-```txt
-normalized command family = npm test*
-```
-
-#### Disable noisy rule
-
-If a rule generates repeated rejected proposals, propose:
-
-```txt
-enabled: false
-```
-
-or stricter params.
+Do not create or read `harness/rules/*.json` as a steady-state rule source.
 
 ---
 

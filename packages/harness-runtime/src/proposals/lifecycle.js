@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { atomicWriteFile, ensureDir } from "../storage/atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "../storage/harness-home.js";
 import { findDraftProposal } from "./proposal-writer.js";
+import { discoverWikiPromptRules, isWikiRulePath } from "../analysis/wiki-prompt-rules.js";
 
 const VALID_STATUS = new Set(["draft", "approved", "rejected", "applied", "rolled_back"]);
 
@@ -67,7 +68,14 @@ export function applyProposal({ config, project, id, allowDirty = false, commit 
   const branchName = `harness/${id}`;
   checkoutBranch(git, branchName);
 
-  const changedPaths = applyTextPatches({ projectRoot: project.projectRoot, targetFiles, patches });
+  const appliedPatch = applyTextPatches({ projectRoot: project.projectRoot, targetFiles, patches });
+  const { changedPaths } = appliedPatch;
+  try {
+    validateChangedPromptRules({ projectRoot: project.projectRoot, changedPaths });
+  } catch (error) {
+    restoreOriginalFiles(appliedPatch.originals);
+    throw error;
+  }
   const diff = runGit(git, ["diff", "--", ...changedPaths]).stdout;
 
   let commitHash;
@@ -218,20 +226,50 @@ function checkoutBranch(git, branchName) {
 
 function applyTextPatches({ projectRoot, targetFiles, patches }) {
   const changed = [];
-  for (const patch of patches) {
-    assertAllowedTarget(patch.path, targetFiles);
-    const filePath = path.resolve(projectRoot, patch.path);
-    const root = fs.realpathSync(projectRoot);
-    const parent = fs.existsSync(path.dirname(filePath)) ? fs.realpathSync(path.dirname(filePath)) : path.resolve(path.dirname(filePath));
-    if (!parent.startsWith(root)) throw cliLikeError(`Patch path escapes project root: ${patch.path}`);
-    if (!fs.existsSync(filePath)) throw cliLikeError(`Patch target file not found: ${patch.path}`);
-    const original = fs.readFileSync(filePath, "utf8");
-    const matches = countOccurrences(original, patch.oldText);
-    if (matches !== 1) throw cliLikeError(`Patch oldText must match exactly once in ${patch.path}; found ${matches}.`);
-    atomicWriteFile(filePath, original.replace(patch.oldText, patch.newText));
-    changed.push(patch.path);
+  const originals = new Map();
+  const root = fs.realpathSync(projectRoot);
+
+  try {
+    for (const patch of patches) {
+      assertAllowedTarget(patch.path, targetFiles);
+      const normalizedPath = normalizeRelativePath(patch.path);
+      const filePath = path.resolve(root, normalizedPath);
+      if (!isPathInside(root, filePath)) throw cliLikeError(`Patch path escapes project root: ${patch.path}`);
+      if (!fs.existsSync(filePath)) throw cliLikeError(`Patch target file not found: ${patch.path}`);
+      if (fs.lstatSync(filePath).isSymbolicLink()) throw cliLikeError(`Patch target cannot be a symlink: ${patch.path}`);
+      const realFilePath = fs.realpathSync(filePath);
+      if (!isPathInside(root, realFilePath)) throw cliLikeError(`Patch target resolves outside project root: ${patch.path}`);
+
+      const original = fs.readFileSync(filePath, "utf8");
+      if (!originals.has(filePath)) originals.set(filePath, original);
+      const matches = countOccurrences(original, patch.oldText);
+      if (matches !== 1) throw cliLikeError(`Patch oldText must match exactly once in ${patch.path}; found ${matches}.`);
+      atomicWriteFile(filePath, original.replace(patch.oldText, patch.newText));
+      changed.push(normalizedPath);
+    }
+  } catch (error) {
+    restoreOriginalFiles(originals);
+    throw error;
   }
-  return [...new Set(changed)];
+
+  return { changedPaths: [...new Set(changed)], originals };
+}
+
+function validateChangedPromptRules({ projectRoot, changedPaths }) {
+  if (!changedPaths.some(isWikiRulePath)) return;
+  const report = discoverWikiPromptRules({ projectRoot });
+  if (report.valid) return;
+  const details = report.errors.slice(0, 8).map((item) => `- ${item.path}: ${item.message}`).join("\n");
+  throw cliLikeError(`Prompt-rule validation failed after apply. Changes were restored.\n${details}`);
+}
+
+function restoreOriginalFiles(originals) {
+  for (const [filePath, content] of originals) atomicWriteFile(filePath, content);
+}
+
+function isPathInside(root, candidate) {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
 function assertAllowedTarget(patchPath, targetFiles) {

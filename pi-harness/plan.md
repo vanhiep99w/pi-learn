@@ -399,10 +399,12 @@ harness-runtime/
 │       └── score.ts
 ├── harness/
 │   ├── config.json
-│   ├── rules/
 │   ├── evals/
 │   ├── memory/
 │   └── proposals-reviewed/
+├── wiki/
+│   ├── _rules.md
+│   └── <section>/_rules.md
 ├── docs/
 └── tests/
 ```
@@ -411,13 +413,14 @@ Trong repo package, `harness/` chỉ chứa artifact đã review/versioned:
 
 ```txt
 harness/config.json
-harness/rules/
 harness/evals/
 harness/memory/
 harness/proposals-reviewed/
+wiki/_rules.md
+wiki/<section>/_rules.md
 ```
 
-Không chứa normalized session cache mặc định.
+Không chứa normalized session cache mặc định. `wiki/**/_rules.md` là reviewed prompt guidance; deterministic detector implementation/defaults vẫn nằm trong `packages/harness-runtime/src/analysis/**` và không dùng JSON rule config trong Wiki.
 
 ### 6.3 Private runtime cache ngoài repo
 
@@ -665,9 +668,10 @@ Repo artifacts chỉ commit sau review/redaction nếu cần:
 
 ```txt
 harness/config.json
-harness/rules/
 harness/evals/
 harness/proposals-reviewed/
+wiki/_rules.md
+wiki/<section>/_rules.md
 ```
 
 ### Definition of Done

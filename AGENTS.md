@@ -1,15 +1,18 @@
 # AGENTS.md — Pi Learn Project
 
-## Wiki
+## Harness Wiki
 
-This repository has documentation located in the /wiki directory.
+This repository has documentation under `wiki/`.
 
-Start here:
-- [Wiki quickstart](wiki/quickstart.md)
+Before modifying repository files:
 
-The wiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
+1. Read `wiki/quickstart.md`.
+2. Follow its “Rule loading” instructions.
+3. Read `wiki/_rules.md`.
+4. Read every section `_rules.md` applicable to the target files.
+5. Re-read applicable rules when the task scope changes or after compaction.
 
-When working in this repository, read the wiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
+Do not modify `wiki/**/_rules.md` outside the approved Harness proposal and apply workflow.
 
 
 ## Tổng quan hiện tại
@@ -37,11 +40,15 @@ pi-learn/
 │   │   └── log-llm-payload.ts         # Extension local/dev-only log payload LLM
 │   └── logs/llm-payloads/             # Log payload local; coi là nhạy cảm
 ├── docs/                              # Tài liệu Pi tiếng Việt, có docs/README.md làm index
+├── pi-harness/                        # Harness specs/roadmap/integration plan
+├── wiki/                              # Repo docs + reviewed section `_rules.md`
 └── packages/
+    ├── harness-runtime/               # Deterministic session/proposal/eval runtime
     └── pi-learn-extensions/
         ├── package.json               # Package con expose extensions/themes
         ├── README.md
         ├── extensions/
+        │   ├── harness/               # Harness + Harness Wiki entrypoint
         │   ├── web-tools/
         │   ├── chatgpt-usage-status/
         │   ├── fixed-input-layout/
@@ -81,10 +88,25 @@ Các dependency/runtime chính:
 
 - ESM TypeScript (`"type": "module"`).
 - `@sinclair/typebox` cho schema tool parameters.
-- Pi peer deps hiện đang dùng namespace `@mariozechner/*` trong package source.
-- Một extension local `.pi/extensions/log-llm-payload.ts` dùng import `@earendil-works/pi-coding-agent`; đừng đổi namespace hàng loạt nếu không kiểm tra version Pi đang chạy.
+- Pi peer deps và public extension imports hiện dùng namespace `@earendil-works/*`.
+- Không migrate namespace Pi package hàng loạt nếu chưa kiểm tra version Pi đang chạy và compatibility của extension liên quan.
 
 ## Extensions trong package
+
+### `harness/`
+
+Một public entrypoint cho Harness observability/proposals/evals và Harness Wiki.
+
+Harness Wiki commands:
+
+```text
+/harness-wiki-init
+/harness-wiki-update
+/harness-wiki-ask
+/harness-wiki-status
+```
+
+Reviewed prompt rules nằm trong `wiki/**/_rules.md`. Model lazy-load theo `AGENTS.md` → `wiki/quickstart.md` → root/section rules; extension không auto-inject toàn bộ rules. Normal Wiki turns không được sửa `_rules.md`.
 
 ### `web-tools/`
 

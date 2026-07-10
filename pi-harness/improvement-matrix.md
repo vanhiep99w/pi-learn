@@ -91,7 +91,8 @@ memory/rules current state
 |---|---|---|---|
 | `AGENTS.md` | thêm/bớt instruction ngắn, actionable | user corrections lặp lại, commit mistakes, safety violations | proposal patch |
 | Memory | thêm/sửa/supersede project facts/workflows | repeated facts/preferences, stable decisions | memory proposal |
-| Rules | add/tune/disable deterministic detectors | repeated failures, false positives, rejected proposals | rule proposal |
+| Prompt rules | thêm/sửa reviewed domain-local guidance trong `wiki/**/_rules.md` | repeated workflow failures/corrections | Markdown rule proposal |
+| Detector runtime | add/tune deterministic detectors/defaults trong runtime code/tests | repeated failures, false positives, rejected proposals | runtime proposal |
 | Parser | support entry/message/content type mới | `warnings.jsonl` unknown/malformed patterns | parser patch |
 | Redaction | thêm secret/path patterns | `redaction_warning`, sensitive leaks | redaction patch/test |
 | Prompt templates | tạo/sửa prompt command/frontmatter | repeated task type, wrong model, repeated prompt wording | prompt patch |
@@ -271,88 +272,76 @@ Không đưa vào memory:
 
 ---
 
-## 6. Target: Rules
+## 6. Target: Prompt rules và detector runtime
 
-Rules là deterministic detectors. Rules đọc normalized data và tạo proposal.
+Harness tách hai loại change:
 
-### 6.1 Khi nào improve rules
+```txt
+reviewed model guidance  → wiki/**/_rules.md
+executable detection     → packages/harness-runtime/src/analysis/** + tests
+```
+
+### 6.1 Khi nào improve prompt rules
 
 Signals:
 
 ```txt
-- cùng pattern failure xuất hiện nhiều lần nhưng chưa có rule
-- rule tạo quá nhiều false positives
-- proposal do một rule tạo bị reject nhiều lần
-- rule bỏ sót pattern lặp lại
-- new target artifact xuất hiện cần detector mới
+- model lặp lại cùng workflow mistake
+- user correction ổn định theo một domain
+- existing guidance thiếu hoặc mơ hồ
+- rule conflict/noise được review xác nhận
+- accepted behavior cần checklist cho future agents
 ```
 
-Nguồn data:
+Routing:
 
 ```txt
-events.jsonl:
-  repeated event pattern
-
-metrics.json:
-  counts/rates
-
-warnings.jsonl:
-  parser/redaction warnings
-
-proposal history:
-  rejected/approved proposals by rule id
+cross-cutting          → wiki/_rules.md
+runtime architecture  → wiki/architecture/_rules.md
+Pi extensions/themes  → wiki/extensions/_rules.md
+operations/docs/test  → wiki/operations/_rules.md
 ```
 
-### 6.2 Improve như thế nào
+Một prompt rule dùng Markdown tự nhiên:
+
+```md
+## EXT-UI-001 — Guard interactive UI operations
+
+Guard dialogs and editors with `ctx.hasUI`.
+
+Requirements:
+
+- Use optional UI access for best-effort cleanup.
+- Dispose timers/listeners on shutdown.
+
+Origin proposal: `P-0012`
+```
+
+Actual changes đi qua proposal → approval → exact Markdown patch → lint/eval. Normal coding/Harness Wiki turns không sửa `_rules.md`.
+
+### 6.2 Khi nào improve detector runtime
+
+Signals:
+
+```txt
+- detector bỏ sót repeated pattern
+- false positives cao
+- grouping/fingerprint không ổn định
+- threshold/default không phù hợp
+- proposal do detector tạo bị reject lặp lại
+```
 
 Actions:
 
 ```txt
-- add new rule config
-- tune threshold
+- sửa built-in detector implementation/default
+- tune minOccurrences trong runtime code
 - improve grouping/fingerprint
-- disable noisy rule
-- split one broad rule into smaller rules
-- merge duplicate rules
+- split/merge deterministic detectors
+- add focused test/eval fixture
 ```
 
-Example add rule:
-
-```json
-{
-  "id": "R-0010",
-  "name": "Repeated edit oldText mismatch",
-  "enabled": true,
-  "detector": "tool_error_repeat",
-  "params": {
-    "toolName": "edit",
-    "errorFingerprint": "oldText did not match",
-    "minOccurrences": 2,
-    "activePathOnly": true
-  },
-  "proposal": {
-    "target": "agents",
-    "risk": "low",
-    "titleTemplate": "Add edit workflow note for exact oldText matching"
-  }
-}
-```
-
-### 6.3 Rule improvement examples
-
-```txt
-False positives high:
-  minOccurrences: 1 → 3
-
-Commands vary slightly:
-  groupBy full command → normalized command family
-
-Rule repeatedly rejected:
-  enabled: true → false
-
-Rule too broad:
-  detector "tool_failure" → "edit_failure" + "web_fetch_failure" + "bash_failure"
-```
+Detector behavior không được encode thành natural-language params trong `_rules.md`. Migration này không dùng `harness/rules/*.json` hoặc `wiki/**/_rules.json`.
 
 ---
 
@@ -961,8 +950,8 @@ provider auth config
 
 | Signal | Likely target | Example improvement |
 |---|---|---|
-| `tool_result.isError` repeated for `edit` | AGENTS/rules/skill | Add exact oldText workflow rule |
-| `bash_execution.exitCode != 0` repeated | rules/AGENTS/eval | Add check command or validation checklist |
+| `tool_result.isError` repeated for `edit` | root prompt rules/agents/eval | Add exact oldText workflow guidance in `wiki/_rules.md` |
+| `bash_execution.exitCode != 0` repeated | operations prompt rules/agents/eval | Add prerequisite/retry checklist in `wiki/operations/_rules.md` |
 | `unknown_entry_type` warnings | parser | Add parser support + fixture |
 | `redaction_warning` | redaction | Add regex/path pattern + test |
 | user repeats same correction | AGENTS/memory/prompt | Add short rule or memory item |
@@ -970,7 +959,8 @@ provider auth config
 | repeated manual report request | extension/UI | Add slash command/status |
 | model switched after task start | prompt/model policy | Add prompt frontmatter |
 | long session + compactions + corrections | compaction/memory | Add handoff/reset policy |
-| proposal rejected repeatedly | rules | Tune/disable noisy rule |
+| prompt-rule proposal rejected repeatedly | rules | Rewrite/remove noisy Markdown guidance |
+| detector proposal rejected repeatedly | detector runtime | Tune grouping/threshold/code with tests |
 | accepted proposal high-risk | eval | Add regression scenario |
 | docs clarification repeated | docs | Add/clarify doc section |
 
@@ -987,8 +977,8 @@ Prompt `/harness-reflect-pi` nên hướng dẫn model chọn target theo nguyê
 | Target | Khi chọn | Không chọn khi |
 |---|---|---|
 | `memory` | Evidence là project fact/preference/decision ổn định, lặp lại và nên nhớ cho future sessions. | One-off task detail, secret, raw output, hoặc workflow chưa ổn định. |
-| `rules` | Cần detector deterministic cho pattern lặp lại trong future scans. Target files là `harness/rules/**` hoặc `src/analysis/rules/**`. | Proposed change chỉ sửa `AGENTS.md` hoặc docs. |
-| `agents` | Cần instruction/checklist ngắn cho coding agent trong project. Target file thường là `AGENTS.md`. | Workflow dài/phức tạp hơn checklist ngắn. |
+| `rules` | Cần reviewed project prompt guidance trong existing `wiki/**/_rules.md`. | Cần thay đổi threshold/grouping/algorithm deterministic; khi đó target runtime source/tests. |
+| `agents` | Cần critical bootstrap/safety instruction ngắn trong `AGENTS.md`. | Domain guidance đã có home phù hợp trong section `_rules.md`. |
 | `skill` | Workflow nhiều bước lặp lại, cần ordering/checks/tool usage riêng. Target file là `skills/**/SKILL.md` hoặc path skill tương ứng. | Chỉ cần một câu rule ngắn trong `AGENTS.md`. |
 | `docs` | Repeated conceptual confusion hoặc docs gap. Target file là `docs/**`/README. | Rule vận hành cho agent hoặc detector runtime. |
 | `parser` | Repeated `warnings.jsonl` parser/normalizer warning hoặc format drift. | Không có parser warning/evidence format drift. |
@@ -999,7 +989,7 @@ Prompt `/harness-reflect-pi` nên hướng dẫn model chọn target theo nguyê
 Priority khi nhiều target đều hợp lý:
 
 ```txt
-docs/memory → agents/prompt → rules/skill → eval → tool/extension → parser/redaction → settings
+docs/memory → rules/agents/prompt → skill → eval → tool/extension → parser/redaction → settings
 ```
 
 ### 19.2 Evidence enrichment trước LLM
@@ -1010,8 +1000,8 @@ Runtime nên enrich mỗi evidence item bằng routing hints để giảm halluc
 {
   "kind": "tool_result",
   "reason": "tool_error:edit",
-  "likelyTargets": ["agents", "rules", "eval"],
-  "targetGuidance": "Prefer agents for a workflow note; use rules only if adding detector config/code."
+  "likelyTargets": ["rules", "agents", "eval"],
+  "targetGuidance": "Prefer wiki/_rules.md for reviewed workflow guidance; use runtime analysis source/tests for deterministic detector changes."
 }
 ```
 
@@ -1019,8 +1009,8 @@ Mapping khuyến nghị:
 
 | Evidence reason | likelyTargets |
 |---|---|
-| `tool_error:edit` lặp lại | `agents`, `rules`, `eval` |
-| `tool_error:bash`/Gradle permission lặp lại | `agents`, `rules` |
+| `tool_error:edit` lặp lại | `rules` (`wiki/_rules.md`), `agents`, `eval` |
+| `tool_error:bash`/Gradle permission lặp lại | `rules` (`wiki/operations/_rules.md`), `agents`, `eval` |
 | `safety_sensitive` + actual leaked/unredacted value | `redaction`, `agents` |
 | `user_correction` lặp lại | `memory`, `agents`, `docs` |
 | `parser_warning:*` | `parser`, `rules`, `eval` |
@@ -1073,13 +1063,23 @@ evidence count
 supersedes existing memory?
 ```
 
-### Rule proposal
+### Prompt-rule proposal
 
 ```txt
-rule id/detector
-threshold/grouping
+section `_rules.md` target
+stable rule ID/title
+instruction/checklist text
+expected scope/conflict risk
+origin proposal ID
+```
+
+### Detector runtime proposal
+
+```txt
+detector source/tests
+threshold/grouping/algorithm change
 false-positive risk
-sample events matched
+sample normalized events matched
 ```
 
 ### Parser proposal
@@ -1138,10 +1138,10 @@ Priority:
 ```txt
 1. report/proposal only
 2. memory/docs
-3. prompt template
-4. rule config
-5. AGENTS.md short rule
-6. skill
+3. domain-local prompt rule or prompt template
+4. AGENTS.md critical bootstrap/safety rule
+5. skill
+6. detector runtime change
 7. eval
 8. extension/tool code
 9. parser/redaction code
@@ -1171,7 +1171,7 @@ Parser warning:
 ```txt
 Harness improves components through evidence-backed proposals.
 Each target has specific signals and patch style.
-Memory/rules/parser/redaction can all improve, but not silently.
+Memory/prompt-rules/detectors/parser/redaction can all improve, but not silently.
 Prefer low-risk artifacts before high-risk code/settings.
 Every applied improvement needs test/eval/rollback.
 ```

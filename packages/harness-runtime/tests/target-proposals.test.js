@@ -45,6 +45,26 @@ test("writeMemoryDrafts appends once and dedupes by fingerprint", () => {
   assert.equal(fs.existsSync(first.draftPath), true);
 });
 
+test("generateTargetedImprovements routes workflow rules to Markdown section files", () => {
+  const fixture = createFixture();
+  const session = writeCachedSession(fixture, {
+    sessionId: "s1",
+    events: [
+      toolError("e1", "edit", "oldText did not match"),
+      toolError("e2", "edit", "oldText must match a unique region"),
+      bashFailure("b1", "npm test"),
+      bashFailure("b2", "npm test"),
+    ],
+  });
+
+  const result = generateTargetedImprovements({ project: fixture.project, sessionResults: [session], target: "rules" });
+
+  assert.equal(result.proposals.length, 2);
+  assert.deepEqual(result.proposals.find((item) => item.ruleId === "RULE-IMPROVE-0001")?.targetFiles, ["wiki/_rules.md"]);
+  assert.deepEqual(result.proposals.find((item) => item.ruleId === "RULE-IMPROVE-0002")?.targetFiles, ["wiki/operations/_rules.md"]);
+  assert.equal(result.proposals.some((item) => item.targetFiles.some((file) => file.includes("harness/rules/"))), false);
+});
+
 test("generateTargetedImprovements target redaction flags sensitive events", () => {
   const fixture = createFixture();
   const session = writeCachedSession(fixture, {
@@ -111,5 +131,27 @@ function userMessage(entryId, excerpt) {
     kind: "user_message",
     summary: "user message",
     excerpt,
+  };
+}
+
+function toolError(entryId, toolName, excerpt) {
+  return {
+    eventId: `${entryId}_evt`,
+    entryId,
+    kind: "tool_result",
+    summary: `${toolName} failed`,
+    excerpt,
+    tool: { name: toolName, isError: true },
+  };
+}
+
+function bashFailure(entryId, command) {
+  return {
+    eventId: `${entryId}_evt`,
+    entryId,
+    kind: "bash_execution",
+    summary: `${command} failed`,
+    excerpt: `${command} exit 1`,
+    bash: { command, exitCode: 1 },
   };
 }

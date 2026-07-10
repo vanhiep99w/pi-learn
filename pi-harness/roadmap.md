@@ -6,12 +6,12 @@
 
 ---
 
-## 1. Current status — 2026-06-26
+## 1. Current status — 2026-07-10
 
 Trạng thái hiện tại của `pi-harness` trong repo này:
 
 ```txt
-Status: Phase 8 LLM reflection MVP, Phase 9 controlled apply MVP, Phase 10 eval harness MVP, and Phase 11 gated automation MVP implemented
+Status: Phase 8-11 Harness MVP plus Phase 12 Harness Wiki consolidation and Markdown prompt-rule plane implemented
 Runtime implementation: packages/harness-runtime
 CLI: removed; runtime is API-only and consumed by Pi extension
 Pi extension: primary UX implemented under packages/pi-learn-extensions/extensions/harness/
@@ -23,10 +23,11 @@ Harness logging: implemented minimal runtime/self_improvement/error-capable JSON
 Rules engine: implemented MVP detectors for repeated bash failures, repeated tool errors, sensitive path access and parser warnings
 Proposal writer: implemented private draft Markdown proposals with evidence refs, dedupe fingerprints, test and rollback plans
 Memory drafts: implemented private `memory/draft.jsonl` writer for reviewed memory candidates
-Targeted improvements: implemented `propose --target memory|rules|parser|redaction`
-Pi wrapper: implemented compact command set `/harness-status`, `/harness-report`, `/harness-reflect-pi`, `/harness-proposals`, `/harness-approve`, `/harness-apply`, `/harness-eval`, `/harness-mark`
-Apply loop: controlled MVP implemented with approval, proposal history, target allowlist, git branch, patch apply and rollback
-Eval loop: deterministic MVP implemented with private JSON/Markdown reports
+Targeted improvements: implemented `propose --target memory|rules|parser|redaction`; target=rules routes reviewed guidance to `wiki/**/_rules.md`, while detector changes target runtime code/tests
+Pi wrapper: single public Harness entrypoint implements observability/proposal commands plus `/harness-wiki-init|update|ask|status`; legacy `/wiki-*` commands are removed
+Prompt-rule plane: `AGENTS.md` → `wiki/quickstart.md` → root/section `_rules.md`; lazy model reads, no automatic full-rule injection or watcher/cache
+Apply loop: controlled MVP implemented with approval, proposal history, target allowlist, git branch, transactional patch apply/rollback and post-apply prompt-rule lint
+Eval loop: deterministic MVP implemented with private JSON/Markdown reports, including prompt-rule protection/routing/loading and command-surface scenarios
 Gated automation: opt-in MVP implemented for scan/report/draft proposals/eval only; no apply/push
 Reflection hardening: redaction strengthened for env/yaml/long opaque tokens; evidence selection caps one reason so safety evidence does not dominate; proposal import preserves evidence kind/reason and normalizes AGENTS-only target mismatches
 Reflection target routing implemented: prompt includes explicit target routing guide, selected evidence includes likelyTargets/targetGuidance, and import preserves evidence kind/reason plus normalizes common AGENTS-only target mismatches
@@ -43,6 +44,7 @@ pi-harness/
 ├── improvement-matrix.md           # signal → target → improvement mapping
 ├── harness-observability.md        # harness runtime/audit/error logs for self-improvement
 ├── extension-migration-plan.md     # plan chuyển primary UX từ CLI sang Pi extension
+├── harness-wiki-integration-plan.md # Harness Wiki + domain-local prompt-rule design
 └── roadmap.md                      # file này
 ```
 
@@ -82,6 +84,15 @@ Runtime API:
 
 Primary commands:
   Pi slash commands in packages/pi-learn-extensions/extensions/harness/index.ts
+
+Harness Wiki:
+  packages/pi-learn-extensions/extensions/harness/wiki-commands.ts
+  packages/pi-learn-extensions/extensions/harness/wiki-prompt.ts
+
+Reviewed prompt rules:
+  wiki/_rules.md
+  wiki/<section>/_rules.md
+  model lazy-loads via AGENTS/quickstart; deterministic detectors remain runtime code
 ```
 
 Phase 0 đã tạo:
@@ -153,7 +164,9 @@ Deferred/explicitly reserved until Phase 3+:
 Khuyến nghị hiện tại:
 
 ```txt
-Bắt đầu bằng runtime CLI read-only, không làm Pi extension trước.
+Dùng Pi Harness extension làm primary UX.
+Giữ runtime deterministic/testable và private evidence ngoài repository.
+Dùng `wiki/**/_rules.md` cho reviewed prompt guidance, không cho detector config.
 ```
 
 ---
@@ -585,12 +598,11 @@ produces a useful Markdown report without copying full raw logs.
 
 Detect clear patterns without LLM and create proposal Markdown.
 
-### Commands
+### Current entrypoints
 
-```bash
-harness propose --project . --rules
-harness proposals --project .
-harness show P-0001
+```txt
+Runtime API: propose({ rules: true }) or propose({ target: "rules" })
+Pi UX: /harness-reflect-pi → /harness-proposals
 ```
 
 ### Initial rules
@@ -616,7 +628,7 @@ Still planned rules:
 ### Tasks
 
 - [x] Implement rule engine.
-- [x] Implement rule config loader.
+- [x] Remove the legacy project JSON rule-config loader; keep detector defaults in runtime code and route reviewed prompt guidance to `wiki/**/_rules.md`.
 - [x] Implement evidence refs.
 - [x] Implement proposal writer.
 - [x] Implement dedupe by fingerprint.
@@ -666,7 +678,7 @@ harness propose --project . --target redaction
 ### Tasks
 
 - [x] Generate MemoryItem drafts.
-- [x] Generate rule add/tune/disable proposals.
+- [x] Generate reviewed prompt-rule proposals and route detector implementation changes to runtime source/tests.
 - [x] Generate parser warning proposals.
 - [x] Generate redaction warning proposals.
 - [x] Track proposal source rule/signal in proposal metadata.
@@ -686,7 +698,7 @@ Harness can say:
 ```txt
 This warning pattern should improve parser.
 This repeated correction should become memory or AGENTS rule.
-This noisy rule should be tuned or disabled.
+This noisy prompt guidance should be rewritten/removed, or the deterministic detector should be tuned in runtime code.
 ```
 
 without applying automatically.
@@ -699,20 +711,22 @@ without applying automatically.
 
 ### Mục tiêu
 
-Chuyển primary UX sang Pi slash commands, trong khi CLI giữ vai trò dev/debug/automation fallback.
+Chuyển primary UX sang Pi slash commands; standalone CLI/bin đã được loại bỏ và extension import runtime API trực tiếp.
 
 Không implement business logic riêng trong extension. Extension gọi core runtime.
 
 ### Commands
 
 ```txt
-/harness-report
-/harness-last
-/harness-warnings
-/harness-propose [rules|memory|rule-config|parser|redaction] [last]
+/harness-status [last]
+/harness-report [last]
+/harness-reflect-pi [last]
 /harness-proposals
-/harness-note <text>
-/harness-tag success|failure <reason>
+/harness-approve P-0001
+/harness-apply P-0001
+/harness-eval [scenario|P-0001]
+/harness-mark success|failure|note [text]
+/harness-wiki-init|update|ask|status
 ```
 
 ### Tasks
@@ -721,11 +735,11 @@ Không implement business logic riêng trong extension. Extension gọi core run
 - [x] Register slash commands.
 - [x] Guard UI calls with `ctx.hasUI` / `ctx.ui?.`.
 - [x] `/harness-report` calls runtime report.
-- [x] `/harness-warnings` shows parser warnings summary.
-- [x] `/harness-propose` calls runtime rule/target proposal generation.
+- [x] `/harness-status` consolidates sessions, warnings, and automation state.
+- [x] `/harness-reflect-pi` uses the current Pi model and normalized evidence.
 - [x] `/harness-proposals` lists draft proposals.
-- [x] `/harness-note` appends custom note entry.
-- [x] `/harness-tag` appends label/custom entry.
+- [x] `/harness-mark` records note/success/failure session entries.
+- [x] `/harness-wiki-*` provides repository documentation and prompt-rule status from the same entrypoint.
 
 ### Definition of Done
 

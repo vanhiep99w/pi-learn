@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { registerHarnessWikiCommands } from "./wiki-commands.js";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_API = resolve(EXTENSION_DIR, "../../../harness-runtime/src/api.js");
@@ -14,6 +15,8 @@ type HarnessRun = {
 };
 
 export default function harnessExtension(pi: ExtensionAPI) {
+  registerHarnessWikiCommands(pi);
+
   pi.registerTool({
     name: "harness_import_llm_reflection",
     label: "Harness Import Reflection",
@@ -249,7 +252,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui?.notify("🧪 Harness: /harness-status, /harness-report, /harness-reflect-pi, /harness-proposals", "info");
+    ctx.ui?.notify("🧪 Harness: /harness-status, /harness-report, /harness-reflect-pi, /harness-wiki-status", "info");
   });
 }
 

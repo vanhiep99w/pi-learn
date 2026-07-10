@@ -13,6 +13,27 @@ Pi Learn is a Pi Coding Agent package and learning repository. It publishes a se
 
 Source references: `README.md`, `package.json`, `packages/pi-learn-extensions/package.json`, `packages/harness-runtime/package.json`, `docs/README.md`, `AGENTS.md`.
 
+## Rule loading
+
+Harness prompt rules are reviewed Markdown instructions stored beside each Wiki domain. They are not automatically injected into every Pi request.
+
+Before modifying repository files:
+
+1. Read [`wiki/_rules.md`](_rules.md) for global rules.
+2. Determine every source/documentation domain touched by the task.
+3. Read the corresponding section `_rules.md` files before editing.
+4. If the task spans multiple domains, read all applicable rule files.
+5. Re-read applicable rules when task scope changes or after compaction.
+
+| Domain | Prompt-rule file |
+|---|---|
+| Global repository behavior | [`wiki/_rules.md`](_rules.md) |
+| Harness runtime and architecture | [`wiki/architecture/_rules.md`](architecture/_rules.md) |
+| Pi extensions and themes | [`wiki/extensions/_rules.md`](extensions/_rules.md) |
+| Tests, docs, releases and operations | [`wiki/operations/_rules.md`](operations/_rules.md) |
+
+Prompt rules enter model context when the model reads these files. Normal coding and Harness Wiki documentation turns must not modify `_rules.md`; changes go through the Harness proposal, approval, and controlled-apply lifecycle. Critical file protection remains deterministic runtime/extension behavior rather than relying only on prompt compliance.
+
 ## Install and run
 
 Install the package from GitHub for all projects:
@@ -49,8 +70,8 @@ Enable the included theme by setting `theme` to `midnight-aurora` in Pi settings
 | ChatGPT usage | Shows ChatGPT Plus/Pro usage when the active provider is `openai-codex` or `chatgpt`. | [Extensions catalog](extensions/catalog.md#chatgpt-usage-status) |
 | Prompt templates | Creates slash commands from Markdown prompts with optional model/thinking frontmatter. | [Extensions catalog](extensions/catalog.md#prompt-with-model) |
 | Aurora UI/theme | Custom TUI editor/footer/status behavior plus the `midnight-aurora` theme. | [Extensions catalog](extensions/catalog.md#aurora-ui-and-fixed-input-layout) |
-| Wiki docs | Pi-native `/wiki-*` commands that generate/update `wiki/` documentation using the current Pi model/tools. | [Wiki extension](extensions/wiki-extension.md) |
-| Harness | Mines normalized Pi session logs to create reports, reflection proposals, evals, and gated automation. | [Harness runtime](architecture/harness-runtime.md) |
+| Harness Wiki | Pi-native `/harness-wiki-*` commands that generate/update `wiki/` documentation and use reviewed domain-local prompt rules. | [Harness Wiki capability](extensions/wiki-extension.md) |
+| Harness | Mines normalized Pi session logs to create reports, reflection proposals, controlled prompt-rule updates, evals, and gated automation. | [Harness runtime](architecture/harness-runtime.md) |
 | Vietnamese Pi docs | Learning/reference material for Pi itself. | `docs/README.md` |
 
 ## Important slash commands
@@ -58,10 +79,10 @@ Enable the included theme by setting `theme` to `midnight-aurora` in Pi settings
 Common package commands documented by the READMEs and extension sources include:
 
 ```txt
-/wiki-init [note]
-/wiki-update [note]
-/wiki-ask <question>
-/wiki-status
+/harness-wiki-init [note]
+/harness-wiki-update [note]
+/harness-wiki-ask <question>
+/harness-wiki-status
 
 /harness-status [last]
 /harness-report [last]
@@ -98,7 +119,7 @@ pi-learn/
 │   │   └── themes/midnight-aurora.json  # bundled theme
 │   └── harness-runtime/                 # private Node runtime for harness commands
 ├── pi-harness/                          # harness design/roadmap docs
-└── wiki/                                # generated OpenWiki/Pi-native repository docs
+└── wiki/                                # Harness Wiki docs + reviewed `_rules.md`
 ```
 
 See [Architecture overview](architecture/overview.md) for package boundaries and source-of-truth rules.
@@ -116,7 +137,7 @@ See [Architecture overview](architecture/overview.md) for package boundaries and
 
 - [Architecture overview](architecture/overview.md) — package layout, manifests, and source-of-truth boundaries.
 - [Extensions catalog](extensions/catalog.md) — public extensions, theme, commands, and modification notes.
-- [Wiki extension](extensions/wiki-extension.md) — `/wiki-*` behavior, metadata, no-op update logic, and upstream OpenWiki differences.
+- [Harness Wiki capability](extensions/wiki-extension.md) — `/harness-wiki-*` behavior, prompt-rule loading, metadata, no-op logic, and upstream OpenWiki differences.
 - [Harness runtime](architecture/harness-runtime.md) — session mining, reports, proposals, eval, automation, and safety model.
 - [Development operations](operations/development.md) — install/update/release/docs workflows.
 - [Testing and safety](operations/testing-and-safety.md) — checks to run and privacy/security constraints.

@@ -54,7 +54,27 @@ Most functions accept the same option shape:
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note <text>
+
+/harness-wiki-init [extra instructions]
+/harness-wiki-update [extra instructions]
+/harness-wiki-ask <question>
+/harness-wiki-status
 ```
+
+Harness Wiki is registered from the same public `harness/index.ts` entrypoint. The legacy `/wiki-*` commands and `extensions/wiki/` entrypoint are removed.
+
+## Prompt rules
+
+Reviewed project guidance lives in Markdown:
+
+```txt
+wiki/_rules.md
+wiki/<section>/_rules.md
+```
+
+Pi loads the bootstrap instruction from `AGENTS.md`; the model then reads `wiki/quickstart.md`, root rules, and applicable section rules. Harness does not parse these prompts as detector config or inject every rule automatically.
+
+Deterministic detectors/defaults remain in `src/analysis/rules.js`. `src/analysis/wiki-prompt-rules.js` only discovers, scaffolds, classifies, and lints reserved prompt-rule files for status/protection/controlled apply.
 
 ## Safety
 
@@ -68,6 +88,8 @@ Most functions accept the same option shape:
 - LLM reflection responses can be imported as draft proposals only if they include evidence refs, target files, risk, test plan and rollback plan.
 - Proposal approve/reject/history only updates private proposal files under `~/.pi/harness`.
 - `apply` requires an approved proposal plus a machine-applicable `## Patch` JSON block, checks git, creates `harness/P-0001`, and only edits files listed in the proposal target list.
+- Changes to `wiki/**/_rules.md` are linted after apply; invalid changes are restored before apply fails.
+- Normal Pi tool turns block write/edit and common shell mutations of `_rules.md` and `.last-update.json`; approved controlled apply writes through runtime code.
 - `rollback` restores uncommitted apply changes for the recorded changed paths, or reverts the recorded commit when `--commit` was used.
 - `eval` runs deterministic regression scenarios and writes JSON/Markdown reports under `~/.pi/harness/projects/<project-key>/evals/`.
 - `automate` is gated by `harness/config.json` and can only scan/report/draft proposals/eval; it never applies, commits, pushes, or reads raw logs beyond the normal normalized scan path.

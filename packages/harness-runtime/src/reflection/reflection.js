@@ -5,6 +5,7 @@ import { atomicWriteFile, ensureDir } from "../storage/atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "../storage/harness-home.js";
 import { redactValue } from "../safety/redaction.js";
 import { truncateString } from "../safety/truncation.js";
+import { isWikiRulePath } from "../analysis/wiki-prompt-rules.js";
 
 const DEFAULT_MAX_EVENTS = 40;
 const DEFAULT_MAX_EXCERPT_CHARS = 700;
@@ -133,16 +134,16 @@ export function renderReflectionPrompt({ project, generatedAt = new Date(), evid
   lines.push("## Target routing guide");
   lines.push("Choose the least risky target that fits the evidence and target files:");
   lines.push("- memory: stable project facts, preferences, or decisions worth remembering; not one-off details or secrets.");
-  lines.push("- rules: deterministic detector/config/code for repeated patterns; target files should be harness/rules/** or src/analysis/rules/**, not only AGENTS.md.");
-  lines.push("- agents: short project instruction/checklist for coding agents; target file is usually AGENTS.md.");
+  lines.push("- rules: reviewed project prompt guidance in an existing `wiki/**/_rules.md`; use runtime analysis code/tests instead when deterministic detector behavior or thresholds must change.");
+  lines.push("- agents: short critical bootstrap/safety instruction for coding agents; target file is usually AGENTS.md. Domain guidance belongs in `wiki/**/_rules.md`.");
   lines.push("- skill: repeated multi-step workflow too long for AGENTS.md; target files should be skills/**/SKILL.md or an explicit skill path.");
   lines.push("- docs: repeated conceptual confusion or project documentation gap; target files should be docs/** or README.md.");
   lines.push("- parser: repeated parser/normalizer warnings or Pi session format drift; target parser/normalizer code and tests.");
   lines.push("- redaction: unredacted secret/token/path pattern or sensitive policy gap; target redaction code/tests. Use agents/docs for safety notes only.");
   lines.push("- eval: regression scenario for a known failure or accepted proposal; target harness/evals/** or eval fixtures.");
   lines.push("- tool: tool/extension wrapper behavior change; do not use tool for AGENTS.md workflow notes.");
-  lines.push("Priority when several targets fit: docs/memory → agents → rules/skill → eval → tool → parser/redaction.");
-  lines.push("Use each evidence item's likelyTargets/targetGuidance when present; if targetFiles are only AGENTS.md, prefer target=agents.");
+  lines.push("Priority when several targets fit: docs/memory → rules/agents → skill → eval → tool → parser/redaction.");
+  lines.push("Use each evidence item's likelyTargets/targetGuidance when present; if targetFiles are only AGENTS.md, prefer target=agents. If target=rules, target an existing root or section `wiki/**/_rules.md` and keep evidence excerpts out of the committed rule text.");
   if (!project?.gitRoot) {
     lines.push("Project root has no enclosing git repository. Prefer proposal changes that can be reviewed manually, and mention if target files are outside nested service repos.");
   }
@@ -261,15 +262,18 @@ function pickBalancedEvidence(items, maxEvents) {
 function normalizeProposalTarget(target, targetFiles) {
   const files = targetFiles.map((file) => String(file));
   const onlyAgents = files.length > 0 && files.every((file) => file === "AGENTS.md" || file.endsWith("/AGENTS.md"));
-  const hasDocs = files.some((file) => file.startsWith("docs/") || file.endsWith(".md"));
-  const hasHarnessRule = files.some((file) => file.includes("harness/rules/") || file.includes("src/analysis/rules"));
+  const hasPromptRule = files.some(isWikiRulePath);
+  const hasDocs = files.some((file) => (file.startsWith("docs/") || file.endsWith(".md")) && !isWikiRulePath(file));
+  const hasRuntimeRule = files.some((file) => file.includes("packages/harness-runtime/src/analysis/") || file.includes("src/analysis/"));
   const hasRedactionCode = files.some((file) => file.includes("redaction") || file.includes("safety/"));
 
   if (onlyAgents && ["rules", "redaction", "tool"].includes(target)) return "agents";
-  if (target === "rules" && !hasHarnessRule && onlyAgents) return "agents";
+  if (target === "rules" && !hasPromptRule && !hasRuntimeRule) {
+    throw new Error("LLM reflection target=rules must target wiki/**/_rules.md or Harness runtime analysis source/tests.");
+  }
   if (target === "redaction" && !hasRedactionCode && onlyAgents) return "agents";
   if (target === "tool" && !files.some((file) => file.includes("tools") || file.includes("extensions")) && onlyAgents) return "agents";
-  if (target === "docs" || (hasDocs && !hasHarnessRule && !hasRedactionCode)) return target;
+  if (target === "docs" || (hasDocs && !hasPromptRule && !hasRuntimeRule && !hasRedactionCode)) return target;
   return target;
 }
 
@@ -278,22 +282,22 @@ function targetHintsForEvidence({ reason, kind, toolName, excerpt }) {
   if (String(reason).startsWith("parser_warning:")) {
     return {
       likelyTargets: ["parser", "rules", "eval"],
-      targetGuidance: "Use parser for session format/normalizer fixes; use rules only for detector tuning; add eval if this should become regression coverage.",
+      targetGuidance: "Use parser for session format/normalizer fixes; use an architecture `_rules.md` only for reviewed workflow guidance; add eval for regression coverage.",
     };
   }
   if (reason === "tool_error:edit") {
     return {
-      likelyTargets: ["agents", "rules", "eval"],
-      targetGuidance: "Prefer agents for exact-text edit workflow guidance; use rules only if adding detector config/code; add eval for repeated regression coverage.",
+      likelyTargets: ["rules", "agents", "eval"],
+      targetGuidance: "Prefer `wiki/_rules.md` for reviewed exact-text edit workflow guidance; use AGENTS.md only for critical bootstrap safety; add eval for repeated regression coverage.",
     };
   }
   if (reason === "tool_error:bash" || reason === "bash_failure") {
     const gradlePermission = /gradlew.*permission denied|permission denied.*gradlew/i.test(text);
     return {
-      likelyTargets: gradlePermission ? ["agents", "rules"] : ["agents", "rules", "eval"],
+      likelyTargets: gradlePermission ? ["rules", "agents"] : ["rules", "agents", "eval"],
       targetGuidance: gradlePermission
-        ? "Prefer agents for a Gradle wrapper fallback note; use rules only if adding a detector for repeated wrapper permission failures."
-        : "Prefer agents for command checklist guidance; use rules for deterministic repeated failure detection; use eval for known regression coverage.",
+        ? "Prefer `wiki/operations/_rules.md` for reviewed Gradle wrapper fallback guidance; change runtime code separately for detector behavior."
+        : "Prefer `wiki/operations/_rules.md` for command checklist guidance; change runtime analysis code for deterministic detection; use eval for regression coverage.",
     };
   }
   if (reason === "safety_sensitive") {

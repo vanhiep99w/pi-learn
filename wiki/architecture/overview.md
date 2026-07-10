@@ -58,8 +58,9 @@ Pi loads extension entrypoints from the directories listed in the manifest. Each
 Representative patterns:
 
 - `web-tools/index.ts` imports and calls `registerWebSearch`, `registerWebFetch`, and `registerToolSearch`, then shows a startup notification.
-- `harness/index.ts` registers one tool (`harness_import_llm_reflection`) plus many `/harness-*` commands that call the runtime API.
-- `wiki/index.ts` registers `/wiki-init`, `/wiki-update`, `/wiki-ask`, and `/wiki-status`, sends prompt text into the current Pi session, then writes metadata after `agent_end` if wiki content changed.
+- `harness/index.ts` is the single public Harness entrypoint. It registers `harness_import_llm_reflection`, observability/proposal commands, and the Harness Wiki module.
+- `harness/wiki-commands.ts` registers `/harness-wiki-*`, sends concise task prompts into the current Pi session, protects reserved rule/metadata files, and finalizes scaffolds/metadata after `agent_settled`.
+- `harness/wiki-prompt.ts` defines documentation-task discipline but does not inject all prompt rules. Pi auto-loads the `AGENTS.md` bootstrap and the model reads root/section `_rules.md` files lazily.
 - `aurora-ui.ts` registers event handlers, a custom editor/footer, working messages, `/aurora-themes`, and `ctrl+shift+t`.
 
 ## Source-of-truth rules
@@ -72,7 +73,9 @@ When changing behavior, use these boundaries:
 | Public theme tokens | `packages/pi-learn-extensions/themes/midnight-aurora.json` |
 | Harness core logic | `packages/harness-runtime/src/**` |
 | Harness Pi command surface | `packages/pi-learn-extensions/extensions/harness/index.ts` |
-| Wiki/OpenWiki command behavior | `packages/pi-learn-extensions/extensions/wiki/index.ts` and `prompt.ts` |
+| Harness Wiki orchestration/prompt | `packages/pi-learn-extensions/extensions/harness/wiki-commands.ts`, `wiki-prompt.ts` |
+| Reviewed project prompt guidance | `wiki/_rules.md`, `wiki/<section>/_rules.md` |
+| Prompt-rule discovery/lint | `packages/harness-runtime/src/analysis/wiki-prompt-rules.js` |
 | Vietnamese Pi reference docs | `docs/**` and `docs/README.md` |
 | User install/package docs | `README.md`, `packages/pi-learn-extensions/README.md` |
 
@@ -82,11 +85,11 @@ When changing behavior, use these boundaries:
 
 Recent history shows two major streams:
 
-- The OpenWiki-derived extension was added as a Pi-native implementation and then renamed from `openwiki` commands/paths to `wiki` commands/paths. Evidence: recent commits `d61a063 Add Pi-native OpenWiki extension` and `204d927 Rename OpenWiki extension commands to wiki`, plus the files now located under `packages/pi-learn-extensions/extensions/wiki/`.
-- The harness moved from a CLI-style runtime toward an extension-driven runtime API with proposal lifecycle, reflection, eval, and automation. Evidence: recent commits listed for `packages/harness-runtime/src/api.js`, `packages/pi-learn-extensions/extensions/harness/index.ts`, and `packages/harness-runtime/README.md`.
+- The OpenWiki-derived workflow started as a separate Pi-native Wiki extension, then became the Harness Wiki capability with `/harness-wiki-*` commands and no compatibility aliases.
+- Harness now combines extension-driven observability/proposal/eval behavior with Wiki knowledge. Reviewed project guidance uses domain-local `_rules.md`; deterministic detectors/defaults remain runtime code.
 
 Do not overfit future documentation to commit hashes; prefer current source unless a historical rename or migration explains current design.
 
-## Known documentation caveat
+## Import compatibility note
 
-`AGENTS.md` contains one stale-looking line claiming current Pi peer dependencies use `@mariozechner/*`. Current package manifests and inspected extension imports use `@earendil-works/*`. Prefer the current source/manifests when changing imports, and update stale docs only when the user asks or when you are already editing the relevant documentation.
+Current package manifests and inspected public extension imports use `@earendil-works/*`. Keep the import style used by each extension and verify the installed Pi version before any namespace-wide migration.

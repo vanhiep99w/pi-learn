@@ -115,7 +115,7 @@ Ví dụ tối thiểu:
 |---|---|---|
 | `agents` | Sửa `AGENTS.md`/instruction project. | medium |
 | `memory` | Thêm/sửa curated memory trong `harness/memory/`. | low-medium |
-| `rules` | Thêm/tune/disable rule config trong `harness/rules/`. | medium |
+| `rules` | Thêm/sửa reviewed Markdown prompt guidance trong existing `wiki/**/_rules.md`. Detector implementation/default changes target runtime code/tests, không phải Wiki config. | medium |
 | `skills` | Tạo/update skill workflow. | medium |
 | `prompts` | Tạo/sửa prompt templates/model prompts. | medium |
 | `extensions` | Sửa Pi extension/tools/TUI code. | high |

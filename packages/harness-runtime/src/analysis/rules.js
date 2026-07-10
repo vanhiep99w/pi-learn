@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
 
 const BUILT_IN_RULES = [
   { id: "R-0001", name: "Repeated bash failure", enabled: true, params: { minOccurrences: 2 } },
@@ -27,20 +26,10 @@ export function runRuleEngine({ project, sessionResults, ruleConfig }) {
   }));
 }
 
-export function loadRuleConfig({ project } = {}) {
-  const merged = new Map(BUILT_IN_RULES.map((rule) => [rule.id, structuredClone(rule)]));
-  const rulesDir = project?.projectRoot ? path.join(project.projectRoot, "harness", "rules") : undefined;
-  if (!rulesDir || !fs.existsSync(rulesDir)) return merged;
-
-  for (const name of fs.readdirSync(rulesDir).filter((file) => file.endsWith(".json")).sort()) {
-    const filePath = path.join(rulesDir, name);
-    const rule = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    if (!rule.id) continue;
-    const current = merged.get(rule.id) ?? {};
-    merged.set(rule.id, deepMerge(current, rule));
-  }
-
-  return merged;
+export function loadRuleConfig() {
+  // Detector defaults are executable runtime behavior. Project prompt rules live
+  // in wiki/**/_rules.md and are never parsed as detector configuration.
+  return new Map(BUILT_IN_RULES.map((rule) => [rule.id, structuredClone(rule)]));
 }
 
 export function loadDataset(sessionResults) {
@@ -92,15 +81,15 @@ function detectRepeatedBashFailures({ dataset, rule }) {
     .map(([commandFamily, evidence]) => ({
       ruleId: "R-0001",
       title: `Add checklist for repeated bash failure: ${commandFamily}`,
-      target: "agents",
-      targetFiles: ["AGENTS.md", "harness/evals/"],
+      target: "rules",
+      targetFiles: ["wiki/operations/_rules.md"],
       risk: "low",
       problem: `Bash command family \`${commandFamily}\` failed ${evidence.length} times in active session paths.`,
-      proposedChange: "Add a short validation/checklist note or eval scenario so future tasks verify the command prerequisites and failure output before retrying.",
+      proposedChange: "Add a concise reviewed prompt rule/checklist so future tasks verify command prerequisites and inspect failure output before retrying.",
       testPlan: [
-        "Run the failing command family manually or in the relevant project check.",
-        "Run `npm --prefix packages/harness-runtime test` if harness files are changed.",
-        "Confirm future report shows fewer repeated bash failures for this command family.",
+        "Review the new prompt rule for a narrow operations scope and false guidance.",
+        "Run `npm --prefix packages/harness-runtime test`.",
+        "Run `/harness-eval wiki-prompt-rule-section-routing` and confirm operations evidence routes to the operations rule file.",
       ],
       rollbackPlan: "Revert the proposal commit or remove the added checklist/eval if it creates noise.",
       evidence: evidence.slice(0, 8),
@@ -133,19 +122,19 @@ function detectRepeatedToolErrors({ dataset, rule }) {
         title: isEditOldText
           ? "Add edit workflow note for exact oldText matching"
           : `Reduce repeated ${toolName} tool error: ${errorKind}`,
-        target: isEditOldText ? "agents" : "tool",
-        targetFiles: isEditOldText ? ["AGENTS.md", "harness/rules/edit-tool-failure.json"] : ["harness/rules/tool-error-repeat.json"],
+        target: "rules",
+        targetFiles: ["wiki/_rules.md"],
         risk: "low",
         problem: `Tool \`${toolName}\` produced repeated error pattern \`${errorKind}\` ${evidence.length} times in active paths.`,
         proposedChange: isEditOldText
-          ? "Add a short workflow note to re-read the target block and keep edit oldText exact/unique before calling the edit tool."
-          : "Add or tune a deterministic rule/checklist for this repeated tool error pattern.",
+          ? "Add a concise global prompt rule to re-read the target block and keep edit oldText exact/unique before calling the edit tool."
+          : "Add a reviewed global prompt rule/checklist for this repeated tool error pattern; change runtime detector code separately if deterministic behavior must change.",
         testPlan: [
-          "Add a fixture or rule test for the repeated tool error pattern.",
+          "Review the prompt rule scope and ensure it does not encode executable detector parameters.",
           "Run `npm --prefix packages/harness-runtime test`.",
-          "Run `/harness-propose rules` in Pi and confirm duplicate proposals are deduped.",
+          "Run `/harness-eval wiki-prompt-rule-lazy-loading`.",
         ],
-        rollbackPlan: "Revert the proposal commit or disable the new rule/checklist if it generates false positives.",
+        rollbackPlan: "Revert the proposal patch if the prompt rule creates noise or misleading guidance.",
         evidence: evidence.slice(0, 8),
         fingerprint: stableHash(["R-0002", key, evidence.map((item) => item.sessionId).sort()].join("|")),
       };
@@ -285,22 +274,4 @@ function fingerprintProposal(proposal) {
 
 function stableHash(value) {
   return crypto.createHash("sha1").update(String(value)).digest("hex");
-}
-
-function deepMerge(...objects) {
-  const result = {};
-  for (const object of objects) mergeInto(result, object ?? {});
-  return result;
-}
-
-function mergeInto(target, source) {
-  for (const [key, value] of Object.entries(source)) {
-    if (value && typeof value === "object" && !Array.isArray(value) && target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) {
-      mergeInto(target[key], value);
-    } else if (value && typeof value === "object" && !Array.isArray(value)) {
-      target[key] = deepMerge(value);
-    } else {
-      target[key] = value;
-    }
-  }
 }

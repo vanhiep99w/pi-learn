@@ -1,6 +1,6 @@
 # Harness runtime architecture
 
-Harness is the repository's session-observability and self-improvement system. It reads Pi session logs, normalizes/redacts them into a private cache, generates reports and reflection prompts, writes proposals, supports approve/reject/apply/rollback lifecycle commands, and runs deterministic eval scenarios.
+Harness is the repository's session-observability, self-improvement, and Wiki knowledge system. It reads Pi session logs, normalizes/redacts them into a private cache, generates reports and reflection prompts, writes proposals, supports approve/reject/apply/rollback lifecycle commands, runs deterministic eval scenarios, and exposes Harness Wiki from the same public extension entrypoint.
 
 The primary UX is the Pi extension in `packages/pi-learn-extensions/extensions/harness/index.ts`. Core logic lives in the private runtime package `packages/harness-runtime/`.
 
@@ -15,7 +15,7 @@ The primary UX is the Pi extension in `packages/pi-learn-extensions/extensions/h
 }
 ```
 
-The harness extension imports the runtime API by resolving `../../../harness-runtime/src/api.js` and exposes it through a compact `/harness-*` command set: `/harness-status`, `/harness-report`, `/harness-reflect-pi`, `/harness-proposals`, `/harness-approve`, `/harness-apply`, `/harness-eval`, and `/harness-mark`. This matches the runtime README: the standalone CLI/bin is no longer the primary interface.
+The harness extension imports the runtime API by resolving `../../../harness-runtime/src/api.js` and exposes observability/proposal commands plus `/harness-wiki-init`, `/harness-wiki-update`, `/harness-wiki-ask`, and `/harness-wiki-status`. The old `/wiki-*` commands are not registered. This matches the runtime README: the standalone CLI/bin is no longer the primary interface.
 
 ## Data flow
 
@@ -40,6 +40,8 @@ Representative source files:
 - `src/reflection/reflection.js` — redacted reflection prompt and response-to-proposal conversion
 - `src/proposals/*` — draft proposal writing and lifecycle
 - `src/eval/eval-harness.js` — deterministic eval scenarios
+- `src/analysis/rules.js` — built-in deterministic detector implementations/defaults
+- `src/analysis/wiki-prompt-rules.js` — `_rules.md` discovery, classification, scaffolding, and lint; it does not configure detectors
 
 ## Storage model
 
@@ -90,6 +92,7 @@ Important API functions in `src/api.js`:
 - `reflect()` scans sessions and writes a redacted reflection prompt with evidence references.
 - `importReflectionResponse()` converts a model response with `{ proposals: [...] }` into draft proposal Markdown files.
 - `propose()` can run the deterministic rule engine or targeted improvement generation for `memory`, `rules`, `parser`, or `redaction`.
+- `target=rules` now means reviewed Markdown prompt guidance in `wiki/**/_rules.md`; deterministic detector behavior/default changes target runtime analysis source and tests.
 
 The Pi extension command `/harness-reflect-pi` bridges runtime and current Pi model by reading the generated reflection prompt and sending a follow-up user message that instructs the model to call `harness_import_llm_reflection`.
 
@@ -99,6 +102,7 @@ The Pi extension command `/harness-reflect-pi` bridges runtime and current Pi mo
 
 - `approveProposal()` and `rejectProposal()` update proposal frontmatter and append history.
 - `applyProposal()` requires approved status, parses target files and a JSON `## Patch` section, requires a clean git worktree unless allowed, checks out/creates branch `harness/<proposal-id>`, applies text patches only to listed target files, and optionally commits.
+- Apply snapshots original target content transactionally. If prompt-rule lint fails after a `_rules.md` patch, original content is restored and apply fails before commit.
 - `rollbackProposal()` reverts an applied commit when present or checks out the recorded changed paths if the apply was uncommitted.
 - Proposal history is written as JSONL under the private harness project cache.
 
@@ -115,6 +119,10 @@ edit-oldText-workflow
 file-protection
 smart-commit-basic
 ts-extension-safety
+wiki-prompt-rule-file-protection
+wiki-prompt-rule-section-routing
+wiki-prompt-rule-lazy-loading
+harness-wiki-command-surface
 ```
 
 The eval runner writes JSON and Markdown reports under the harness project's `evals/` directory. It checks redaction, parser resilience, rule generation, file protection, controlled apply, and TypeScript extension safety.
@@ -123,7 +131,8 @@ Automation is gated by config and disabled by default. Runtime and README eviden
 
 ## Change guidance
 
-- For command wording or UI behavior, edit `packages/pi-learn-extensions/extensions/harness/index.ts`.
+- For general Harness command wording or UI behavior, edit `packages/pi-learn-extensions/extensions/harness/index.ts`.
+- For Harness Wiki behavior/prompt, edit `harness/wiki-commands.ts` and `harness/wiki-prompt.ts`; preserve lazy rule loading and reserved-file protection.
 - For parsing, caching, reports, reflection, proposals, eval, or automation behavior, edit `packages/harness-runtime/src/**` and add/update tests in `packages/harness-runtime/tests/**`.
 - Run harness runtime tests from `packages/harness-runtime/` with `npm test`.
 - For security-sensitive changes, add/adjust tests around redaction, file protection, and proposal lifecycle.

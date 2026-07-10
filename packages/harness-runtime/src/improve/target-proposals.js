@@ -73,18 +73,18 @@ function generateRuleImprovementProposals({ dataset }) {
   if (editErrors.length >= 2) {
     proposals.push({
       ruleId: "RULE-IMPROVE-0001",
-      title: "Add project rule config for repeated edit tool failures",
+      title: "Add global prompt rule for repeated edit tool failures",
       target: "rules",
-      targetFiles: ["harness/rules/edit-tool-failure.json"],
-      risk: "medium",
-      problem: `Edit tool failures appeared ${editErrors.length} times. This pattern is useful as a deterministic rule config.`,
-      proposedChange: "Add a reviewed project rule config for edit tool failures with minOccurrences and oldText mismatch fingerprinting.",
+      targetFiles: ["wiki/_rules.md"],
+      risk: "low",
+      problem: `Edit tool failures appeared ${editErrors.length} times. The repeated workflow needs concise reviewed guidance before future edits.`,
+      proposedChange: "Add a Markdown prompt rule that requires re-reading the target block and verifying exact, unique oldText before retrying edit.",
       testPlan: [
-        "Add rule config under harness/rules/.",
-        "Run `/harness-propose rules` in Pi and confirm the rule still dedupes proposals.",
+        "Review the new rule ID, scope, instruction and checklist in `wiki/_rules.md`.",
         "Run `npm --prefix packages/harness-runtime test`.",
+        "Run `/harness-eval wiki-prompt-rule-lazy-loading`.",
       ],
-      rollbackPlan: "Delete or disable the rule config if it creates noisy proposals.",
+      rollbackPlan: "Revert the Markdown rule patch if it creates noisy or misleading edit guidance.",
       evidence: editErrors.slice(0, 8),
       fingerprint: stableHash(`rules|edit_tool_failure|${editErrors.map((item) => item.entryId).join("|")}`),
     });
@@ -94,18 +94,18 @@ function generateRuleImprovementProposals({ dataset }) {
   if (bashFailures.length >= 2) {
     proposals.push({
       ruleId: "RULE-IMPROVE-0002",
-      title: "Add project rule config for repeated bash failures",
+      title: "Add operations prompt rule for repeated bash failures",
       target: "rules",
-      targetFiles: ["harness/rules/bash-failure-repeat.json"],
-      risk: "medium",
-      problem: `Bash failures appeared ${bashFailures.length} times. A project rule can tune thresholds/grouping for this repo.`,
-      proposedChange: "Add a reviewed project rule config for repeated bash failure detection with command-family grouping.",
+      targetFiles: ["wiki/operations/_rules.md"],
+      risk: "low",
+      problem: `Bash failures appeared ${bashFailures.length} times. Future operations tasks need reviewed retry and prerequisite guidance.`,
+      proposedChange: "Add a Markdown prompt rule that requires inspecting command prerequisites and failure output before retrying. Keep detector thresholds in runtime code.",
       testPlan: [
-        "Add rule config under harness/rules/.",
-        "Run `/harness-propose rules` in Pi and verify proposal count is reasonable.",
+        "Review the rule scope in `wiki/operations/_rules.md`.",
         "Run `npm --prefix packages/harness-runtime test`.",
+        "Run `/harness-eval wiki-prompt-rule-section-routing`.",
       ],
-      rollbackPlan: "Delete or disable the rule config if it creates false positives.",
+      rollbackPlan: "Revert the Markdown rule patch if it creates false or overly broad guidance.",
       evidence: bashFailures.slice(0, 8),
       fingerprint: stableHash(`rules|bash_failure|${bashFailures.map((item) => item.entryId).join("|")}`),
     });

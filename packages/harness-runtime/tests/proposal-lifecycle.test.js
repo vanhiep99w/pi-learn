@@ -39,6 +39,37 @@ test("applyProposal requires approved status and machine patch", () => {
   );
 });
 
+test("applyProposal validates a changed Markdown prompt-rule file", () => {
+  const fixture = createLifecycleFixture({ withWiki: true });
+  const written = writePromptRuleProposal(fixture, {
+    oldText: "Follow the existing instruction.",
+    newText: "Follow the reviewed updated instruction.",
+  });
+  approveProposal({ config: fixture.config, project: fixture.project, id: written.id });
+
+  const applied = applyProposal({ config: fixture.config, project: fixture.project, id: written.id });
+
+  assert.deepEqual(applied.changedPaths, ["wiki/_rules.md"]);
+  assert.match(fs.readFileSync(path.join(fixture.projectRoot, "wiki", "_rules.md"), "utf8"), /reviewed updated/);
+});
+
+test("applyProposal restores prompt rules when post-apply lint fails", () => {
+  const fixture = createLifecycleFixture({ withWiki: true });
+  const rulePath = path.join(fixture.projectRoot, "wiki", "_rules.md");
+  const original = fs.readFileSync(rulePath, "utf8");
+  const written = writePromptRuleProposal(fixture, {
+    oldText: "Follow the existing instruction.",
+    newText: "## GLOBAL-TEST-001 — Duplicate rule\n\nFollow duplicate guidance.",
+  });
+  approveProposal({ config: fixture.config, project: fixture.project, id: written.id });
+
+  assert.throws(
+    () => applyProposal({ config: fixture.config, project: fixture.project, id: written.id }),
+    /Prompt-rule validation failed/,
+  );
+  assert.equal(fs.readFileSync(rulePath, "utf8"), original);
+});
+
 test("applyProposal applies only target files and rollback restores uncommitted patch", () => {
   const fixture = createLifecycleFixture();
   const written = writeProposalWithPatch(fixture);
@@ -61,16 +92,28 @@ test("applyProposal applies only target files and rollback restores uncommitted 
   assert.deepEqual(history.map((event) => event.event), ["proposal_approved", "proposal_applied", "proposal_rolled_back"]);
 });
 
-function createLifecycleFixture() {
+function createLifecycleFixture({ withWiki = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-lifecycle-"));
   const projectRoot = path.join(root, "project");
   const harnessHome = path.join(root, "harness-home");
   fs.mkdirSync(projectRoot, { recursive: true });
   fs.writeFileSync(path.join(projectRoot, "AGENTS.md"), "# Notes\n\nExisting note.\n");
+  if (withWiki) {
+    fs.mkdirSync(path.join(projectRoot, "wiki"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "wiki", "quickstart.md"), "# Quickstart\n");
+    fs.writeFileSync(path.join(projectRoot, "wiki", "_rules.md"), [
+      "# Global rules",
+      "",
+      "## GLOBAL-TEST-001 — Existing rule",
+      "",
+      "Follow the existing instruction.",
+      "",
+    ].join("\n"));
+  }
   git(projectRoot, ["init"]);
   git(projectRoot, ["config", "user.email", "test@example.com"]);
   git(projectRoot, ["config", "user.name", "Harness Test"]);
-  git(projectRoot, ["add", "AGENTS.md"]);
+  git(projectRoot, ["add", "."]);
   git(projectRoot, ["commit", "-m", "initial"]);
 
   return {
@@ -107,6 +150,29 @@ function writeProposalWithPatch(fixture) {
   });
   const proposal = result.written[0];
   fs.appendFileSync(proposal.filePath, `\n## Patch\n\`\`\`json\n${JSON.stringify([{ path: "AGENTS.md", oldText: "Existing note.", newText: "Existing note.\n- Use exact oldText before edit." }])}\n\`\`\`\n`);
+  return proposal;
+}
+
+function writePromptRuleProposal(fixture, { oldText, newText }) {
+  const result = writeDraftProposals({
+    config: fixture.config,
+    project: fixture.project,
+    proposals: [{
+      ruleId: "RULE-TEST",
+      title: "Patch reviewed prompt rule",
+      target: "rules",
+      targetFiles: ["wiki/_rules.md"],
+      risk: "low",
+      problem: "Need reviewed prompt guidance.",
+      proposedChange: "Update one prompt-rule block.",
+      testPlan: ["Run prompt-rule lint."],
+      rollbackPlan: "Restore the previous Markdown block.",
+      evidence: [{ sessionId: "s1", entryId: "e1", kind: "fixture", excerpt: "fixture evidence" }],
+      fingerprint: `rules-${Date.now()}-${Math.random()}`,
+    }],
+  });
+  const proposal = result.written[0];
+  fs.appendFileSync(proposal.filePath, `\n## Patch\n\`\`\`json\n${JSON.stringify([{ path: "wiki/_rules.md", oldText, newText }])}\n\`\`\`\n`);
   return proposal;
 }
 

@@ -9,9 +9,8 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 - `web-tools` — `web_search`, `web_fetch`, `tool_search`.
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
 - `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
-- `harness` — đọc Pi session logs đã redact/normalize để tạo report, reflection proposals, eval và gated automation.
+- `harness` — report/reflection/proposal/eval cùng Harness Wiki và reviewed domain-local prompt rules.
 - `aurora-ui` — custom input border + ChatGPT usage badge.
-- `wiki` — Pi-native commands tạo/cập nhật tài liệu repo trong `wiki/`.
 - `midnight-aurora` — theme dark custom.
 
 Pi load package qua root `package.json`:
@@ -123,34 +122,36 @@ Nếu project settings đã có package:
 
 ## Cấu hình tùy chọn
 
-### Wiki Pi-native
+### Harness Wiki
 
-Extension `wiki` port cách dùng OpenWiki sang Pi với output folder `wiki/` và command prefix `/wiki-*`: giữ workflow tài liệu, git context, `.last-update.json` và no-op update, nhưng dùng chính agent/model/tools hiện tại của Pi thay vì chạy CLI/DeepAgents riêng.
+Harness Wiki là capability tài liệu repository bên trong extension `harness`. Nó giữ output `wiki/`, git context, `.last-update.json` và no-op update của Pi-native OpenWiki port, nhưng dùng model/provider/tools hiện tại của Pi.
 
 Commands:
 
 ```txt
-/wiki-init [ghi chú thêm]
-/wiki-update [ghi chú thêm]
-/wiki-ask <câu hỏi>
-/wiki-status
+/harness-wiki-init [ghi chú thêm]
+/harness-wiki-update [ghi chú thêm]
+/harness-wiki-ask <câu hỏi>
+/harness-wiki-status
 ```
 
 Ví dụ:
 
 ```txt
-/wiki-init
-/wiki-update Document the new extension commands first
-/wiki-ask Repo này expose những Pi extension nào?
+/harness-wiki-init
+/harness-wiki-update Document the new extension commands first
+/harness-wiki-ask Prompt rules được load thế nào?
 ```
 
 Ghi chú:
 
-- Docs được tạo/cập nhật trong `wiki/` của repo hiện tại.
-- Metadata do extension ghi tại `wiki/.last-update.json` sau khi Pi agent kết thúc và nội dung docs thật sự thay đổi.
-- `/wiki-update` không có ghi chú thêm sẽ skip nếu không phát hiện thay đổi repo đáng kể từ lần update trước.
-- Extension không đọc key OpenWiki riêng; nó dùng model/provider hiện tại của Pi.
-- Base upstream ban đầu: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem checklist nâng cấp trong `packages/pi-learn-extensions/extensions/wiki/README.md`.
+- Không còn `/wiki-*` aliases hoặc public `extensions/wiki/` entrypoint.
+- Normal docs được tạo/cập nhật trong `wiki/`; reviewed prompt rules nằm tại `wiki/**/_rules.md`.
+- Pi tự nạp bootstrap trong `AGENTS.md`; model đọc `wiki/quickstart.md`, root rules và section rules phù hợp bằng tool `read`. Extension không inject toàn bộ rules vào system prompt.
+- Metadata do extension ghi tại `wiki/.last-update.json` sau khi agent settle và normal documentation thực sự thay đổi. `_rules.md` không nằm trong docs snapshot.
+- Prompt-rule content thay đổi không cần `/reload`; extension source thay đổi vẫn cần `/reload`.
+- Rule edits chỉ đi qua proposal → approval → controlled apply; critical protection vẫn được enforce bằng code.
+- Base upstream: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem `packages/pi-learn-extensions/extensions/harness/README.md`.
 
 ### Tavily cho `web_search`
 
@@ -351,18 +352,13 @@ packages/pi-learn-extensions/extensions/
 packages/pi-learn-extensions/themes/
 ```
 
-Khi sửa extension trong `.pi/extensions`, sync sang package trước khi release:
+Public extension/theme changes phải được thực hiện trực tiếp dưới `packages/pi-learn-extensions/`. `.pi/extensions/` hiện chỉ chứa local/dev-only behavior; không copy đè toàn bộ public package từ `.pi/` khi release.
+
+Sau khi sửa Harness runtime/extension:
 
 ```bash
-rm -rf packages/pi-learn-extensions/extensions packages/pi-learn-extensions/themes
-mkdir -p packages/pi-learn-extensions/extensions packages/pi-learn-extensions/themes
-
-cp -r .pi/extensions/web-tools packages/pi-learn-extensions/extensions/
-cp -r .pi/extensions/chatgpt-usage-status packages/pi-learn-extensions/extensions/
-cp -r .pi/extensions/wiki packages/pi-learn-extensions/extensions/
-cp .pi/extensions/prompt-with-model.ts packages/pi-learn-extensions/extensions/
-cp .pi/extensions/aurora-ui.ts packages/pi-learn-extensions/extensions/
-cp .pi/themes/midnight-aurora.json packages/pi-learn-extensions/themes/
+npm --prefix packages/harness-runtime test
+# Sau đó restart Pi hoặc chạy /reload và test command liên quan.
 ```
 
 Publish thay đổi lên `main`:

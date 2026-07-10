@@ -24,8 +24,8 @@ test("selectReflectionEvidence uses normalized redacted events and truncates exc
 
   assert.equal(evidence.length, 1);
   assert.equal(evidence[0].reason, "tool_error:edit");
-  assert.deepEqual(evidence[0].likelyTargets, ["agents", "rules", "eval"]);
-  assert.match(evidence[0].targetGuidance, /Prefer agents/);
+  assert.deepEqual(evidence[0].likelyTargets, ["rules", "agents", "eval"]);
+  assert.match(evidence[0].targetGuidance, /wiki\/_rules\.md/);
   assert.match(evidence[0].excerpt, /<REDACTED_SECRET>/);
   assert.doesNotMatch(evidence[0].excerpt, /sk-abcdefghijklmnopqrstuvwxyz/);
   assert.equal(evidence[0].excerpt.length <= 160, true);
@@ -85,6 +85,8 @@ test("buildReflection renders safety rules, schema, metrics and evidence refs", 
   assert.match(reflection.prompt, /`oldText` must be an exact unique substring/);
   assert.match(reflection.prompt, /## Target routing guide/);
   assert.match(reflection.prompt, /skill: repeated multi-step workflow/);
+  assert.match(reflection.prompt, /wiki\/\*\*\/_rules\.md/);
+  assert.match(reflection.prompt, /deterministic detector behavior/);
   assert.match(reflection.prompt, /likelyTargets/);
   assert.match(reflection.prompt, /"entryId": "e1"/);
   assert.equal(reflection.metrics.sessions, 1);
@@ -117,6 +119,49 @@ test("reflectionResponseToProposals validates required proposal shape", () => {
   assert.equal(proposals[0].evidence[0].reason, "parser_warning");
   assert.deepEqual(proposals[0].patch, [{ path: "packages/harness-runtime/tests/parse-tree.test.js", oldText: "old", newText: "new" }]);
   assert.equal(Boolean(proposals[0].fingerprint), true);
+});
+
+test("reflectionResponseToProposals keeps Markdown prompt-rule targets as rules", () => {
+  const fixture = createFixture();
+  const proposals = reflectionResponseToProposals({
+    project: fixture.project,
+    response: JSON.stringify({
+      proposals: [{
+        title: "Add extension UI prompt rule",
+        target: "rules",
+        targetFiles: ["wiki/extensions/_rules.md"],
+        risk: "low",
+        problem: "Extension UI cleanup failures repeated.",
+        proposedChange: "Add reviewed UI cleanup guidance.",
+        evidence: [{ sessionId: "s1", entryId: "e1", kind: "tool_result", reason: "tool_error:edit", excerpt: "cleanup missing" }],
+        testPlan: ["Run the prompt-rule routing eval."],
+        rollbackPlan: "Remove the prompt rule block.",
+      }],
+    }),
+  });
+
+  assert.equal(proposals[0].target, "rules");
+  assert.deepEqual(proposals[0].targetFiles, ["wiki/extensions/_rules.md"]);
+});
+
+test("reflectionResponseToProposals rejects legacy JSON rule targets", () => {
+  const fixture = createFixture();
+  assert.throws(() => reflectionResponseToProposals({
+    project: fixture.project,
+    response: JSON.stringify({
+      proposals: [{
+        title: "Add legacy detector config",
+        target: "rules",
+        targetFiles: ["harness/rules/edit.json"],
+        risk: "medium",
+        problem: "Legacy config requested.",
+        proposedChange: "Add JSON rule config.",
+        evidence: [{ sessionId: "s1", entryId: "e1", kind: "tool_result", reason: "tool_error:edit", excerpt: "oldText mismatch" }],
+        testPlan: ["Run tests."],
+        rollbackPlan: "Delete config.",
+      }],
+    }),
+  }), /wiki\/\*\*\/_rules\.md/);
 });
 
 test("reflectionResponseToProposals normalizes AGENTS-only target mismatches", () => {

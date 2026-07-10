@@ -1,10 +1,13 @@
-## Wiki
+## Harness Wiki
 
-This repository has documentation located in the /wiki directory.
+This repository has documentation under `wiki/`.
 
-Start here:
-- [Wiki quickstart](wiki/quickstart.md)
+Before modifying repository files:
 
-The wiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
+1. Read `wiki/quickstart.md`.
+2. Follow its “Rule loading” instructions.
+3. Read `wiki/_rules.md`.
+4. Read every section `_rules.md` applicable to the target files.
+5. Re-read applicable rules when the task scope changes or after compaction.
 
-When working in this repository, read the wiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
+Do not modify `wiki/**/_rules.md` outside the approved Harness proposal and apply workflow.

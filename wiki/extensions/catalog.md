@@ -30,7 +30,7 @@ Change guidance:
 
 Source: `packages/pi-learn-extensions/extensions/harness/index.ts`; runtime: `packages/harness-runtime/`
 
-The harness extension exposes the Pi command surface for session observability and improvement workflows. It delegates core logic to the runtime API rather than implementing parsing/report/proposal logic directly in TypeScript extension code.
+The Harness extension is the single public entrypoint for session observability, improvement workflows, and Harness Wiki repository knowledge. Core parsing/report/proposal behavior is delegated to the runtime API; Wiki orchestration lives in `harness/wiki-commands.ts` and `harness/wiki-prompt.ts`.
 
 Recommended commands include:
 
@@ -43,11 +43,18 @@ Recommended commands include:
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note [text]
+
+/harness-wiki-init [extra instructions]
+/harness-wiki-update [extra instructions]
+/harness-wiki-ask <question>
+/harness-wiki-status
 ```
+
+The old `/wiki-*` commands and separate `extensions/wiki/` entrypoint are removed. Harness Wiki uses reviewed `wiki/**/_rules.md` prompt rules that the model loads lazily through `AGENTS.md` and `wiki/quickstart.md`.
 
 It also registers the `harness_import_llm_reflection` tool, which is intended for model use after `/harness-reflect-pi` queues a reflection prompt. The tool imports JSON proposals into private harness drafts.
 
-See [Harness runtime](../architecture/harness-runtime.md) for the data flow and safety model.
+See [Harness runtime](../architecture/harness-runtime.md) for the data flow/safety model and [Harness Wiki capability](wiki-extension.md) for documentation, prompt-rule loading, metadata, and no-op behavior.
 
 ## ChatGPT usage status
 
@@ -143,14 +150,6 @@ Change guidance:
 - Prefer theme tokens (`theme.fg(...)` and token names) over raw ANSI escape sequences.
 - Test in an interactive terminal after changes; fixed input rendering depends on terminal behavior.
 - Keep cleanup best-effort and resilient to stale UI contexts.
-
-## Wiki extension
-
-Source: `packages/pi-learn-extensions/extensions/wiki/`
-
-This is a Pi-native port of OpenWiki concepts using `wiki/` output and `/wiki-*` commands. It uses the current Pi provider/model/tools, not OpenWiki's separate CLI/DeepAgents runtime.
-
-See [Wiki extension](wiki-extension.md) for detailed command behavior, metadata, and upgrade guidance.
 
 ## Theme: midnight-aurora
 

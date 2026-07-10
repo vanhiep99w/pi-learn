@@ -60,7 +60,7 @@ Các command còn lại chủ yếu để debug, kiểm tra, hoặc quản lý n
 ```txt
 extensions/
 ├── web-tools/                  # web_search, web_fetch, tool_search
-├── harness/                    # session mining, report, proposals, eval, automation
+├── harness/                    # observability, proposals, eval, Harness Wiki
 ├── chatgpt-usage-status/       # ChatGPT Plus/Pro usage status
 ├── fixed-input-layout/         # helper cho aurora-ui
 ├── prompt-with-model.ts        # prompt templates có model/thinking riêng
@@ -129,6 +129,23 @@ Ghi chú `/harness-reflect-pi`:
 - Chỉ dùng normalized evidence, không đọc raw session logs.
 - Prompt có target routing guide để chọn đúng `memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`.
 - Tool `harness_import_llm_reflection` chỉ dành cho model gọi tự động sau command này; người dùng thường không cần gọi tay.
+
+### Harness Wiki
+
+Harness Wiki nằm trong cùng `harness/` entrypoint:
+
+```txt
+/harness-wiki-init [ghi chú]
+/harness-wiki-update [ghi chú]
+/harness-wiki-ask <câu hỏi>
+/harness-wiki-status
+```
+
+- Không còn `/wiki-*` aliases hoặc `extensions/wiki/` entrypoint.
+- Normal docs nằm trong `wiki/**/*.md`; reviewed prompt rules nằm trong `wiki/**/_rules.md`.
+- Model lazy-load rules theo `AGENTS.md` → `wiki/quickstart.md` → root/section `_rules.md` bằng tool `read`.
+- Extension không tự inject toàn bộ rules và không cần reload/cache watcher cho Markdown content.
+- Wiki turns bị chặn sửa `_rules.md`; rule changes chỉ đi qua approved controlled apply.
 
 Apply/automation policy:
 
@@ -275,9 +292,8 @@ Xem hướng dẫn chi tiết ở README root repo:
 extensions/
 ├── web-tools/
 ├── chatgpt-usage-status/
-├── harness/             # Pi Harness commands and reflection import tool
+├── harness/             # Pi Harness + Harness Wiki commands
 ├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
-├── wiki/                # Pi-native wiki documentation commands
 ├── prompt-with-model.ts # model-aware prompt template commands
 └── aurora-ui.ts         # fixed input cluster + bordered editor
 

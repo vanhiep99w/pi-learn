@@ -25,6 +25,7 @@ Representative test files include:
 - `reflection.test.js`
 - `rules.test.js`
 - `eval-harness.test.js`
+- `wiki-prompt-rules.test.js`
 
 Source references: `packages/harness-runtime/package.json`, `packages/harness-runtime/tests/`.
 
@@ -39,9 +40,13 @@ edit-oldText-workflow
 file-protection
 smart-commit-basic
 ts-extension-safety
+wiki-prompt-rule-file-protection
+wiki-prompt-rule-section-routing
+wiki-prompt-rule-lazy-loading
+harness-wiki-command-surface
 ```
 
-These scenarios validate safety and workflow behaviors that are easy to regress: secret redaction, parser resilience, edit/proposal rule detection, file target protection, controlled apply, and extension integration.
+These scenarios validate safety and workflow behaviors that are easy to regress: secret redaction, parser resilience, prompt-rule routing/loading/protection, file target protection, controlled apply, and the merged command surface.
 
 When changing harness logic, run both Node tests and the relevant `/harness-eval` scenario from Pi if possible.
 
@@ -59,7 +64,7 @@ Examples:
 - Web tools: call `web_search`, then `web_fetch` on a result; test DuckDuckGo fallback when Tavily is not configured if relevant.
 - Prompt templates: create or edit a small test prompt under `.pi/agent/model-prompts/`, `/reload`, then run the generated command.
 - Aurora UI: verify startup banner, editor border, footer/status rendering, theme switching, and terminal cleanup after session shutdown.
-- Wiki: run `/wiki-status`, a no-op `/wiki-update`, and a small forced `/wiki-update <note>` when changing wiki behavior.
+- Harness Wiki: run `/harness-wiki-status`, `/harness-wiki-ask`, a no-op `/harness-wiki-update`, and a small forced update when changing Wiki behavior. Confirm `/wiki-*` commands are absent and Wiki turns cannot edit `_rules.md`.
 - Harness: run `/harness-status`, `/harness-report`, and targeted `/harness-eval` after runtime changes.
 
 ## Security and privacy rules

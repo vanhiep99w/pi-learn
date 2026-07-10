@@ -1,108 +1,142 @@
-# Wiki extension
+# Harness Wiki capability
 
-The wiki extension is the repository's Pi-native OpenWiki variant. It generates and updates documentation under `wiki/` by sending a carefully constrained prompt to the **current Pi agent/model/tools**. It does not run the upstream OpenWiki CLI, LangChain model setup, DeepAgents runtime, OpenRouter fallback logic, or `~/.openwiki/.env` credential flow.
+Harness Wiki is the repository-knowledge capability of the single public Harness extension. It preserves the useful Pi-native OpenWiki workflow while sharing command ownership, safety, proposals, and status with Harness.
 
-Sources: `packages/pi-learn-extensions/extensions/wiki/index.ts`, `packages/pi-learn-extensions/extensions/wiki/prompt.ts`, `packages/pi-learn-extensions/extensions/wiki/README.md`.
+Sources:
+
+```txt
+packages/pi-learn-extensions/extensions/harness/index.ts
+packages/pi-learn-extensions/extensions/harness/wiki-commands.ts
+packages/pi-learn-extensions/extensions/harness/wiki-prompt.ts
+packages/pi-learn-extensions/extensions/harness/README.md
+packages/harness-runtime/src/analysis/wiki-prompt-rules.js
+```
 
 ## Commands
 
 ```txt
-/wiki-init [extra instructions]
-/wiki-update [extra instructions]
-/wiki-ask <question>
-/wiki-status
+/harness-wiki-init [extra instructions]
+/harness-wiki-update [extra instructions]
+/harness-wiki-ask <question>
+/harness-wiki-status
 ```
 
-Behavior summary:
+The old `/wiki-*` commands are intentionally absent; there are no deprecated or hidden aliases.
 
-- `/wiki-init` starts an initial documentation run for the current repository.
-- `/wiki-update` refreshes existing wiki docs from repository changes. With no extra instructions, it skips when the repo appears unchanged since the last successful wiki update.
-- `/wiki-ask` asks a repository/wiki question with lightweight wiki context.
-- `/wiki-status` reports documentation presence, current git head, last metadata, and no-op update status.
+## Command behavior
 
-## How a documentation run works
+- `/harness-wiki-init` creates missing deterministic prompt-rule scaffolds, then starts an initial documentation run with the current Pi model/tools.
+- `/harness-wiki-update` inspects existing docs, metadata, git history, and worktree changes. Without extra instructions it skips when only already-accounted-for documentation/metadata changes exist.
+- `/harness-wiki-ask` asks a repository/Wiki question without modifying docs by default.
+- `/harness-wiki-status` reports docs snapshot, metadata/no-op status, prompt-rule files, missing section scaffolds, rule IDs, and lint errors/warnings.
 
-`index.ts` implements the runtime orchestration:
+The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt.
 
-1. The command handler checks that the Pi agent is idle.
-2. For `/wiki-update` without extra instructions, it calls no-op detection before starting.
-3. It gathers context from git and previous metadata.
-4. It snapshots current `wiki/` content, excluding `.last-update.json` from content-change churn.
-5. It sends a generated prompt from `prompt.ts` into the current Pi session with `pi.sendUserMessage(...)`.
-6. On `agent_end`, it snapshots `wiki/` again.
-7. If documentation content changed, it writes `wiki/.last-update.json` with `updatedAt`, command, git head, and current model label.
+## Prompt-rule loading
 
-The agent prompt explicitly tells the model not to edit `.last-update.json`; the extension writes that metadata itself.
+Reviewed prompt rules use one Markdown file for root and each final Wiki section:
 
-## Git evidence and no-op logic
+```txt
+wiki/_rules.md
+wiki/architecture/_rules.md
+wiki/extensions/_rules.md
+wiki/operations/_rules.md
+```
 
-The extension mirrors OpenWiki's git-aware workflow at a high level. It gathers:
+Loading is lazy:
 
-- working tree status with `git status --short --untracked-files=all`
-- current `HEAD` with `git rev-parse HEAD`
-- recent commits for init, or commits since the previous wiki `gitHead`/timestamp for update
-- diff summary with `git diff --name-status HEAD`
+```txt
+Pi auto-loads AGENTS.md
+  → model reads wiki/quickstart.md
+  → model reads wiki/_rules.md
+  → model identifies target domains
+  → model reads applicable section/_rules.md
+  → rule text enters context as read-tool results
+```
 
-No-op update detection uses `wiki/.last-update.json` when available:
+The extension does not use `before_agent_start`, `context`, or provider-payload rewriting to inject all rules. It does not maintain a rule-content watcher or mtime/hash cache. A later `read` sees current file content, so editing Markdown rules does not require `/reload`; changing extension code does.
 
-- If there is no previous `gitHead`, update does not skip.
-- If the working tree has meaningful changes outside the metadata file, update does not skip.
-- If `HEAD` changed, the extension checks changed paths since the previous wiki head.
-- If only wiki paths changed, an update may skip; otherwise it runs.
+This is best-effort prompt discipline. File protection, approval, target allowlists, path safety, redaction, and rollback remain deterministic code behavior.
 
-Source references: `createGitSummary`, `getUpdateNoopStatus`, `createOpenWikiContentSnapshot`, and `writeLastUpdateMetadata` in `packages/pi-learn-extensions/extensions/wiki/index.ts`.
+## Ownership and file protection
 
-## Prompt responsibilities
+| Path | Owner |
+|---|---|
+| Normal `wiki/**/*.md` pages | Harness Wiki documentation workflow |
+| `wiki/**/_rules.md` | Harness proposal → approval → controlled apply |
+| `wiki/.last-update.json` | Harness Wiki metadata finalizer |
+| `wiki/_plan.md` | Temporary documentation run; removed before completion |
 
-`prompt.ts` encodes the documentation discipline given to the current Pi agent. The prompt requires the agent to:
+The Harness extension blocks built-in write/edit and common shell mutation attempts against `_rules.md` and `.last-update.json` in normal Pi tool turns. Approved `/harness-apply` writes through the controlled runtime lifecycle rather than model tool calls.
 
-- inspect source and existing docs instead of inventing behavior
-- use `wiki/quickstart.md` as the entrypoint
-- keep the first pass focused and navigable
-- use git history selectively
-- protect secrets and sensitive logs
-- update top-level `AGENTS.md`/`CLAUDE.md` with a standard Wiki reference section when needed
-- create a temporary `wiki/_plan.md` before writing final docs and remove it before completion
+Missing `_rules.md` files are a narrow bootstrap exception: the extension may create deterministic prompt-empty scaffolds for root/final sections. It does not invent policy or proposal origins.
 
-The prompt is an adaptation of upstream OpenWiki rules for Pi execution, not a byte-for-byte upstream copy.
+## Snapshot and metadata
 
-## Differences from upstream OpenWiki
+The documentation snapshot hashes only normal Wiki Markdown. It excludes:
 
-The local README records the upstream base as `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` and lists the intentional differences.
+```txt
+wiki/**/_rules.md
+wiki/.last-update.json
+wiki/_plan.md
+hidden/temp files
+```
 
-Kept/adapted:
+After `agent_settled`:
 
-- `wiki/` documentation output directory
-- `.last-update.json` update metadata semantics
-- init/update/chat concepts as Pi slash commands
-- git evidence and no-op update ideas
-- snapshot-based metadata write only when docs content changes
+1. Harness creates any missing final-section scaffolds.
+2. It recomputes the normal documentation snapshot.
+3. It writes `.last-update.json` only when that snapshot changed.
+4. Scaffold-only or prompt-rule-only changes do not create a fake documentation update.
 
-Not ported:
+A prompt-rule Git change is still meaningful for no-op detection because normal docs may need to reflect updated workflow/policy.
 
-- OpenWiki Ink CLI UI
-- upstream command parser
-- `~/.openwiki/.env` credentials
-- LangChain model construction
-- DeepAgents shell/backend runtime
-- SQLite LangGraph checkpointer
-- OpenRouter retry/fallback model handling
+## Rule validation and controlled apply
 
-## Git history context
+`packages/harness-runtime/src/analysis/wiki-prompt-rules.js` provides lightweight Markdown/path lint:
 
-Recent repository history explains the current naming:
+- Reserved basename `_rules.md`.
+- Root/final-section completeness.
+- Project-root and symlink safety.
+- UTF-8/NUL/64 KiB checks.
+- Stable rule-heading IDs and duplicate detection.
+- Proposal-origin syntax checks.
 
-- `d61a063 Add Pi-native OpenWiki extension` introduced the extension as an OpenWiki-style Pi port.
-- `204d927 Rename OpenWiki extension commands to wiki` renamed the command surface and directory to the shorter `wiki` terminology.
+It does not parse natural language into detector parameters or build an effective runtime detector registry. Status always reports lint errors; init/update/ask fail closed after deterministic scaffold creation if the prompt-rule layout remains invalid.
 
-Current source paths and command names should therefore use `wiki`, not `openwiki`, unless describing upstream provenance.
+Approved prompt-rule proposals patch exact Markdown blocks. Controlled apply validates the complete prompt-rule layout afterward and restores original content if validation fails.
 
-## Change guidance
+## No-op update behavior
 
-When changing this extension:
+`/harness-wiki-update` runs when:
 
-- Preserve the separation between **agent-generated docs** and **extension-written metadata**.
-- Do not make the extension read or expose secret-bearing files.
-- If prompt rules change, update `prompt.ts` and consider updating `packages/pi-learn-extensions/extensions/wiki/README.md` if behavior or upstream compatibility changes.
-- If upstream OpenWiki is re-synced, follow the upgrade checklist in the local README and update the recorded upstream base commit.
-- Verify behavior in Pi with `/wiki-status`, a no-op `/wiki-update`, and a documentation-changing `/wiki-update <note>` where appropriate.
+- No previous update Git head exists.
+- The worktree has meaningful changes other than metadata.
+- Prompt rules changed.
+- Source/config paths changed.
+- Git changed but changed paths cannot be determined safely.
+
+It may skip when all committed changes since the previous update are normal Wiki documentation/metadata and the worktree is otherwise clean.
+
+## OpenWiki provenance
+
+The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base.
+
+Harness Wiki intentionally does not use OpenWiki's CLI/Ink UI, credential flow, LangChain/DeepAgents runtime, SQLite checkpointer, or separate model/provider key. See `packages/pi-learn-extensions/extensions/harness/README.md` for the upgrade checklist.
+
+## Verification
+
+```bash
+npm --prefix packages/harness-runtime test
+```
+
+Then reload Pi and verify:
+
+```txt
+/reload
+/harness-wiki-status
+/harness-wiki-ask Prompt rules được load vào context thế nào?
+/harness-wiki-update
+```
+
+Also verify `/wiki-status` is absent and a normal Harness Wiki turn cannot modify `_rules.md`.

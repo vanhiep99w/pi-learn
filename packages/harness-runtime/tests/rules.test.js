@@ -19,12 +19,13 @@ test("runRuleEngine detects repeated edit oldText mismatch", () => {
   const proposal = proposals.find((item) => item.ruleId === "R-0002");
 
   assert.equal(proposal?.title, "Add edit workflow note for exact oldText matching");
-  assert.equal(proposal.target, "agents");
+  assert.equal(proposal.target, "rules");
+  assert.deepEqual(proposal.targetFiles, ["wiki/_rules.md"]);
   assert.equal(proposal.evidence.length, 2);
   assert.equal(Boolean(proposal.fingerprint), true);
 });
 
-test("runRuleEngine respects project rule config override", () => {
+test("runRuleEngine ignores legacy project JSON rule config", () => {
   const fixture = createFixture();
   fs.mkdirSync(path.join(fixture.project.projectRoot, "harness", "rules"), { recursive: true });
   fs.writeFileSync(path.join(fixture.project.projectRoot, "harness", "rules", "edit.json"), JSON.stringify({
@@ -43,7 +44,8 @@ test("runRuleEngine respects project rule config override", () => {
   const rules = loadRuleConfig({ project: fixture.project });
   const proposals = runRuleEngine({ project: fixture.project, sessionResults: [session], ruleConfig: rules });
 
-  assert.equal(proposals.some((item) => item.ruleId === "R-0002"), false);
+  assert.equal(rules.get("R-0002").params.minOccurrences, 2);
+  assert.equal(proposals.some((item) => item.ruleId === "R-0002"), true);
 });
 
 test("runRuleEngine detects parser warnings", () => {

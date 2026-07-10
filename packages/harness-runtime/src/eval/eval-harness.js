@@ -6,6 +6,7 @@ import { parseSessionFile } from "../session/parse-session.js";
 import { collectNormalizeWarnings } from "../session/warnings.js";
 import { redactString, redactValue, isSensitivePath } from "../safety/redaction.js";
 import { runRuleEngine } from "../analysis/rules.js";
+import { discoverWikiPromptRules } from "../analysis/wiki-prompt-rules.js";
 import { approveProposal, applyProposal } from "../proposals/lifecycle.js";
 import { findDraftProposal, writeDraftProposals } from "../proposals/proposal-writer.js";
 import { atomicWriteFile, atomicWriteJson, ensureDir } from "../storage/atomic-write.js";
@@ -18,6 +19,10 @@ export const BUILT_IN_SCENARIOS = [
   "file-protection",
   "smart-commit-basic",
   "ts-extension-safety",
+  "wiki-prompt-rule-file-protection",
+  "wiki-prompt-rule-section-routing",
+  "wiki-prompt-rule-lazy-loading",
+  "harness-wiki-command-surface",
 ];
 
 export async function runEvalHarness({ config, project, scenario, proposalId } = {}) {
@@ -102,6 +107,14 @@ async function runScenario(name, context) {
         return scenarioResult(name, smartCommitBasicChecks());
       case "ts-extension-safety":
         return scenarioResult(name, tsExtensionSafetyChecks(context));
+      case "wiki-prompt-rule-file-protection":
+        return scenarioResult(name, wikiPromptRuleFileProtectionChecks(context));
+      case "wiki-prompt-rule-section-routing":
+        return scenarioResult(name, wikiPromptRuleSectionRoutingChecks(context));
+      case "wiki-prompt-rule-lazy-loading":
+        return scenarioResult(name, wikiPromptRuleLazyLoadingChecks(context));
+      case "harness-wiki-command-surface":
+        return scenarioResult(name, harnessWikiCommandSurfaceChecks(context));
       default:
         throw cliLikeError(`Unknown eval scenario: ${name}`);
     }
@@ -156,7 +169,7 @@ function editOldTextWorkflowChecks() {
   const proposal = proposals.find((item) => item.ruleId === "R-0002");
   return [
     check("R-0002 proposal generated", Boolean(proposal)),
-    check("proposal targets agents workflow", proposal?.target === "agents"),
+    check("proposal targets global Markdown prompt rules", proposal?.target === "rules" && proposal?.targetFiles?.includes("wiki/_rules.md")),
     check("proposal includes evidence refs", (proposal?.evidence?.length ?? 0) >= 2),
   ];
 }
@@ -217,6 +230,68 @@ function tsExtensionSafetyChecks({ project }) {
     check("extension exposes Pi-session reflection", source.includes("harness-reflect-pi") && source.includes("pi.sendUserMessage")),
     check("UI operations are guarded", source.includes("ctx.hasUI") && source.includes("ctx.ui?.")),
   ];
+}
+
+function wikiPromptRuleFileProtectionChecks({ project }) {
+  const commandSource = readProjectFile(project, "packages/pi-learn-extensions/extensions/harness/wiki-commands.ts");
+  const promptSource = readProjectFile(project, "packages/pi-learn-extensions/extensions/harness/wiki-prompt.ts");
+  const lifecycleSource = readProjectFile(project, "packages/harness-runtime/src/proposals/lifecycle.js");
+  return [
+    check("Wiki tool calls have a deterministic mutation gate", /pi\.on\("tool_call"/.test(commandSource) && commandSource.includes("isProtectedWikiMutationPath")),
+    check("Wiki prompt forbids normal prompt-rule edits", promptSource.includes("Do not create, edit, move, or delete any") && promptSource.includes("_rules.md")),
+    check("controlled apply validates changed prompt rules", lifecycleSource.includes("validateChangedPromptRules") && lifecycleSource.includes("restoreOriginalFiles")),
+  ];
+}
+
+function wikiPromptRuleSectionRoutingChecks({ project }) {
+  const fixture = createProjectFixture("harness-eval-wiki-routing-");
+  const session = writeCachedSession(fixture, {
+    sessionId: "s-wiki-routing",
+    events: [
+      toolResultEvent("e1", "edit", "oldText must match a unique region"),
+      toolResultEvent("e2", "edit", "oldText did not match"),
+      bashExecutionEvent("b1", "npm test", 1),
+      bashExecutionEvent("b2", "npm test", 1),
+    ],
+  });
+  const proposals = runRuleEngine({ project: fixture.project, sessionResults: [session] });
+  const editProposal = proposals.find((item) => item.ruleId === "R-0002");
+  const bashProposal = proposals.find((item) => item.ruleId === "R-0001");
+  const ruleReport = discoverWikiPromptRules({ projectRoot: project.projectRoot });
+  return [
+    check("edit workflow routes to global prompt rules", editProposal?.targetFiles?.includes("wiki/_rules.md")),
+    check("bash workflow routes to operations prompt rules", bashProposal?.targetFiles?.includes("wiki/operations/_rules.md")),
+    check("repository prompt-rule sections are valid", ruleReport.valid, ruleReport.errors.map((item) => item.message).join("; ")),
+  ];
+}
+
+function wikiPromptRuleLazyLoadingChecks({ project }) {
+  const agents = readProjectFile(project, "AGENTS.md");
+  const quickstart = readProjectFile(project, "wiki/quickstart.md");
+  const promptSource = readProjectFile(project, "packages/pi-learn-extensions/extensions/harness/wiki-prompt.ts");
+  const commandSource = readProjectFile(project, "packages/pi-learn-extensions/extensions/harness/wiki-commands.ts");
+  return [
+    check("AGENTS bootstraps quickstart and root rules", agents.includes("wiki/quickstart.md") && agents.includes("wiki/_rules.md")),
+    check("quickstart maps all prompt-rule sections", ["wiki/_rules.md", "architecture/_rules.md", "extensions/_rules.md", "operations/_rules.md"].every((item) => quickstart.includes(item))),
+    check("Harness Wiki task prompt tells the model to read rules", promptSource.includes("Prompt-rule loading discipline") && promptSource.includes("read tool results")),
+    check("Wiki module does not automatically inject rules", !commandSource.includes("before_agent_start") && !commandSource.includes('pi.on("context"')),
+  ];
+}
+
+function harnessWikiCommandSurfaceChecks({ project }) {
+  const source = readProjectFile(project, "packages/pi-learn-extensions/extensions/harness/wiki-commands.ts");
+  const oldWikiEntrypoint = path.join(project.projectRoot, "packages", "pi-learn-extensions", "extensions", "wiki", "index.ts");
+  const expected = ["harness-wiki-init", "harness-wiki-update", "harness-wiki-ask", "harness-wiki-status"];
+  return [
+    check("all Harness Wiki commands are registered", expected.every((command) => source.includes(`registerCommand(\"${command}\"`))),
+    check("legacy Wiki commands are not registered", !/registerCommand\("wiki-(?:init|update|ask|status)"/.test(source)),
+    check("legacy Wiki extension entrypoint is removed", !fs.existsSync(oldWikiEntrypoint), oldWikiEntrypoint),
+  ];
+}
+
+function readProjectFile(project, relativePath) {
+  const filePath = path.join(project.projectRoot, ...relativePath.split("/"));
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
 }
 
 function runProposalQuality({ config, project, proposalId }) {
@@ -316,6 +391,17 @@ function toolResultEvent(entryId, toolName, excerpt) {
     summary: `${toolName} result error`,
     excerpt,
     tool: { name: toolName, isError: true },
+  };
+}
+
+function bashExecutionEvent(entryId, command, exitCode) {
+  return {
+    eventId: `${entryId}_evt`,
+    entryId,
+    kind: "bash_execution",
+    summary: `${command} exit ${exitCode}`,
+    excerpt: `${command} failed`,
+    bash: { command, exitCode },
   };
 }
 

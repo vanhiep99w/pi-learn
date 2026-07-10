@@ -76,9 +76,11 @@ When adding or changing docs:
 - Write Vietnamese for `docs/` unless the surrounding file uses another language.
 - Update `docs/README.md` if adding a new `docs/*.md` page.
 - Avoid duplicating whole existing docs in the wiki; link to them and summarize the repository-specific implications.
-- Keep generated wiki pages concise and source-referenced.
+- Keep generated Wiki pages concise and source-referenced.
+- Treat `wiki/**/_rules.md` as reviewed prompt policy, not generated documentation; normal Wiki updates must not edit it.
+- Keep the quickstart Rule loading index aligned when real Wiki sections are added/removed.
 
-The wiki extension itself is documented in [Wiki extension](../extensions/wiki-extension.md).
+Harness Wiki is documented in [Harness Wiki capability](../extensions/wiki-extension.md).
 
 ## Working with extension code
 
@@ -99,9 +101,10 @@ Where to change common features:
 | ChatGPT usage UI and account commands | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts` |
 | Prompt commands/model switching | `packages/pi-learn-extensions/extensions/prompt-with-model.ts` |
 | Aurora TUI/editor/footer | `packages/pi-learn-extensions/extensions/aurora-ui.ts`, `fixed-input-layout/**` |
-| Wiki commands and prompt rules | `packages/pi-learn-extensions/extensions/wiki/**` |
 | Harness command surface | `packages/pi-learn-extensions/extensions/harness/index.ts` |
-| Harness core behavior | `packages/harness-runtime/src/**` |
+| Harness Wiki commands/task prompt | `packages/pi-learn-extensions/extensions/harness/wiki-commands.ts`, `wiki-prompt.ts` |
+| Reviewed domain prompt rules | `wiki/_rules.md`, `wiki/<section>/_rules.md` |
+| Harness core/lint behavior | `packages/harness-runtime/src/**` |
 
 ## Local-only files
 
