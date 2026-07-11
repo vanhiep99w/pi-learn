@@ -4,6 +4,7 @@ import path from "node:path";
 export const WIKI_DIR = "wiki";
 export const WIKI_RULE_BASENAME = "_rules.md";
 export const WIKI_METADATA_PATH = "wiki/.last-update.json";
+export const WIKI_INSTRUCTIONS_PATH = "wiki/INSTRUCTIONS.md";
 export const WIKI_PLAN_PATH = "wiki/_plan.md";
 export const MAX_WIKI_RULE_FILE_BYTES = 64 * 1024;
 
@@ -43,6 +44,10 @@ export function isWikiMetadataPath(value) {
   return normalizeRepositoryPath(value) === WIKI_METADATA_PATH;
 }
 
+export function isWikiInstructionsPath(value) {
+  return normalizeRepositoryPath(value) === WIKI_INSTRUCTIONS_PATH;
+}
+
 export function isWikiTemporaryPath(value) {
   const normalized = normalizeRepositoryPath(value);
   if (isWikiRulePath(normalized) || isWikiMetadataPath(normalized)) return false;
@@ -56,6 +61,7 @@ export function isWikiDocumentationPath(value) {
   return normalized.startsWith(`${WIKI_DIR}/`)
     && normalized.endsWith(".md")
     && !isWikiRulePath(normalized)
+    && !isWikiInstructionsPath(normalized)
     && !isWikiTemporaryPath(normalized);
 }
 
@@ -321,7 +327,11 @@ function discoverSectionDirectories(absoluteDir, relativeDir, sections) {
 }
 
 function isFinalDocumentationPage(name) {
-  return name.endsWith(".md") && name !== WIKI_RULE_BASENAME && name !== "_plan.md" && !name.startsWith(".");
+  return name.endsWith(".md")
+    && name !== WIKI_RULE_BASENAME
+    && name !== "INSTRUCTIONS.md"
+    && name !== "_plan.md"
+    && !name.startsWith(".");
 }
 
 function shouldSkipSectionDirectory(name) {

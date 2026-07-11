@@ -36,11 +36,16 @@ The old `/wiki-*` commands are intentionally removed without compatibility alias
 
 - Generates and updates normal repository documentation under `wiki/` using the current Pi provider/model/tools.
 - Writes update metadata at `wiki/.last-update.json` only when normal Wiki documentation changes.
+- Loads the optional user-owned `wiki/INSTRUCTIONS.md` brief into init/update/ask prompts without treating it as generated documentation.
 - Treats `wiki/**/_rules.md` as reviewed prompt rules, not generated documentation.
 - Creates deterministic empty `_rules.md` scaffolds for root/final sections when missing.
-- Blocks Pi tool turns from modifying `_rules.md` or `.last-update.json` through write/edit and common shell mutation paths; approved `/harness-apply` writes through the controlled runtime lifecycle.
-- Excludes `_rules.md`, `.last-update.json`, `_plan.md`, hidden files, and temporary files from the documentation snapshot.
-- Treats prompt-rule changes as meaningful repository changes for update/no-op decisions.
+- Blocks Pi tool turns from modifying `_rules.md` or `.last-update.json` through write/edit and common shell mutation paths; active Wiki runs also protect `wiki/INSTRUCTIONS.md`.
+- Excludes `INSTRUCTIONS.md`, `_rules.md`, `.last-update.json`, `_plan.md`, hidden files, and temporary files from the documentation snapshot.
+- Treats prompt-rule, Wiki brief, source, and configuration changes as meaningful repository changes for update/no-op decisions.
+
+## Persistent Wiki brief
+
+`wiki/INSTRUCTIONS.md` is optional user-owned control metadata for documentation scope, priorities, language, exclusions, and intended audience. Harness reads at most 64 KiB from a regular non-symlink file and includes it in init/update/ask task prompts. Normal Wiki runs cannot modify it; users can edit it in a regular Pi turn or directly in their editor. Reviewed `wiki/**/_rules.md` instructions and deterministic safety controls take precedence over the brief.
 
 ## Prompt-rule loading
 
@@ -66,6 +71,7 @@ repository: langchain-ai/openwiki
 commit: 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
 short:  23428de fix: use dash-delimited Anthropic model id for Opus (claude-opus-4-8) (#113)
 date checked locally: 2026-07-06
+latest prompt review: fa9a9b519d65ea6a31b5d063ba5d97edb1fca0f0 (OpenWiki 0.1.1, 2026-07-11)
 ```
 
 Kept/adapted:
@@ -74,6 +80,7 @@ Kept/adapted:
 - `wiki/` output and `.last-update.json` metadata.
 - Git evidence collection and no-op update behavior.
 - Documentation quality, planning, privacy, and update discipline.
+- User-owned persistent Wiki brief adapted from OpenWiki `openwiki/INSTRUCTIONS.md`.
 
 Intentionally different:
 

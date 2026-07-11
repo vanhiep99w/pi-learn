@@ -30,7 +30,13 @@ The old `/wiki-*` commands are intentionally absent; there are no deprecated or 
 - `/harness-wiki-ask` asks a repository/Wiki question without modifying docs by default.
 - `/harness-wiki-status` reports docs snapshot, metadata/no-op status, prompt-rule files, missing section scaffolds, rule IDs, and lint errors/warnings.
 
-The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt.
+The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt. When present, the user-owned `wiki/INSTRUCTIONS.md` brief is also included in init/update/ask prompts.
+
+## Persistent Wiki brief
+
+`wiki/INSTRUCTIONS.md` is optional user-owned control metadata for documentation scope, priorities, language, exclusions, and intended audience. Harness reads at most 64 KiB from a regular non-symlink file and includes the content in init/update/ask prompts.
+
+Normal Harness Wiki runs cannot modify this file. Users may edit it directly or in a regular Pi turn. It is excluded from generated-documentation snapshots, but a worktree or committed change to the brief remains meaningful for `/harness-wiki-update` no-op detection. Reviewed `wiki/**/_rules.md` instructions and deterministic privacy/protection/apply controls take precedence over the brief.
 
 ## Prompt-rule loading
 
@@ -63,6 +69,7 @@ This is best-effort prompt discipline. File protection, approval, target allowli
 | Path | Owner |
 |---|---|
 | Normal `wiki/**/*.md` pages | Harness Wiki documentation workflow |
+| `wiki/INSTRUCTIONS.md` | User-owned persistent Wiki brief |
 | `wiki/**/_rules.md` | Harness proposal → approval → controlled apply |
 | `wiki/.last-update.json` | Harness Wiki metadata finalizer |
 | `wiki/_plan.md` | Temporary documentation run; removed before completion |
@@ -76,6 +83,7 @@ Missing `_rules.md` files are a narrow bootstrap exception: the extension may cr
 The documentation snapshot hashes only normal Wiki Markdown. It excludes:
 
 ```txt
+wiki/INSTRUCTIONS.md
 wiki/**/_rules.md
 wiki/.last-update.json
 wiki/_plan.md
@@ -89,7 +97,7 @@ After `agent_settled`:
 3. It writes `.last-update.json` only when that snapshot changed.
 4. Scaffold-only or prompt-rule-only changes do not create a fake documentation update.
 
-A prompt-rule Git change is still meaningful for no-op detection because normal docs may need to reflect updated workflow/policy.
+A prompt-rule or `wiki/INSTRUCTIONS.md` Git change is still meaningful for no-op detection because normal docs may need to reflect updated workflow, policy, scope, or priorities.
 
 ## Rule validation and controlled apply
 
@@ -120,7 +128,7 @@ It may skip when all committed changes since the previous update are normal Wiki
 
 ## OpenWiki provenance
 
-The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base.
+The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. The prompt was reviewed through `fa9a9b519d65ea6a31b5d063ba5d97edb1fca0f0` (OpenWiki 0.1.1); Harness selectively adapted the user-owned persistent Wiki brief rather than porting OpenWiki's personal-wiki/connectors runtime.
 
 Harness Wiki intentionally does not use OpenWiki's CLI/Ink UI, credential flow, LangChain/DeepAgents runtime, SQLite checkpointer, or separate model/provider key. See `packages/pi-learn-extensions/extensions/harness/README.md` for the upgrade checklist.
 

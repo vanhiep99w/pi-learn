@@ -7,6 +7,7 @@ import {
   discoverWikiPromptRules,
   ensureWikiPromptRuleScaffolds,
   isWikiDocumentationPath,
+  isWikiInstructionsPath,
   isWikiMetadataPath,
   isWikiRulePath,
   isWikiTemporaryPath,
@@ -19,12 +20,15 @@ test("Wiki path classification keeps prompt rules separate from documentation", 
   assert.equal(isWikiRulePath("wiki/extensions/_rules.md"), true);
   assert.equal(isWikiRulePath("wiki/extensions/guide.md"), false);
   assert.equal(isWikiMetadataPath("wiki/.last-update.json"), true);
+  assert.equal(isWikiInstructionsPath("wiki/INSTRUCTIONS.md"), true);
+  assert.equal(isWikiInstructionsPath("wiki/architecture/INSTRUCTIONS.md"), false);
   assert.equal(isWikiTemporaryPath("wiki/_plan.md"), true);
   assert.equal(isWikiTemporaryPath("wiki/_rules.md"), false);
   assert.equal(isWikiTemporaryPath("wiki/.last-update.json"), false);
   assert.equal(isWikiDocumentationPath("wiki/quickstart.md"), true);
   assert.equal(isWikiDocumentationPath("wiki/extensions/guide.md"), true);
   assert.equal(isWikiDocumentationPath("wiki/extensions/_rules.md"), false);
+  assert.equal(isWikiDocumentationPath("wiki/INSTRUCTIONS.md"), false);
   assert.equal(isWikiDocumentationPath("wiki/.last-update.json"), false);
   assert.equal(isWikiDocumentationPath("wiki/_plan.md"), false);
 });
@@ -41,6 +45,7 @@ test("discoverWikiPromptRules finds root and final section files in stable order
   write(root, "wiki/_rules.md", validRules("GLOBAL-EDIT-001"));
   write(root, "wiki/architecture/_rules.md", validRules("ARCH-PARSER-001"));
   write(root, "wiki/extensions/_rules.md", validRules("EXT-UI-001"));
+  write(root, "wiki/INSTRUCTIONS.md", "# Wiki brief\n");
   write(root, "wiki/assets/logo.md", "asset notes\n");
   write(root, "wiki/_tmp/scratch.md", "temporary\n");
 

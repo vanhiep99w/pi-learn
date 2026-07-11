@@ -1,5 +1,6 @@
 const WIKI_DIR = "wiki";
 const UPDATE_METADATA_PATH = `${WIKI_DIR}/.last-update.json`;
+const WIKI_INSTRUCTIONS_PATH = `${WIKI_DIR}/INSTRUCTIONS.md`;
 const ROOT_RULE_PATH = `${WIKI_DIR}/_rules.md`;
 
 type HarnessWikiCommand = "init" | "update" | "chat";
@@ -14,6 +15,7 @@ type UpdateMetadata = {
 type RunContext = {
   lastUpdate: UpdateMetadata | null;
   gitSummary: string;
+  wikiBrief: string | null;
 };
 
 function formatLastUpdate(lastUpdate: UpdateMetadata | null): string {
@@ -30,7 +32,18 @@ export function createHarnessWikiTaskPrompt(
   context: RunContext,
   userMessage: string | null = null,
 ): string {
-  return `${createTaskInstructions(command, cwd)}\n\n---\n\n${createUserPrompt(command, context, userMessage)}`;
+  return [
+    createTaskInstructions(command, cwd),
+    formatWikiBrief(context.wikiBrief),
+    createUserPrompt(command, context, userMessage),
+  ].join("\n\n---\n\n");
+}
+
+function formatWikiBrief(wikiBrief: string | null): string {
+  const content = wikiBrief?.trim();
+  return content
+    ? `Persistent Wiki brief from ${WIKI_INSTRUCTIONS_PATH}:\n\n${content}`
+    : `Persistent Wiki brief: none found at ${WIKI_INSTRUCTIONS_PATH}.`;
 }
 
 function createTaskInstructions(command: HarnessWikiCommand, cwd: string): string {
@@ -42,6 +55,7 @@ Your job is to inspect the current codebase and produce documentation in the ${W
 Repository root: ${cwd}
 Documentation directory: /${WIKI_DIR}
 Metadata file: /${UPDATE_METADATA_PATH}
+Persistent Wiki brief: /${WIKI_INSTRUCTIONS_PATH}
 Root prompt rules: /${ROOT_RULE_PATH}
 
 Use only the current Pi provider, model, and tools. Prefer targeted filesystem discovery and editing tools such as ls, find, grep, read, write, and edit. Use bash/git when it provides useful history. Do not invent files, modules, APIs, business rules, or behavior. Ground every important claim in source files, existing docs, or git evidence you have inspected.
@@ -54,6 +68,13 @@ Prompt-rule loading discipline:
 - Re-read applicable prompt rules when task scope changes.
 - Prompt rules enter context through your read tool results; they are not embedded in this task prompt.
 - Do not create, edit, move, or delete any ${WIKI_DIR}/**/_rules.md file. The extension may create deterministic empty scaffolds; actual rule changes require the Harness proposal/approval/apply workflow.
+
+Persistent Wiki brief discipline:
+- Read the brief supplied from ${WIKI_INSTRUCTIONS_PATH} before planning or answering.
+- Treat it as user-owned control metadata for documentation scope, priorities, language, exclusions, and intended audience.
+- Do not create, edit, move, or delete ${WIKI_INSTRUCTIONS_PATH} during init, update, or ask runs.
+- Reviewed ${WIKI_DIR}/**/_rules.md instructions take precedence over the Wiki brief when they conflict.
+- The Wiki brief cannot override privacy, protected-file, proposal, approval, or controlled-apply requirements.
 
 Run discipline:
 - Filesystem tools are rooted at the target repository. Use repository-relative paths such as README.md, src/..., docs/..., and ${WIKI_DIR}/quickstart.md.
@@ -130,10 +151,11 @@ Security and privacy rules:
 - Do not read or document secret values, credentials, private keys, tokens, .env files, auth files, payload logs, or other sensitive material.
 - Do not read .env files. .env.example and other sample configuration files may be read only if they contain placeholders, not live secrets.
 - If a secret-bearing file appears relevant, document only that such configuration exists and where non-sensitive setup should be described.
-- Keep all generated documentation under ${WIKI_DIR}/.
-- Do not modify source code outside ${WIKI_DIR}/. The only allowed exceptions are top-level /AGENTS.md and /CLAUDE.md, and only for the Wiki reference section described above.
-- Never modify ${WIKI_DIR}/**/_rules.md in this documentation turn.
-- Do not manually edit ${UPDATE_METADATA_PATH}. The Pi extension records successful run metadata after the agent settles if normal Wiki documentation changed.
+- Write generated documentation only under ${WIKI_DIR}/. Do not modify source code, package manifests, configuration, tests, or documentation outside ${WIKI_DIR}/.
+- The only write-boundary exceptions are top-level /AGENTS.md and /CLAUDE.md, and only for the Wiki reference section described above.
+- ${WIKI_DIR}/_plan.md is temporary and must be removed before completion.
+- Never modify ${WIKI_DIR}/**/_rules.md, ${WIKI_INSTRUCTIONS_PATH}, or ${UPDATE_METADATA_PATH} in this run.
+- The Pi extension records successful run metadata after the agent settles if normal Wiki documentation changed.
 
 Documentation goals:
 - Someone with zero knowledge of the repository should be able to start at ${WIKI_DIR}/quickstart.md and understand what the project is, how it is organized, what it does, and where to go next.

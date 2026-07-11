@@ -9,6 +9,7 @@ Pi Learn is a Pi Coding Agent package and learning repository. It publishes a se
 - **Harness runtime package** in `packages/harness-runtime/`, a private Node runtime used by the Pi harness extension for session reports, proposals, evals, and gated automation.
 - **Vietnamese Pi docs** in `docs/`, indexed by `docs/README.md`.
 - **Harness design notes** in `pi-harness/`, useful when changing the harness runtime or extension.
+- **Persistent Wiki brief** in [`wiki/INSTRUCTIONS.md`](INSTRUCTIONS.md), containing user-owned documentation scope, priorities, language, and exclusions for Harness Wiki runs.
 - **Local/dev-only Pi files** under `.pi/`; do not treat these as public package source. In particular, payload logs may contain sensitive prompts or context and should not be read unless explicitly requested.
 
 Source references: `README.md`, `package.json`, `packages/pi-learn-extensions/package.json`, `packages/harness-runtime/package.json`, `docs/README.md`, `AGENTS.md`.
@@ -33,6 +34,8 @@ Before modifying repository files:
 | Tests, docs, releases and operations | [`wiki/operations/_rules.md`](operations/_rules.md) |
 
 Prompt rules enter model context when the model reads these files. Normal coding and Harness Wiki documentation turns must not modify `_rules.md`; changes go through the Harness proposal, approval, and controlled-apply lifecycle. Critical file protection remains deterministic runtime/extension behavior rather than relying only on prompt compliance.
+
+`wiki/INSTRUCTIONS.md` is separate from reviewed prompt rules: users may edit this optional brief directly to steer documentation scope and priorities, while `_rules.md` and deterministic safety controls continue to take precedence.
 
 ## Install and run
 

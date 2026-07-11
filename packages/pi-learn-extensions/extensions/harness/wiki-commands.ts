@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -8,6 +8,7 @@ import {
   discoverWikiPromptRules,
   ensureWikiPromptRuleScaffolds,
   isWikiDocumentationPath,
+  isWikiInstructionsPath,
   isWikiMetadataPath,
   isWikiRulePath,
   relativeProjectPath,
@@ -21,6 +22,8 @@ const execFileAsync = promisify(execFile);
 // See ./README.md for intentional differences and the upgrade checklist.
 const WIKI_DIR = "wiki";
 const UPDATE_METADATA_PATH = `${WIKI_DIR}/.last-update.json`;
+const WIKI_INSTRUCTIONS_PATH = `${WIKI_DIR}/INSTRUCTIONS.md`;
+const MAX_WIKI_BRIEF_BYTES = 64 * 1024;
 const STATUS_KEY = "harness-wiki";
 
 type HarnessWikiCommand = "init" | "update" | "chat";
@@ -35,6 +38,7 @@ type UpdateMetadata = {
 type RunContext = {
   lastUpdate: UpdateMetadata | null;
   gitSummary: string;
+  wikiBrief: string | null;
 };
 
 type ActiveWikiRun = {
@@ -95,22 +99,23 @@ export function registerHarnessWikiCommands(pi: ExtensionAPI) {
 
   pi.on("tool_call", async (event, ctx) => {
     const toolName = event.toolName;
+    const protectWikiBrief = activeWikiRun?.cwd === ctx.cwd;
     if (toolName === "write" || toolName === "edit") {
       const candidate = (event.input as { path?: unknown })?.path;
-      if (isProtectedWikiMutationPath(ctx.cwd, candidate)) {
+      if (isProtectedWikiMutationPath(ctx.cwd, candidate, protectWikiBrief)) {
         return {
           block: true,
-          reason: "Pi tool turns cannot modify wiki/**/_rules.md or wiki/.last-update.json. Prompt rules require an approved Harness proposal; metadata is extension-owned.",
+          reason: "Pi tool turns cannot modify wiki/**/_rules.md or wiki/.last-update.json. Active Harness Wiki runs also cannot modify the user-owned wiki/INSTRUCTIONS.md brief.",
         };
       }
     }
 
     if (toolName === "bash") {
       const command = String((event.input as { command?: unknown })?.command ?? "");
-      if (commandMutatesProtectedWikiPath(command)) {
+      if (commandMutatesProtectedWikiPath(command, protectWikiBrief)) {
         return {
           block: true,
-          reason: "Harness blocked a shell mutation of prompt-rule or metadata files. Use the proposal/approval/apply lifecycle for wiki/**/_rules.md.",
+          reason: "Harness blocked a shell mutation of protected Wiki rules, metadata, or the active run's user-owned Wiki brief.",
         };
       }
     }
@@ -198,9 +203,29 @@ async function startDocumentationRun(
 }
 
 async function createRunContext(command: HarnessWikiCommand, cwd: string): Promise<RunContext> {
-  const lastUpdate = await readLastUpdate(cwd);
-  if (command === "chat") return { lastUpdate, gitSummary: "Not applicable for chat." };
-  return { lastUpdate, gitSummary: await createGitSummary(command, cwd, lastUpdate) };
+  const [lastUpdate, wikiBrief] = await Promise.all([
+    readLastUpdate(cwd),
+    readWikiBrief(cwd),
+  ]);
+  if (command === "chat") return { lastUpdate, gitSummary: "Not applicable for chat.", wikiBrief };
+  return { lastUpdate, gitSummary: await createGitSummary(command, cwd, lastUpdate), wikiBrief };
+}
+
+async function readWikiBrief(cwd: string): Promise<string | null> {
+  const briefPath = path.join(cwd, WIKI_INSTRUCTIONS_PATH);
+  try {
+    const info = await lstat(briefPath);
+    if (info.isSymbolicLink() || !info.isFile()) {
+      throw new Error(`${WIKI_INSTRUCTIONS_PATH} must be a regular file inside the repository.`);
+    }
+    if (info.size > MAX_WIKI_BRIEF_BYTES) {
+      throw new Error(`${WIKI_INSTRUCTIONS_PATH} exceeds the ${MAX_WIKI_BRIEF_BYTES}-byte limit.`);
+    }
+    return await readFile(briefPath, "utf8");
+  } catch (error) {
+    if (isFileNotFoundError(error)) return null;
+    throw error;
+  }
 }
 
 async function createGitSummary(
@@ -374,16 +399,21 @@ function assertPromptRulesValidForWikiRun(cwd: string) {
   throw new Error(`Harness Wiki cannot run while prompt-rule lint is invalid. Run /harness-wiki-status for details. ${details}`);
 }
 
-function isProtectedWikiMutationPath(cwd: string, value: unknown): boolean {
+function isProtectedWikiMutationPath(cwd: string, value: unknown, protectWikiBrief = false): boolean {
   if (typeof value !== "string") return false;
   const relative = relativeProjectPath(cwd, value);
-  return relative !== undefined && (isWikiRulePath(relative) || isWikiMetadataPath(relative));
+  return relative !== undefined && (
+    isWikiRulePath(relative)
+    || isWikiMetadataPath(relative)
+    || (protectWikiBrief && isWikiInstructionsPath(relative))
+  );
 }
 
-function commandMutatesProtectedWikiPath(command: string): boolean {
+function commandMutatesProtectedWikiPath(command: string, protectWikiBrief = false): boolean {
   const normalized = command.replace(/\\/g, "/");
-  const mentionsProtectedPath = /wiki\/(?:[^\s'";&|>]+\/)*_rules\.md\b|wiki\/\.last-update\.json\b/.test(normalized);
-  if (!mentionsProtectedPath) return false;
+  const mentionsAlwaysProtectedPath = /wiki\/(?:[^\s'";&|>]+\/)*_rules\.md\b|wiki\/\.last-update\.json\b/.test(normalized);
+  const mentionsWikiBrief = protectWikiBrief && /wiki\/INSTRUCTIONS\.md\b/.test(normalized);
+  if (!mentionsAlwaysProtectedPath && !mentionsWikiBrief) return false;
   return /(?:>>?|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\btee\b|\bsed\s+-[^\n]*i|\bperl\s+-[^\n]*i)/i.test(normalized);
 }
 
