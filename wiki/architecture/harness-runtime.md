@@ -94,7 +94,7 @@ Important API functions in `src/api.js`:
 - `propose()` can run the deterministic rule engine or targeted improvement generation for `memory`, `rules`, `parser`, or `redaction`.
 - `target=rules` now means reviewed Markdown prompt guidance in `wiki/**/_rules.md`; deterministic detector behavior/default changes target runtime analysis source and tests.
 
-The Pi extension command `/harness-improve` bridges runtime and current Pi model by reading the generated reflection prompt and sending a follow-up user message that instructs the model to call `harness_import_llm_reflection`. The former `/harness-reflect-pi` name remains a deprecated compatibility alias.
+The Pi extension command `/harness-improve` bridges runtime and current Pi model by reading the generated reflection prompt and sending a follow-up user message that instructs the model to call `harness_import_llm_reflection`.
 
 ## Proposal lifecycle and controlled apply
 

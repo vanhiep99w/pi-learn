@@ -50,8 +50,6 @@ Recommended commands include:
 /harness-wiki-status
 ```
 
-`/harness-reflect-pi [last]` remains a deprecated compatibility alias for `/harness-improve [last]`.
-
 The old `/wiki-*` commands and separate `extensions/wiki/` entrypoint are removed. Harness Wiki uses reviewed `wiki/**/_rules.md` prompt rules that the model loads lazily through `AGENTS.md` and `wiki/quickstart.md`.
 
 It also registers the `harness_import_llm_reflection` tool, which is intended for model use after `/harness-improve` queues a reflection prompt. The tool imports JSON proposals into private harness drafts.

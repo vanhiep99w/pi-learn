@@ -61,8 +61,6 @@ Most functions accept the same option shape:
 /harness-wiki-status
 ```
 
-`/harness-reflect-pi [last]` remains a deprecated compatibility alias for `/harness-improve [last]`.
-
 Harness Wiki is registered from the same public `harness/index.ts` entrypoint. The legacy `/wiki-*` commands and `extensions/wiki/` entrypoint are removed.
 
 ## Prompt rules

@@ -127,7 +127,6 @@ Mặc định các command dùng **5 session gần nhất**. Có thể truyền 
 Ghi chú `/harness-improve`:
 
 - Chỉ dùng normalized evidence, không đọc raw session logs.
-- `/harness-reflect-pi` vẫn là alias deprecated để tương thích; workflow mới nên dùng `/harness-improve`.
 - Prompt có target routing guide để chọn đúng `memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`.
 - Tool `harness_import_llm_reflection` chỉ dành cho model gọi tự động sau command này; người dùng thường không cần gọi tay.
 

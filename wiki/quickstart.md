@@ -107,8 +107,6 @@ Common package commands documented by the READMEs and extension sources include:
 /aurora-themes
 ```
 
-`/harness-reflect-pi [last]` remains a deprecated compatibility alias for `/harness-improve [last]`.
-
 The READMEs are the best command reference for users; the source files are the source of truth for exact behavior.
 
 ## How the repo is organized

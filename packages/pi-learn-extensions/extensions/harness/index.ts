@@ -154,14 +154,6 @@ export default function harnessExtension(pi: ExtensionAPI) {
     handler: harnessImproveHandler,
   });
 
-  pi.registerCommand("harness-reflect-pi", {
-    description: "Deprecated alias for /harness-improve [last]",
-    handler: async (args, ctx) => {
-      notifyOrLog(ctx, "/harness-reflect-pi is deprecated; use /harness-improve instead.", "warning");
-      await harnessImproveHandler(args, ctx);
-    },
-  });
-
   pi.registerCommand("harness-proposals", {
     description: "List and preview draft Harness proposals",
     handler: async (_args, ctx) => withHarnessErrors(ctx, async () => {

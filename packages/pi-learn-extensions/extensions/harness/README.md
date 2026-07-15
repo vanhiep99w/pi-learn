@@ -21,8 +21,6 @@ wiki-prompt.ts    # Pi-native documentation task prompt
 /harness-mark success|failure|note [text]
 ```
 
-`/harness-reflect-pi [last]` remains available as a deprecated compatibility alias for `/harness-improve [last]`.
-
 ## Harness Wiki commands
 
 ```txt
