@@ -80,7 +80,7 @@ Harness is designed to avoid raw-log exposure in normal workflows:
 - The runtime README states that reflection prompts are built from normalized redacted cache excerpts, not raw JSONL.
 - `src/safety/redaction.js` redacts common API keys/tokens, bearer headers, sensitive assignments, long opaque tokens, sensitive object keys, and sensitive paths such as `.env`, Pi auth stores, Pi sessions, and `.pi/logs/llm-payloads/`.
 - `writeSessionCache()` records redaction-enabled metadata and writes normalized artifacts to harness home.
-- The Pi extension tells `/harness-reflect-pi` to use only normalized evidence and to call `harness_import_llm_reflection` with JSON proposals instead of responding in prose.
+- The Pi extension tells `/harness-improve` to use only normalized evidence and to call `harness_import_llm_reflection` with JSON proposals instead of responding in prose.
 
 Future changes should preserve these boundaries. Do not read raw session logs, auth files, or payload logs unless the user explicitly asks and the task requires it.
 
@@ -94,7 +94,7 @@ Important API functions in `src/api.js`:
 - `propose()` can run the deterministic rule engine or targeted improvement generation for `memory`, `rules`, `parser`, or `redaction`.
 - `target=rules` now means reviewed Markdown prompt guidance in `wiki/**/_rules.md`; deterministic detector behavior/default changes target runtime analysis source and tests.
 
-The Pi extension command `/harness-reflect-pi` bridges runtime and current Pi model by reading the generated reflection prompt and sending a follow-up user message that instructs the model to call `harness_import_llm_reflection`.
+The Pi extension command `/harness-improve` bridges runtime and current Pi model by reading the generated reflection prompt and sending a follow-up user message that instructs the model to call `harness_import_llm_reflection`. The former `/harness-reflect-pi` name remains a deprecated compatibility alias.
 
 ## Proposal lifecycle and controlled apply
 

@@ -602,7 +602,7 @@ Detect clear patterns without LLM and create proposal Markdown.
 
 ```txt
 Runtime API: propose({ rules: true }) or propose({ target: "rules" })
-Pi UX: /harness-reflect-pi → /harness-proposals
+Pi UX: /harness-improve → /harness-proposals
 ```
 
 ### Initial rules
@@ -720,7 +720,7 @@ Không implement business logic riêng trong extension. Extension gọi core run
 ```txt
 /harness-status [last]
 /harness-report [last]
-/harness-reflect-pi [last]
+/harness-improve [last]
 /harness-proposals
 /harness-approve P-0001
 /harness-apply P-0001
@@ -736,7 +736,7 @@ Không implement business logic riêng trong extension. Extension gọi core run
 - [x] Guard UI calls with `ctx.hasUI` / `ctx.ui?.`.
 - [x] `/harness-report` calls runtime report.
 - [x] `/harness-status` consolidates sessions, warnings, and automation state.
-- [x] `/harness-reflect-pi` uses the current Pi model and normalized evidence.
+- [x] `/harness-improve` uses the current Pi model and normalized evidence.
 - [x] `/harness-proposals` lists draft proposals.
 - [x] `/harness-mark` records note/success/failure session entries.
 - [x] `/harness-wiki-*` provides repository documentation and prompt-rule status from the same entrypoint.
@@ -787,7 +787,7 @@ Pi:
 - [x] Add explicit target routing guide to reflection prompt (`memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`).
 - [x] Enrich selected evidence with `likelyTargets` and `targetGuidance` before sending to LLM.
 - [x] Save reflection prompt under private harness home.
-- [x] Pi extension path using the current Pi session model via `/harness-reflect-pi` + `harness_import_llm_reflection` tool.
+- [x] Pi extension path using the current Pi session model via `/harness-improve` + `harness_import_llm_reflection` tool.
 - [x] Runtime stays API-key free; no separate LLM provider credentials in harness runtime.
 - [x] Import LLM JSON response as draft proposals.
 - [x] Validate imported proposals include evidence refs, target files, risk, test plan and rollback.
@@ -1042,7 +1042,7 @@ Do not enter next phase unless gate passes.
 Immediate recommended next steps:
 
 ```txt
-1. Live-test `/harness-reflect-pi` on `prasac` and verify targets match target files.
+1. Live-test `/harness-improve` on `prasac` and verify targets match target files.
 2. Live-test `/harness-automation-status` and `/harness-automate` inside Pi after `/reload`.
 3. Decide whether Phase 12 should be dashboard/status UI or richer automation scheduling.
 4. Keep automation opt-in and proposal-first; do not add silent auto-apply or auto-push.

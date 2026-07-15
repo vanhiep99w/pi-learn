@@ -227,7 +227,8 @@ function tsExtensionSafetyChecks({ project }) {
   return [
     check("harness extension exists", exists, extensionPath),
     check("extension delegates to runtime API", source.includes("runHarness") && source.includes("RUNTIME_API")),
-    check("extension exposes Pi-session reflection", source.includes("harness-reflect-pi") && source.includes("pi.sendUserMessage")),
+    check("extension exposes Harness improvement review", source.includes('registerCommand("harness-improve"') && source.includes("pi.sendUserMessage")),
+    check("extension keeps deprecated reflection alias", source.includes('registerCommand("harness-reflect-pi"')),
     check("UI operations are guarded", source.includes("ctx.hasUI") && source.includes("ctx.ui?.")),
   ];
 }

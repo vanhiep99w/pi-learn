@@ -972,7 +972,7 @@ LLM reflection không được tự đoán target chỉ từ tên target trong J
 
 ### 19.1 Target routing guide trong prompt
 
-Prompt `/harness-reflect-pi` nên hướng dẫn model chọn target theo nguyên tắc **least risky target that fits the evidence**:
+Prompt `/harness-improve` nên hướng dẫn model chọn target theo nguyên tắc **least risky target that fits the evidence**:
 
 | Target | Khi chọn | Không chọn khi |
 |---|---|---|

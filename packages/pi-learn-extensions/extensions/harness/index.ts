@@ -20,8 +20,8 @@ export default function harnessExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "harness_import_llm_reflection",
     label: "Harness Import Reflection",
-    description: "Import a Pi-session LLM reflection JSON response into private Harness draft proposals. Use only after /harness-reflect-pi asks you to create evidence-backed proposals.",
-    promptSnippet: "Call `harness_import_llm_reflection` with the final JSON reflection proposals when asked by /harness-reflect-pi.",
+    description: "Import a Pi-session LLM reflection JSON response into private Harness draft proposals. Use only after /harness-improve asks you to create evidence-backed proposals.",
+    promptSnippet: "Call `harness_import_llm_reflection` with the final JSON reflection proposals when asked by /harness-improve.",
     promptGuidelines: [
       "Use harness_import_llm_reflection only for Pi Harness reflection proposals requested by the user or extension.",
       "The proposals must include evidence refs, targetFiles, risk, testPlan, and rollbackPlan.",
@@ -125,31 +125,41 @@ export default function harnessExtension(pi: ExtensionAPI) {
     }),
   });
 
-  pi.registerCommand("harness-reflect-pi", {
-    description: "Use the current Pi session model to create Harness reflection proposals. Usage: /harness-reflect-pi [last]",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const last = firstArg(args) ?? DEFAULT_LAST;
-      const run = await runHarness(ctx, ["reflect", "--project", ctx.cwd, "--last", last, "--json"]);
-      const output = parseJson(run.stdout);
-      const promptPath = output?.reflection?.latestPath;
-      if (!promptPath) return notifyOrLog(ctx, "Harness reflect did not return latestPath.", "warning");
-      const prompt = await readFile(promptPath, "utf8");
-      const userMessage = [
-        "Review the Harness reflection prompt below using only its normalized evidence.",
-        "Do not read raw session logs or other files.",
-        "Call `harness_import_llm_reflection` with `{ \"proposals\": [...] }`; if no strong evidence-backed proposals exist, call it with `{ \"proposals\": [] }`.",
-        "Do not reply with chat prose.",
-        "",
-        prompt,
-      ].join("\n");
+  const harnessImproveHandler = async (args: string | undefined, ctx: ExtensionCommandContext) => withHarnessErrors(ctx, async () => {
+    const last = firstArg(args) ?? DEFAULT_LAST;
+    const run = await runHarness(ctx, ["reflect", "--project", ctx.cwd, "--last", last, "--json"]);
+    const output = parseJson(run.stdout);
+    const promptPath = output?.reflection?.latestPath;
+    if (!promptPath) return notifyOrLog(ctx, "Harness improve did not return latestPath.", "warning");
+    const prompt = await readFile(promptPath, "utf8");
+    const userMessage = [
+      "Review the Harness improvement prompt below using only its normalized evidence.",
+      "Do not read raw session logs. Read no other files except an exact normalizedRef line explicitly allowed by the improvement prompt.",
+      "Call `harness_import_llm_reflection` with `{ \"proposals\": [...] }`; if no strong evidence-backed proposals exist, call it with `{ \"proposals\": [] }`.",
+      "Do not reply with chat prose.",
+      "",
+      prompt,
+    ].join("\n");
 
-      if (ctx.isIdle()) {
-        pi.sendUserMessage(userMessage);
-      } else {
-        pi.sendUserMessage(userMessage, { deliverAs: "followUp" });
-      }
-      notifyOrLog(ctx, `Queued Harness reflection on current Pi model from: ${promptPath}`, "info");
-    }),
+    if (ctx.isIdle()) {
+      pi.sendUserMessage(userMessage);
+    } else {
+      pi.sendUserMessage(userMessage, { deliverAs: "followUp" });
+    }
+    notifyOrLog(ctx, `Queued Harness improvement review on current Pi model from: ${promptPath}`, "info");
+  });
+
+  pi.registerCommand("harness-improve", {
+    description: "Use the current Pi session model to create Harness improvement proposals. Usage: /harness-improve [last]",
+    handler: harnessImproveHandler,
+  });
+
+  pi.registerCommand("harness-reflect-pi", {
+    description: "Deprecated alias for /harness-improve [last]",
+    handler: async (args, ctx) => {
+      notifyOrLog(ctx, "/harness-reflect-pi is deprecated; use /harness-improve instead.", "warning");
+      await harnessImproveHandler(args, ctx);
+    },
   });
 
   pi.registerCommand("harness-proposals", {
@@ -159,7 +169,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
       const output = parseJson(run.stdout);
       const proposals = output?.proposals ?? [];
       if (!proposals.length) {
-        notifyOrLog(ctx, "No draft Harness proposals found. Run /harness-reflect-pi first.", "info");
+        notifyOrLog(ctx, "No draft Harness proposals found. Run /harness-improve first.", "info");
         return;
       }
 
@@ -252,7 +262,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui?.notify("🧪 Harness: /harness-status, /harness-report, /harness-reflect-pi, /harness-wiki-status", "info");
+    ctx.ui?.notify("🧪 Harness: /harness-status, /harness-report, /harness-improve, /harness-wiki-status", "info");
   });
 }
 

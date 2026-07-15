@@ -45,7 +45,7 @@ Nếu thấy quá nhiều command, dùng theo thứ tự này:
 
 ```txt
 1. /harness-report          Xem report session gần đây của project.
-2. /harness-reflect-pi      Nhờ model hiện tại tạo improvement proposals.
+2. /harness-improve         Nhờ model hiện tại tạo improvement proposals.
 3. /harness-proposals       Xem proposal đã tạo.
 4. /harness-approve P-0001  Approve proposal muốn apply.
 5. /harness-apply P-0001    Apply proposal đã approve, nếu proposal có patch.
@@ -108,7 +108,7 @@ Mặc định các command dùng **5 session gần nhất**. Có thể truyền 
 ```txt
 /harness-status 10
 /harness-report 10
-/harness-reflect-pi 10
+/harness-improve 10
 ```
 
 ### Command chính khuyến nghị
@@ -117,16 +117,17 @@ Mặc định các command dùng **5 session gần nhất**. Có thể truyền 
 |---|---|---|
 | `/harness-status [last]` | Trạng thái tổng hợp: session gần đây, warning summary, automation state. | `/harness-status` hoặc `/harness-status 10` |
 | `/harness-report [last]` | Scan session gần đây, tạo và preview report Markdown. | `/harness-report` hoặc `/harness-report 10` |
-| `/harness-reflect-pi [last]` | Gửi reflection prompt vào model hiện tại; model phải gọi tool import để tạo draft proposals. | Cách chính để tạo proposal bằng LLM. |
-| `/harness-proposals` | List + preview draft proposals. | Sau `/harness-reflect-pi`. |
+| `/harness-improve [last]` | Gửi reflection prompt vào model hiện tại; model phải gọi tool import để tạo draft proposals. | Cách chính để tạo proposal bằng LLM. |
+| `/harness-proposals` | List + preview draft proposals. | Sau `/harness-improve`. |
 | `/harness-approve P-0001` | Đánh dấu proposal là approved. | `/harness-approve P-0001` |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu proposal có JSON Patch machine-readable. | `/harness-apply P-0001` |
 | `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite hoặc scenario/proposal cụ thể. | `/harness-eval`, `/harness-eval redaction-fixture` |
 | `/harness-mark success\|failure\|note [text]` | Mark current session bằng success/failure hoặc ghi note riêng. | `/harness-mark success fixed Redis config` |
 
-Ghi chú `/harness-reflect-pi`:
+Ghi chú `/harness-improve`:
 
 - Chỉ dùng normalized evidence, không đọc raw session logs.
+- `/harness-reflect-pi` vẫn là alias deprecated để tương thích; workflow mới nên dùng `/harness-improve`.
 - Prompt có target routing guide để chọn đúng `memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`.
 - Tool `harness_import_llm_reflection` chỉ dành cho model gọi tự động sau command này; người dùng thường không cần gọi tay.
 

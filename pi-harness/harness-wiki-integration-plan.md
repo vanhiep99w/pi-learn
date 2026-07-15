@@ -156,7 +156,7 @@ Harness extension hiện đăng ký:
 ```txt
 /harness-status
 /harness-report
-/harness-reflect-pi
+/harness-improve
 /harness-proposals
 /harness-approve
 /harness-apply
@@ -301,7 +301,7 @@ sẽ được xóa. Nội dung provenance/upgrade có giá trị phải được
 ```txt
 /harness-status [last]
 /harness-report [last]
-/harness-reflect-pi [last]
+/harness-improve [last]
 /harness-proposals
 /harness-approve P-0001
 /harness-apply P-0001

@@ -37,7 +37,7 @@ Recommended commands include:
 ```txt
 /harness-status [last]
 /harness-report [last]
-/harness-reflect-pi [last]
+/harness-improve [last]
 /harness-proposals
 /harness-approve P-0001
 /harness-apply P-0001
@@ -50,9 +50,11 @@ Recommended commands include:
 /harness-wiki-status
 ```
 
+`/harness-reflect-pi [last]` remains a deprecated compatibility alias for `/harness-improve [last]`.
+
 The old `/wiki-*` commands and separate `extensions/wiki/` entrypoint are removed. Harness Wiki uses reviewed `wiki/**/_rules.md` prompt rules that the model loads lazily through `AGENTS.md` and `wiki/quickstart.md`.
 
-It also registers the `harness_import_llm_reflection` tool, which is intended for model use after `/harness-reflect-pi` queues a reflection prompt. The tool imports JSON proposals into private harness drafts.
+It also registers the `harness_import_llm_reflection` tool, which is intended for model use after `/harness-improve` queues a reflection prompt. The tool imports JSON proposals into private harness drafts.
 
 See [Harness runtime](../architecture/harness-runtime.md) for the data flow/safety model and [Harness Wiki capability](wiki-extension.md) for documentation, prompt-rule loading, metadata, and no-op behavior.
 

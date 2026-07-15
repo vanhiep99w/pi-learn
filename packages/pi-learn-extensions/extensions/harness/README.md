@@ -13,13 +13,15 @@ wiki-prompt.ts    # Pi-native documentation task prompt
 ```txt
 /harness-status [last]
 /harness-report [last]
-/harness-reflect-pi [last]
+/harness-improve [last]
 /harness-proposals
 /harness-approve P-0001
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note [text]
 ```
+
+`/harness-reflect-pi [last]` remains available as a deprecated compatibility alias for `/harness-improve [last]`.
 
 ## Harness Wiki commands
 

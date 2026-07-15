@@ -48,7 +48,7 @@ Most functions accept the same option shape:
 ```txt
 /harness-status [last]
 /harness-report [last]
-/harness-reflect-pi [last]
+/harness-improve [last]
 /harness-proposals
 /harness-approve P-0001
 /harness-apply P-0001
@@ -60,6 +60,8 @@ Most functions accept the same option shape:
 /harness-wiki-ask <question>
 /harness-wiki-status
 ```
+
+`/harness-reflect-pi [last]` remains a deprecated compatibility alias for `/harness-improve [last]`.
 
 Harness Wiki is registered from the same public `harness/index.ts` entrypoint. The legacy `/wiki-*` commands and `extensions/wiki/` entrypoint are removed.
 
@@ -87,7 +89,7 @@ Deterministic detectors/defaults remain in `src/analysis/rules.js`. `src/analysi
 - Successful tool results are compact in reflection prompts: output bodies are omitted while status, timing when derivable, output size, and a `normalizedRef` locator are retained. Failed tool results keep a bounded redacted excerpt.
 - A reflection model may use an available file-reading tool to inspect exactly one referenced line in normalized `events.jsonl` when compact evidence is insufficient. It must verify the referenced `eventId` and must never follow `sessionFile`, `rawRef`, or paths under `~/.pi/agent/sessions/`.
 - Assistant thinking blocks are omitted from normalized message excerpts; final assistant text and thinking-level change metadata remain available.
-- Runtime does not keep a separate LLM API key; `/harness-reflect-pi` uses the current Pi session model.
+- Runtime does not keep a separate LLM API key; `/harness-improve` uses the current Pi session model.
 - LLM reflection responses can be imported as draft proposals only if they include evidence refs, target files, risk, test plan and rollback plan.
 - Proposal approve/reject/history only updates private proposal files under `~/.pi/harness`.
 - `apply` requires an approved proposal plus a machine-applicable `## Patch` JSON block, checks git, creates `harness/P-0001`, and only edits files listed in the proposal target list.

@@ -829,7 +829,7 @@ LLM phải tuân thủ:
 
 ### Target routing trong LLM reflection
 
-Prompt `/harness-reflect-pi` phải giải thích ngắn khi nào chọn từng target:
+Prompt `/harness-improve` phải giải thích ngắn khi nào chọn từng target:
 
 ```txt
 memory    = fact/preference/decision ổn định cần nhớ
