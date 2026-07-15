@@ -38,6 +38,7 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
   for (const result of sessionResults ?? []) {
     const events = readJsonlSafe(result.paths?.events);
     const warnings = result.warnings ?? readJsonlSafe(result.paths?.warnings);
+    const toolCallTimestamps = indexToolCallTimestamps(events);
 
     for (const warning of warnings) {
       const reason = `parser_warning:${warning.code ?? "unknown"}`;
@@ -45,7 +46,6 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
         score: 95,
         source: "warning",
         sessionId: warning.sessionId ?? result.sessionId,
-        sessionFile: warning.sessionFile ?? result.sessionFile,
         entryId: warning.entryId,
         timestamp: warning.timestamp,
         kind: warning.code ?? "warning",
@@ -58,19 +58,25 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
     for (const event of events) {
       if (!event.activePath) continue;
       const reasons = scoreEvent(event);
+      const excerpt = firstNonEmpty(event.excerpt, event.summary, event.bash?.errorLines?.join(" | "));
+      const successfulToolResult = event.kind === "tool_result" && !event.tool?.isError;
       for (const reason of reasons) {
         candidates.push({
           score: reason.score,
           source: "event",
           sessionId: event.sessionId ?? result.sessionId,
-          sessionFile: event.sessionFile ?? result.sessionFile,
           entryId: event.entryId,
           timestamp: event.timestamp,
           kind: event.kind,
           reason: reason.reason,
           tool: event.tool?.name,
-          excerpt: firstNonEmpty(event.excerpt, event.summary, event.bash?.errorLines?.join(" | ")),
-          ...targetHintsForEvidence({ reason: reason.reason, kind: event.kind, toolName: event.tool?.name, excerpt: firstNonEmpty(event.excerpt, event.summary, event.bash?.errorLines?.join(" | ")) }),
+          toolStatus: event.kind === "tool_result" ? (event.tool?.isError ? "error" : "success") : undefined,
+          durationMs: toolDurationMs(event, toolCallTimestamps),
+          outputChars: event.kind === "tool_result" ? event.contentStats?.chars : undefined,
+          outputTruncated: event.kind === "tool_result" ? Boolean(event.contentStats?.truncated) : undefined,
+          normalizedRef: event.kind === "tool_result" ? normalizedEventRef(result.paths?.events, event) : undefined,
+          ...(successfulToolResult ? {} : { excerpt }),
+          ...targetHintsForEvidence({ reason: reason.reason, kind: event.kind, toolName: event.tool?.name, excerpt }),
         });
       }
     }
@@ -106,6 +112,15 @@ export function renderReflectionPrompt({ project, generatedAt = new Date(), evid
   lines.push(`- Do not quote more than ${maxExcerptChars} chars from any one evidence item.`);
   lines.push("- Weak/noisy ideas should be omitted, not padded.");
   lines.push("- Never propose automatic apply/push.");
+  lines.push("");
+  lines.push("## Optional normalized evidence lookup");
+  lines.push("Some compact evidence items include `normalizedRef` with `path`, `lineNumber`, and `eventId`.");
+  lines.push("- If a potentially strong proposal cannot be evaluated from the compact evidence, you may use an available file-reading tool to read exactly the referenced line from `normalizedRef.path`.");
+  lines.push("- Read at most one referenced normalized line at a time and verify that its `eventId` matches `normalizedRef.eventId`.");
+  lines.push("- Read only normalized cache entries. Never read or follow `sessionFile`, `rawRef`, or any path under `~/.pi/agent/sessions/`.");
+  lines.push("- Do not reconstruct raw Pi JSONL entries. Treat normalized entries as sensitive even though they are redacted.");
+  lines.push(`- Do not quote more than ${maxExcerptChars} chars from a looked-up normalized entry.`);
+  lines.push("- If the normalized evidence remains insufficient, omit the proposal.");
   lines.push("");
   lines.push("## Required output");
   lines.push("Return JSON only, matching this shape:");
@@ -342,8 +357,35 @@ function scoreEvent(event) {
 
 function sanitizeEvidence(item, maxExcerptChars) {
   const redacted = redactValue(item).value;
+  if (!Object.hasOwn(redacted, "excerpt")) return redacted;
   const truncated = truncateString(String(redacted.excerpt ?? ""), maxExcerptChars).value;
   return { ...redacted, excerpt: truncated };
+}
+
+function indexToolCallTimestamps(events) {
+  const timestamps = new Map();
+  for (const event of events) {
+    if (event.kind !== "assistant_tool_call" || !event.tool?.callId || !event.timestamp) continue;
+    timestamps.set(event.tool.callId, event.timestamp);
+  }
+  return timestamps;
+}
+
+function toolDurationMs(event, toolCallTimestamps) {
+  if (event.kind !== "tool_result" || !event.tool?.callId || !event.timestamp) return undefined;
+  const startedAt = Date.parse(toolCallTimestamps.get(event.tool.callId));
+  const finishedAt = Date.parse(event.timestamp);
+  if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt < startedAt) return undefined;
+  return finishedAt - startedAt;
+}
+
+function normalizedEventRef(eventsPath, event) {
+  if (!eventsPath || !event.eventId || !event.__cacheLineNumber) return undefined;
+  return {
+    path: eventsPath,
+    lineNumber: event.__cacheLineNumber,
+    eventId: event.eventId,
+  };
 }
 
 function summarizeMetrics(sessionResults) {
@@ -376,10 +418,13 @@ function summarizeMetrics(sessionResults) {
 
 function readJsonlSafe(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return [];
-  return fs.readFileSync(filePath, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
+  const items = [];
+  const lines = fs.readFileSync(filePath, "utf8").split("\n");
+  for (const [index, line] of lines.entries()) {
+    if (!line.trim()) continue;
+    items.push({ ...JSON.parse(line), __cacheLineNumber: index + 1 });
+  }
+  return items;
 }
 
 function looksLikeCorrection(text) {

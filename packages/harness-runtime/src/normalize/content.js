@@ -10,7 +10,7 @@ export function contentToText(content) {
   for (const block of content) {
     if (!block || typeof block !== "object") continue;
     if (block.type === "text") parts.push(block.text ?? "");
-    else if (block.type === "thinking") parts.push("<thinking>");
+    else if (block.type === "thinking") continue;
     else if (block.type === "image") parts.push(`<image ${block.mimeType ?? "unknown"}>`);
     else if (block.type === "toolCall") parts.push(`<toolCall ${block.name ?? "unknown"}>`);
     else parts.push(`<${block.type ?? "unknown"}>`);

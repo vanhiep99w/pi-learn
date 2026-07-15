@@ -84,6 +84,9 @@ Deterministic detectors/defaults remain in `src/analysis/rules.js`. `src/analysi
 - Harness runtime logs are written under `~/.pi/harness/logs/` by default.
 - Does not modify raw Pi session files.
 - `reflect` builds LLM prompts only from normalized redacted cache excerpts, never raw session JSONL.
+- Successful tool results are compact in reflection prompts: output bodies are omitted while status, timing when derivable, output size, and a `normalizedRef` locator are retained. Failed tool results keep a bounded redacted excerpt.
+- A reflection model may use an available file-reading tool to inspect exactly one referenced line in normalized `events.jsonl` when compact evidence is insufficient. It must verify the referenced `eventId` and must never follow `sessionFile`, `rawRef`, or paths under `~/.pi/agent/sessions/`.
+- Assistant thinking blocks are omitted from normalized message excerpts; final assistant text and thinking-level change metadata remain available.
 - Runtime does not keep a separate LLM API key; `/harness-reflect-pi` uses the current Pi session model.
 - LLM reflection responses can be imported as draft proposals only if they include evidence refs, target files, risk, test plan and rollback plan.
 - Proposal approve/reject/history only updates private proposal files under `~/.pi/harness`.

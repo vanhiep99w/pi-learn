@@ -31,6 +31,90 @@ test("selectReflectionEvidence uses normalized redacted events and truncates exc
   assert.equal(evidence[0].excerpt.length <= 160, true);
 });
 
+test("selectReflectionEvidence compacts successful tool results and links their normalized cache line", () => {
+  const fixture = createFixture();
+  const session = writeCachedSession(fixture, {
+    sessionId: "s1",
+    events: [
+      {
+        eventId: "call-event",
+        entryId: "call-entry",
+        kind: "assistant_tool_call",
+        timestamp: "2026-06-14T00:00:00.000Z",
+        tool: { name: "mcp", callId: "call-1" },
+        activePath: true,
+      },
+      {
+        eventId: "result-event",
+        entryId: "result-entry",
+        kind: "tool_result",
+        timestamp: "2026-06-14T00:00:01.250Z",
+        excerpt: "large successful result that should stay out of the reflection prompt",
+        contentStats: { chars: 18340, truncated: true },
+        tool: { name: "mcp", callId: "call-1", isError: false },
+        safety: { redacted: true, sensitivePath: false, secretDetected: true },
+        activePath: true,
+      },
+    ],
+  });
+
+  const evidence = selectReflectionEvidence({ sessionResults: [session] });
+
+  assert.equal(evidence.length, 1);
+  assert.equal(evidence[0].reason, "safety_sensitive");
+  assert.equal(evidence[0].toolStatus, "success");
+  assert.equal(evidence[0].durationMs, 1250);
+  assert.equal(evidence[0].outputChars, 18340);
+  assert.equal(evidence[0].outputTruncated, true);
+  assert.equal(Object.hasOwn(evidence[0], "excerpt"), false);
+  assert.deepEqual(evidence[0].normalizedRef, {
+    path: session.paths.events,
+    lineNumber: 2,
+    eventId: "result-event",
+  });
+  assert.equal(Object.hasOwn(evidence[0], "sessionFile"), false);
+});
+
+test("selectReflectionEvidence keeps failed tool excerpts with an on-demand normalized reference", () => {
+  const fixture = createFixture();
+  const session = writeCachedSession(fixture, {
+    sessionId: "s1",
+    events: [
+      {
+        eventId: "call-event",
+        entryId: "call-entry",
+        kind: "assistant_tool_call",
+        timestamp: "2026-06-14T00:00:00.000Z",
+        tool: { name: "bash", callId: "call-1" },
+        activePath: true,
+      },
+      {
+        eventId: "result-event",
+        entryId: "result-entry",
+        kind: "tool_result",
+        timestamp: "2026-06-14T00:00:00.500Z",
+        excerpt: "command failed with exit code 1",
+        contentStats: { chars: 31, truncated: false },
+        tool: { name: "bash", callId: "call-1", isError: true },
+        activePath: true,
+      },
+    ],
+  });
+
+  const evidence = selectReflectionEvidence({ sessionResults: [session] });
+
+  assert.equal(evidence.length, 1);
+  assert.equal(evidence[0].reason, "tool_error:bash");
+  assert.equal(evidence[0].toolStatus, "error");
+  assert.equal(evidence[0].durationMs, 500);
+  assert.equal(evidence[0].excerpt, "command failed with exit code 1");
+  assert.deepEqual(evidence[0].normalizedRef, {
+    path: session.paths.events,
+    lineNumber: 2,
+    eventId: "result-event",
+  });
+});
+
 test("selectReflectionEvidence caps one reason so safety evidence does not dominate", () => {
   const fixture = createFixture();
   const events = [];
@@ -79,6 +163,9 @@ test("buildReflection renders safety rules, schema, metrics and evidence refs", 
   const reflection = buildReflection({ project: fixture.project, sessionResults: [session], generatedAt: new Date("2026-06-14T00:00:00.000Z") });
 
   assert.match(reflection.prompt, /Use only the normalized evidence/);
+  assert.match(reflection.prompt, /## Optional normalized evidence lookup/);
+  assert.match(reflection.prompt, /read exactly the referenced line/);
+  assert.match(reflection.prompt, /Never read or follow `sessionFile`, `rawRef`/);
   assert.match(reflection.prompt, /Return JSON only/);
   assert.match(reflection.prompt, /targetFiles/);
   assert.match(reflection.prompt, /rollbackPlan/);
