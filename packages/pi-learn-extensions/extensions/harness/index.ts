@@ -344,12 +344,16 @@ async function selectModalItem(
     return chosen ? options.items[labels.indexOf(chosen)]?.value : undefined;
   }
 
-  return ctx.ui.custom<string | undefined>((tui, theme, _keybindings, done) => {
+  return ctx.ui.custom<string | undefined>((tui, theme, keybindings, done) => {
     const panel = new Box(2, 1, (text: string) => theme.bg("customMessageBg", text));
     panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
     panel.addChild(new Text(theme.fg("customMessageLabel", theme.bold("HARNESS  /  PROPOSAL REVIEW")), 0, 0));
     panel.addChild(new Text(theme.fg("accent", theme.bold(options.title)), 0, 0));
-    const detailText = new ScrollableText(theme.fg("customMessageText", options.body), 10);
+    const detailText = new ScrollableText(
+      theme.fg("customMessageText", options.body),
+      9,
+      (text: string) => theme.fg("dim", text),
+    );
     panel.addChild(detailText);
 
     const list = new SelectList(options.items, Math.min(options.items.length, 8), {
@@ -364,15 +368,17 @@ async function selectModalItem(
     list.onSelect = (item) => done(item.value);
     list.onCancel = () => done(undefined);
     panel.addChild(list);
-    panel.addChild(new Text(theme.fg("dim", "PgUp/PgDn cuộn chi tiết    ↑↓ chọn action    Enter xác nhận    Esc đóng"), 0, 1));
+    panel.addChild(new Text(theme.fg("dim", "PgUp/PgDn hoặc Ctrl+U/D cuộn chi tiết    ↑↓ chọn action    Enter xác nhận    Esc đóng"), 0, 1));
     panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
 
     return {
       render: (width: number) => panel.render(width),
       invalidate: () => panel.invalidate(),
       handleInput: (data: string) => {
-        if (matchesKey(data, Key.pageUp)) detailText.scroll(-8);
-        else if (matchesKey(data, Key.pageDown)) detailText.scroll(8);
+        const pageUp = keybindings.matches(data, "tui.select.pageUp") || matchesKey(data, Key.ctrl("u"));
+        const pageDown = keybindings.matches(data, "tui.select.pageDown") || matchesKey(data, Key.ctrl("d")) || matchesKey(data, Key.space);
+        if (pageUp) detailText.scroll(-7);
+        else if (pageDown) detailText.scroll(7);
         else list.handleInput(data);
         tui.requestRender();
       },
@@ -391,18 +397,24 @@ async function selectModalItem(
 class ScrollableText {
   private readonly text: Text;
   private readonly maxVisibleLines: number;
+  private readonly statusFn: (text: string) => string;
   private offset = 0;
 
-  constructor(value: string, maxVisibleLines: number) {
+  constructor(value: string, maxVisibleLines: number, statusFn: (text: string) => string) {
     this.text = new Text(value, 0, 0);
     this.maxVisibleLines = maxVisibleLines;
+    this.statusFn = statusFn;
   }
 
   render(width: number): string[] {
     const lines = this.text.render(width);
     const maxOffset = Math.max(0, lines.length - this.maxVisibleLines);
     this.offset = Math.min(this.offset, maxOffset);
-    return lines.slice(this.offset, this.offset + this.maxVisibleLines);
+    const visible = lines.slice(this.offset, this.offset + this.maxVisibleLines);
+    const status = lines.length > this.maxVisibleLines
+      ? `↕ Chi tiết ${this.offset + 1}-${Math.min(this.offset + this.maxVisibleLines, lines.length)}/${lines.length}`
+      : "";
+    return [...visible, this.statusFn(status)];
   }
 
   scroll(delta: number) {
