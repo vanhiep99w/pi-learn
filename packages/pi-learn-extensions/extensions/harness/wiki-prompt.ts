@@ -143,7 +143,6 @@ Pi-native wiki command reference:
 - /harness-wiki-init [message] initializes wiki documentation for the current repository.
 - /harness-wiki-update [message] updates existing wiki documentation for the current repository.
 - /harness-wiki-ask <question> asks a question with wiki/repository context.
-- /harness-wiki-status reports docs, git, metadata, and no-op update status.
 
 If the user asks what Harness Wiki can do, answer from the command reference above and mention that it uses the current Pi provider/model/tools rather than the upstream OpenWiki CLI runtime.
 

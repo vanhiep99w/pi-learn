@@ -56,7 +56,6 @@ Most functions accept the same option shape:
 /harness-wiki-init [extra instructions]
 /harness-wiki-update [extra instructions]
 /harness-wiki-ask <question>
-/harness-wiki-status
 ```
 
 `/harness [last]` is the single interactive observability command in TUI mode: it combines status and the generated Markdown report in one scrollable dashboard modal. `/harness-proposals` is the single interactive review command in TUI mode: it opens the proposal picker and provides detail, approve, reject, and approve-and-apply actions with confirmation. Proposals with a JSON Patch expose `Approve & Apply`; already approved proposals expose `Apply`. Approve/reject/apply remain runtime operations used internally or by the dedicated apply command. In print and JSON modes, `/harness-proposals` only prints the proposal list.

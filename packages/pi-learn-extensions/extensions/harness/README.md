@@ -27,7 +27,6 @@ Trong TUI, `/harness [last]` mở một dashboard modal duy nhất gồm status,
 /harness-wiki-init [extra instructions]
 /harness-wiki-update [extra instructions]
 /harness-wiki-ask <question>
-/harness-wiki-status
 ```
 
 The old `/wiki-*` commands are intentionally removed without compatibility aliases.

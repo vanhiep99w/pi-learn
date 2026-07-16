@@ -132,7 +132,6 @@ Commands:
 /harness-wiki-init [ghi chú thêm]
 /harness-wiki-update [ghi chú thêm]
 /harness-wiki-ask <câu hỏi>
-/harness-wiki-status
 ```
 
 Ví dụ:

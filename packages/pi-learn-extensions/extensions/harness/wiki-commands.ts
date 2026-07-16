@@ -89,14 +89,6 @@ export function registerHarnessWikiCommands(pi: ExtensionAPI) {
     }),
   });
 
-  pi.registerCommand("harness-wiki-status", {
-    description: "Show Harness Wiki docs, update, and prompt-rule health",
-    handler: async (_args, ctx) => runWikiCommand(ctx, async () => {
-      const status = await createStatusReport(ctx.cwd);
-      await showText(ctx, "Harness Wiki status", status);
-    }),
-  });
-
   pi.on("tool_call", async (event, ctx) => {
     const toolName = event.toolName;
     const protectWikiBrief = activeWikiRun?.cwd === ctx.cwd;
@@ -358,45 +350,11 @@ async function addDocumentationToSnapshot(
   hash.update("\0");
 }
 
-async function createStatusReport(cwd: string): Promise<string> {
-  const lastUpdate = await readLastUpdate(cwd);
-  const head = await getGitHead(cwd);
-  const promptRules = discoverWikiPromptRules({ projectRoot: cwd });
-  const snapshot = await createWikiDocumentationSnapshot(cwd);
-  const noop = await getUpdateNoopStatus(cwd);
-  const ruleCount = promptRules.ruleIds.length;
-
-  const lines = [
-    "Harness Wiki status",
-    `- cwd: ${cwd}`,
-    `- docs: ${promptRules.wikiExists ? `/${WIKI_DIR} exists` : `/${WIKI_DIR} missing`}`,
-    `- git head: ${head ?? "unavailable"}`,
-    `- docs snapshot: ${snapshot}`,
-    `- last update: ${lastUpdate ? JSON.stringify(lastUpdate) : "none"}`,
-    `- update no-op: ${noop.shouldSkip ? "yes" : `no (${noop.reason})`}`,
-    `- prompt rule files: ${promptRules.files.length}`,
-    `- prompt rule IDs: ${ruleCount}`,
-    `- sections missing rules: ${promptRules.missingRuleSections.length}`,
-    `- prompt rule lint: ${promptRules.valid ? "valid" : "invalid"}`,
-    "",
-    "Rule files",
-    ...(promptRules.files.length ? promptRules.files.map((file) => `- ${file}`) : ["- none"]),
-  ];
-
-  if (promptRules.errors.length) {
-    lines.push("", "Errors", ...promptRules.errors.map((item) => `- ${item.path}: ${item.message}`));
-  }
-  if (promptRules.warnings.length) {
-    lines.push("", "Warnings", ...promptRules.warnings.map((item) => `- ${item.path}: ${item.message}`));
-  }
-  return lines.join("\n");
-}
-
 function assertPromptRulesValidForWikiRun(cwd: string) {
   const report = discoverWikiPromptRules({ projectRoot: cwd });
   if (report.valid) return;
   const details = report.errors.slice(0, 5).map((item) => `${item.path}: ${item.message}`).join("; ");
-  throw new Error(`Harness Wiki cannot run while prompt-rule lint is invalid. Run /harness-wiki-status for details. ${details}`);
+  throw new Error(`Harness Wiki cannot run while prompt-rule lint is invalid. Fix wiki/**/_rules.md first. ${details}`);
 }
 
 function isProtectedWikiMutationPath(cwd: string, value: unknown, protectWikiBrief = false): boolean {
@@ -452,11 +410,6 @@ async function runWikiCommand(ctx: ExtensionCommandContext, fn: () => Promise<vo
   } catch (error) {
     notifyOrLog(ctx, `Harness Wiki error: ${formatError(error)}`, "error");
   }
-}
-
-async function showText(ctx: ExtensionCommandContext, title: string, text: string) {
-  if (ctx.hasUI && ctx.ui?.editor) await ctx.ui.editor(title, text);
-  else console.log(text);
 }
 
 function notifyOrLog(

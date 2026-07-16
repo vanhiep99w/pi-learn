@@ -282,9 +282,10 @@ function wikiPromptRuleLazyLoadingChecks({ project }) {
 function harnessWikiCommandSurfaceChecks({ project }) {
   const source = readProjectFile(project, "packages/pi-learn-extensions/extensions/harness/wiki-commands.ts");
   const oldWikiEntrypoint = path.join(project.projectRoot, "packages", "pi-learn-extensions", "extensions", "wiki", "index.ts");
-  const expected = ["harness-wiki-init", "harness-wiki-update", "harness-wiki-ask", "harness-wiki-status"];
+  const expected = ["harness-wiki-init", "harness-wiki-update", "harness-wiki-ask"];
   return [
     check("all Harness Wiki commands are registered", expected.every((command) => source.includes(`registerCommand(\"${command}\"`))),
+    check("legacy Wiki status command is not registered", !source.includes(`registerCommand("harness-wiki-status"`)),
     check("legacy Wiki commands are not registered", !/registerCommand\("wiki-(?:init|update|ask|status)"/.test(source)),
     check("legacy Wiki extension entrypoint is removed", !fs.existsSync(oldWikiEntrypoint), oldWikiEntrypoint),
   ];

@@ -103,7 +103,6 @@ Harness Wiki commands:
 /harness-wiki-init
 /harness-wiki-update
 /harness-wiki-ask
-/harness-wiki-status
 ```
 
 Reviewed prompt rules nằm trong `wiki/**/_rules.md`. Model lazy-load theo `AGENTS.md` → `wiki/quickstart.md` → root/section rules; extension không auto-inject toàn bộ rules. Normal Wiki turns không được sửa `_rules.md`.

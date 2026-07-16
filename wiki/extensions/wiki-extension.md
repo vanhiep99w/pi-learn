@@ -18,17 +18,15 @@ packages/harness-runtime/src/analysis/wiki-prompt-rules.js
 /harness-wiki-init [extra instructions]
 /harness-wiki-update [extra instructions]
 /harness-wiki-ask <question>
-/harness-wiki-status
 ```
 
-The old `/wiki-*` commands are intentionally absent; there are no deprecated or hidden aliases.
+The old `/wiki-*` commands and `/harness-wiki-status` are intentionally absent; there are no deprecated or hidden aliases.
 
 ## Command behavior
 
 - `/harness-wiki-init` creates missing deterministic prompt-rule scaffolds, then starts an initial documentation run with the current Pi model/tools.
 - `/harness-wiki-update` inspects existing docs, metadata, git history, and worktree changes. Without extra instructions it skips when only already-accounted-for documentation/metadata changes exist.
 - `/harness-wiki-ask` asks a repository/Wiki question without modifying docs by default.
-- `/harness-wiki-status` reports docs snapshot, metadata/no-op status, prompt-rule files, missing section scaffolds, rule IDs, and lint errors/warnings.
 
 The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt. When present, the user-owned `wiki/INSTRUCTIONS.md` brief is also included in init/update/ask prompts.
 
@@ -152,7 +150,6 @@ Then reload Pi and verify:
 
 ```txt
 /reload
-/harness-wiki-status
 /harness-wiki-ask Prompt rules được load vào context thế nào?
 /harness-wiki-update
 ```

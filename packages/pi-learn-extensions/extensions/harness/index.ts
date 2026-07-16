@@ -220,7 +220,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui?.notify("🧪 Harness: /harness, /harness-improve, /harness-proposals, /harness-wiki-status", "info");
+    ctx.ui?.notify("🧪 Harness: /harness, /harness-improve, /harness-proposals, /harness-wiki-ask", "info");
   });
 }
 

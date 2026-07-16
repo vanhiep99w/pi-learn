@@ -15,7 +15,7 @@ The primary UX is the Pi extension in `packages/pi-learn-extensions/extensions/h
 }
 ```
 
-The harness extension imports the runtime API by resolving `../../../harness-runtime/src/api.js` and exposes observability/proposal commands plus `/harness-wiki-init`, `/harness-wiki-update`, `/harness-wiki-ask`, and `/harness-wiki-status`. The old `/wiki-*` commands are not registered. This matches the runtime README: the standalone CLI/bin is no longer the primary interface.
+The harness extension imports the runtime API by resolving `../../../harness-runtime/src/api.js` and exposes observability/proposal commands plus `/harness-wiki-init`, `/harness-wiki-update`, and `/harness-wiki-ask`. The old `/wiki-*` commands and `/harness-wiki-status` are not registered. This matches the runtime README: the standalone CLI/bin is no longer the primary interface.
 
 ## Data flow
 

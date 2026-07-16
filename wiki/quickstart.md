@@ -85,7 +85,6 @@ Common package commands documented by the READMEs and extension sources include:
 /harness-wiki-init [note]
 /harness-wiki-update [note]
 /harness-wiki-ask <question>
-/harness-wiki-status
 
 /harness [last]
 /harness-improve [last]

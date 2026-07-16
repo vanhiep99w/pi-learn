@@ -134,7 +134,6 @@ Harness Wiki nằm trong cùng `harness/` entrypoint:
 /harness-wiki-init [ghi chú]
 /harness-wiki-update [ghi chú]
 /harness-wiki-ask <câu hỏi>
-/harness-wiki-status
 ```
 
 - Không còn `/wiki-*` aliases hoặc `extensions/wiki/` entrypoint.
