@@ -49,7 +49,7 @@ Recommended commands include:
 /harness-wiki-status
 ```
 
-Trong TUI, `/harness-proposals` là workflow review duy nhất: modal cho chọn proposal, xem tóm tắt, mở Markdown đầy đủ, quay lại danh sách và xác nhận approve, reject hoặc approve & apply. Proposal có JSON Patch sẽ hiện `Approve & Apply`; proposal đã approved sẽ hiện `Apply`. Approve/reject/apply vẫn là runtime operations được modal hoặc apply command gọi, không còn approve/reject slash commands riêng. Print/JSON mode chỉ in danh sách proposal.
+Trong TUI, `/harness-proposals` là workflow review duy nhất: chọn proposal sẽ mở ngay màn hình chi tiết cùng các action approve, reject hoặc approve & apply; không còn action xem chi tiết riêng. Proposal có JSON Patch sẽ hiện `Approve & Apply`; proposal đã approved sẽ hiện `Apply`. Approve/reject/apply vẫn là runtime operations được modal hoặc apply command gọi, không còn approve/reject slash commands riêng. Print/JSON mode chỉ in danh sách proposal.
 
 The old `/wiki-*` commands and separate `extensions/wiki/` entrypoint are removed. Harness Wiki uses reviewed `wiki/**/_rules.md` prompt rules that the model loads lazily through `AGENTS.md` and `wiki/quickstart.md`.
 

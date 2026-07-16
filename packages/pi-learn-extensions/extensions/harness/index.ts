@@ -25,7 +25,7 @@ type HarnessProposal = {
   filePath?: string;
 };
 
-type ProposalAction = "details" | "approve" | "apply" | "reject" | "back";
+type ProposalAction = "approve" | "apply" | "reject" | "back";
 
 export default function harnessExtension(pi: ExtensionAPI) {
   registerHarnessWikiCommands(pi);
@@ -257,13 +257,6 @@ async function reviewHarnessProposals(ctx: ExtensionCommandContext) {
       continue;
     }
 
-    if (action === "details") {
-      if (ctx.ui?.editor) {
-        await ctx.ui.editor(`📋 ${proposal.id}: ${proposal.title} (preview only)`, markdown || "Proposal details are unavailable.");
-      }
-      continue;
-    }
-
     if (action === "apply") {
       const confirmed = await confirmProposalApply(ctx, proposal, markdown);
       if (!confirmed) continue;
@@ -304,13 +297,7 @@ async function selectProposalAction(
   proposal: HarnessProposal,
   markdown: string,
 ): Promise<ProposalAction | undefined> {
-  const items: SelectItem[] = [
-    {
-      value: "details",
-      label: "▣ Mở Markdown đầy đủ",
-      description: "Mở viewer/editor có thể scroll để đọc toàn bộ nội dung; thay đổi sẽ không được lưu.",
-    },
-  ];
+  const items: SelectItem[] = [];
   if (proposal.status !== "applied") {
     items.push({
       value: "approve",
@@ -341,7 +328,7 @@ async function selectProposalAction(
     title: `${proposal.id} — ${proposal.title}`,
     body: formatProposalPreview(proposal, markdown),
     items,
-    selectedValue: "details",
+    selectedValue: proposal.status === "applied" ? "back" : "approve",
   });
   return selected as ProposalAction | undefined;
 }
@@ -392,8 +379,8 @@ async function selectModalItem(
     overlayOptions: {
       anchor: "center",
       width: 92,
-      maxHeight: "85%",
-      margin: 2,
+      maxHeight: "95%",
+      margin: 1,
     },
   });
 }
@@ -462,8 +449,8 @@ async function applyHarnessProposal(ctx: ExtensionCommandContext, id: string, fl
 }
 
 function formatProposalPreview(proposal: HarnessProposal, markdown: string) {
-  const problem = compactMarkdownSection(markdown, "Problem", 520) || "Không có mô tả.";
-  const proposedChange = compactMarkdownSection(markdown, "Proposed change", 520) || "Không có mô tả.";
+  const problem = compactMarkdownSection(markdown, "Problem", 1200) || "Không có mô tả.";
+  const proposedChange = compactMarkdownSection(markdown, "Proposed change", 1200) || "Không có mô tả.";
   const targetFiles = compactMarkdownSection(markdown, "Target files") || "TBD";
   return [
     `STATUS  ${(proposal.status ?? "draft").toUpperCase()}    TARGET  ${(proposal.target ?? "unknown").toUpperCase()}    RISK  ${(proposal.risk ?? "unknown").toUpperCase()}    EVIDENCE  ${proposal.evidenceCount ?? "?"}`,
