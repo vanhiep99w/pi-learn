@@ -307,8 +307,8 @@ async function selectProposalAction(
   const items: SelectItem[] = [
     {
       value: "details",
-      label: "▣ Xem toàn bộ chi tiết",
-      description: "Mở Markdown đầy đủ; mọi chỉnh sửa trong preview sẽ không được lưu.",
+      label: "▣ Mở Markdown đầy đủ",
+      description: "Mở viewer/editor có thể scroll để đọc toàn bộ nội dung; thay đổi sẽ không được lưu.",
     },
   ];
   if (proposal.status !== "applied") {
@@ -462,8 +462,8 @@ async function applyHarnessProposal(ctx: ExtensionCommandContext, id: string, fl
 }
 
 function formatProposalPreview(proposal: HarnessProposal, markdown: string) {
-  const problem = compactMarkdownSection(markdown, "Problem") || "Không có mô tả.";
-  const proposedChange = compactMarkdownSection(markdown, "Proposed change") || "Không có mô tả.";
+  const problem = compactMarkdownSection(markdown, "Problem", 520) || "Không có mô tả.";
+  const proposedChange = compactMarkdownSection(markdown, "Proposed change", 520) || "Không có mô tả.";
   const targetFiles = compactMarkdownSection(markdown, "Target files") || "TBD";
   return [
     `STATUS  ${(proposal.status ?? "draft").toUpperCase()}    TARGET  ${(proposal.target ?? "unknown").toUpperCase()}    RISK  ${(proposal.risk ?? "unknown").toUpperCase()}    EVIDENCE  ${proposal.evidenceCount ?? "?"}`,
