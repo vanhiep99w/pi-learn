@@ -50,7 +50,8 @@ Most functions accept the same option shape:
 /harness-report [last]
 /harness-improve [last]
 /harness-proposals
-/harness-approve P-0001
+/harness-approve [P-0001]
+/harness-reject [P-0001]
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note <text>
@@ -60,6 +61,8 @@ Most functions accept the same option shape:
 /harness-wiki-ask <question>
 /harness-wiki-status
 ```
+
+The proposal commands use a shared interactive review modal in TUI mode. `/harness-proposals` opens the proposal picker; approve/reject may omit the ID in TUI mode and preselect the matching action. Print and JSON modes still require an ID for approve/reject.
 
 Harness Wiki is registered from the same public `harness/index.ts` entrypoint. The legacy `/wiki-*` commands and `extensions/wiki/` entrypoint are removed.
 

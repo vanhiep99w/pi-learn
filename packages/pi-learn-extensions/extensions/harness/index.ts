@@ -2,7 +2,8 @@ import { readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import { registerHarnessWikiCommands } from "./wiki-commands.js";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
@@ -13,6 +14,18 @@ type HarnessRun = {
   stdout: string;
   stderr: string;
 };
+
+type HarnessProposal = {
+  id: string;
+  title: string;
+  status?: string;
+  target?: string;
+  risk?: string;
+  evidenceCount?: number;
+  filePath?: string;
+};
+
+type ProposalAction = "details" | "approve" | "reject" | "back";
 
 export default function harnessExtension(pi: ExtensionAPI) {
   registerHarnessWikiCommands(pi);
@@ -155,40 +168,35 @@ export default function harnessExtension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("harness-proposals", {
-    description: "List and preview draft Harness proposals",
+    description: "Review Harness proposals in an interactive approve/reject modal",
     handler: async (_args, ctx) => withHarnessErrors(ctx, async () => {
-      const run = await runHarness(ctx, ["proposals", "--project", ctx.cwd, "--json"]);
-      const output = parseJson(run.stdout);
-      const proposals = output?.proposals ?? [];
-      if (!proposals.length) {
-        notifyOrLog(ctx, "No draft Harness proposals found. Run /harness-improve first.", "info");
-        return;
-      }
-
-      if (ctx.hasUI && ctx.ui?.select) {
-        const labels = proposals.map((p: any) => `${p.id} [${p.target}/${p.risk}] ${p.title}`);
-        const chosen = await ctx.ui.select("📋 Draft Harness proposals", labels);
-        if (!chosen) return;
-        const proposal = proposals[labels.indexOf(chosen)];
-        if (proposal?.filePath) {
-          const markdown = await readFile(proposal.filePath, "utf8");
-          await ctx.ui.editor(`📋 ${proposal.id}: ${proposal.title}`, markdown);
-        }
-        return;
-      }
-
-      console.log(proposals.map((p: any) => `${p.id} [${p.target}/${p.risk}] ${p.title}\n  ${p.filePath}`).join("\n"));
+      await reviewHarnessProposals(ctx);
     }),
   });
 
   pi.registerCommand("harness-approve", {
-    description: "Approve a Harness proposal. Usage: /harness-approve P-0001",
+    description: "Review and approve a Harness proposal. Usage: /harness-approve [P-0001]",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const id = firstArg(args);
-      if (!id) return notifyOrLog(ctx, "Usage: /harness-approve P-0001", "warning");
-      const run = await runHarness(ctx, ["approve", id, "--project", ctx.cwd, "--json"]);
-      const output = parseJson(run.stdout);
-      notifyOrLog(ctx, `Harness proposal ${output?.proposal?.id ?? id}: ${output?.proposal?.status ?? "approved"}`, "info");
+      const id = normalizeProposalId(firstArg(args));
+      if (!ctx.hasUI) {
+        if (!id) return notifyOrLog(ctx, "Usage: /harness-approve P-0001", "warning");
+        await transitionHarnessProposal(ctx, id, "approve");
+        return;
+      }
+      await reviewHarnessProposals(ctx, { preferredId: id, initialAction: "approve" });
+    }),
+  });
+
+  pi.registerCommand("harness-reject", {
+    description: "Review and reject a Harness proposal. Usage: /harness-reject [P-0001]",
+    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
+      const id = normalizeProposalId(firstArg(args));
+      if (!ctx.hasUI) {
+        if (!id) return notifyOrLog(ctx, "Usage: /harness-reject P-0001", "warning");
+        await transitionHarnessProposal(ctx, id, "reject");
+        return;
+      }
+      await reviewHarnessProposals(ctx, { preferredId: id, initialAction: "reject" });
     }),
   });
 
@@ -226,7 +234,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
       }
       let text = parts.slice(1).join(" ");
       if (kind === "note" && !text.trim() && ctx.hasUI && ctx.ui?.editor) {
-        text = await ctx.ui.editor("📝 Harness note", "");
+        text = (await ctx.ui.editor("📝 Harness note", "")) ?? "";
       }
       const leafId = ctx.sessionManager?.getLeafId?.();
       if (leafId && (kind === "success" || kind === "failure")) {
@@ -256,6 +264,224 @@ export default function harnessExtension(pi: ExtensionAPI) {
     if (!ctx.hasUI) return;
     ctx.ui?.notify("🧪 Harness: /harness-status, /harness-report, /harness-improve, /harness-wiki-status", "info");
   });
+}
+
+async function reviewHarnessProposals(
+  ctx: ExtensionCommandContext,
+  options: { preferredId?: string; initialAction?: "approve" | "reject" } = {},
+) {
+  const run = await runHarness(ctx, ["proposals", "--project", ctx.cwd, "--json"]);
+  const output = parseJson(run.stdout);
+  const proposals = (output?.proposals ?? []) as HarnessProposal[];
+  if (!proposals.length) {
+    notifyOrLog(ctx, "No Harness proposals found. Run /harness-improve first.", "info");
+    return;
+  }
+
+  if (!ctx.hasUI) {
+    printProposalList(proposals);
+    return;
+  }
+
+  let proposal = options.preferredId
+    ? proposals.find((item) => item.id.toUpperCase() === options.preferredId)
+    : await selectHarnessProposal(ctx, proposals);
+  if (options.preferredId && !proposal) {
+    throw new Error(`Proposal not found: ${options.preferredId}`);
+  }
+
+  while (proposal) {
+    const markdown = proposal.filePath ? await readFile(proposal.filePath, "utf8") : "";
+    const action = await selectProposalAction(ctx, proposal, markdown, options.initialAction);
+    if (!action) return;
+
+    if (action === "back") {
+      proposal = await selectHarnessProposal(ctx, proposals);
+      continue;
+    }
+
+    if (action === "details") {
+      if (ctx.ui?.editor) {
+        await ctx.ui.editor(`📋 ${proposal.id}: ${proposal.title} (preview only)`, markdown || "Proposal details are unavailable.");
+      }
+      continue;
+    }
+
+    const confirmed = await confirmProposalTransition(ctx, proposal, action);
+    if (!confirmed) continue;
+    await transitionHarnessProposal(ctx, proposal.id, action);
+    return;
+  }
+}
+
+async function selectHarnessProposal(ctx: ExtensionCommandContext, proposals: HarnessProposal[]) {
+  const items: SelectItem[] = proposals.map((proposal) => ({
+    value: proposal.id,
+    label: `${proposal.id}  ${proposal.title}`,
+    description: `${proposal.status ?? "draft"} • target: ${proposal.target ?? "unknown"} • risk: ${proposal.risk ?? "unknown"}`,
+  }));
+  const selected = await selectModalItem(ctx, {
+    title: "📋 Chọn Harness proposal",
+    body: `${proposals.length} proposal • Chọn một proposal để xem chi tiết và quyết định approve/reject.`,
+    items,
+  });
+  return proposals.find((proposal) => proposal.id === selected);
+}
+
+async function selectProposalAction(
+  ctx: ExtensionCommandContext,
+  proposal: HarnessProposal,
+  markdown: string,
+  initialAction?: "approve" | "reject",
+): Promise<ProposalAction | undefined> {
+  const items: SelectItem[] = [
+    {
+      value: "details",
+      label: "▣ Xem toàn bộ chi tiết",
+      description: "Mở Markdown đầy đủ; mọi chỉnh sửa trong preview sẽ không được lưu.",
+    },
+    {
+      value: "approve",
+      label: "✓ Approve proposal",
+      description: "Đánh dấu approved để proposal có thể được apply.",
+    },
+    {
+      value: "reject",
+      label: "✕ Reject proposal",
+      description: "Đánh dấu rejected; vẫn có thể review và approve lại sau.",
+    },
+    {
+      value: "back",
+      label: "← Chọn proposal khác",
+      description: "Quay lại danh sách proposal.",
+    },
+  ];
+  const selected = await selectModalItem(ctx, {
+    title: `${proposal.id} — ${proposal.title}`,
+    body: formatProposalPreview(proposal, markdown),
+    items,
+    selectedValue: initialAction ?? "details",
+  });
+  return selected as ProposalAction | undefined;
+}
+
+async function selectModalItem(
+  ctx: ExtensionCommandContext,
+  options: { title: string; body: string; items: SelectItem[]; selectedValue?: string },
+): Promise<string | undefined> {
+  if (ctx.mode !== "tui") {
+    if (!ctx.hasUI || !ctx.ui?.select) return undefined;
+    const labels = options.items.map((item) => `${item.label} — ${item.description ?? ""}`);
+    const chosen = await ctx.ui.select(options.title, labels);
+    return chosen ? options.items[labels.indexOf(chosen)]?.value : undefined;
+  }
+
+  return ctx.ui.custom<string | undefined>((tui, theme, _keybindings, done) => {
+    const container = new Container();
+    container.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
+    container.addChild(new Text(theme.fg("accent", theme.bold(options.title)), 1, 0));
+    container.addChild(new Text(theme.fg("muted", options.body), 1, 1));
+
+    const list = new SelectList(options.items, Math.min(options.items.length, 10), {
+      selectedPrefix: (text) => theme.fg("accent", text),
+      selectedText: (text) => theme.fg("accent", theme.bold(text)),
+      description: (text) => theme.fg("muted", text),
+      scrollInfo: (text) => theme.fg("dim", text),
+      noMatch: (text) => theme.fg("warning", text),
+    });
+    const selectedIndex = options.items.findIndex((item) => item.value === options.selectedValue);
+    if (selectedIndex >= 0) list.setSelectedIndex(selectedIndex);
+    list.onSelect = (item) => done(item.value);
+    list.onCancel = () => done(undefined);
+    container.addChild(list);
+    container.addChild(new Text(theme.fg("dim", "↑↓ di chuyển • Enter chọn • Esc đóng"), 1, 0));
+    container.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
+
+    return {
+      render: (width: number) => container.render(width),
+      invalidate: () => container.invalidate(),
+      handleInput: (data: string) => {
+        list.handleInput(data);
+        tui.requestRender();
+      },
+    };
+  }, {
+    overlay: true,
+    overlayOptions: {
+      anchor: "center",
+      width: "80%",
+      minWidth: 56,
+      maxHeight: "80%",
+      margin: 1,
+    },
+  });
+}
+
+async function confirmProposalTransition(
+  ctx: ExtensionCommandContext,
+  proposal: HarnessProposal,
+  action: "approve" | "reject",
+) {
+  if (!ctx.hasUI || !ctx.ui?.confirm) return true;
+  const isApprove = action === "approve";
+  return ctx.ui.confirm(
+    isApprove ? "✓ Approve Harness proposal" : "✕ Reject Harness proposal",
+    isApprove
+      ? `Approve ${proposal.id}? Sau đó bạn có thể chạy /harness-apply ${proposal.id}.`
+      : `Reject ${proposal.id}? Proposal sẽ không thể apply cho đến khi được approve lại.`,
+  );
+}
+
+async function transitionHarnessProposal(
+  ctx: ExtensionCommandContext,
+  id: string,
+  action: "approve" | "reject",
+) {
+  const run = await runHarness(ctx, [action, id, "--project", ctx.cwd, "--json"]);
+  const output = parseJson(run.stdout);
+  const status = output?.proposal?.status ?? (action === "approve" ? "approved" : "rejected");
+  notifyOrLog(ctx, `Harness proposal ${output?.proposal?.id ?? id}: ${status}`, action === "approve" ? "info" : "warning");
+}
+
+function formatProposalPreview(proposal: HarnessProposal, markdown: string) {
+  const problem = compactMarkdownSection(markdown, "Problem") || "Không có mô tả.";
+  const proposedChange = compactMarkdownSection(markdown, "Proposed change") || "Không có mô tả.";
+  const targetFiles = compactMarkdownSection(markdown, "Target files") || "TBD";
+  return [
+    `Trạng thái: ${proposal.status ?? "draft"}  •  Target: ${proposal.target ?? "unknown"}  •  Risk: ${proposal.risk ?? "unknown"}`,
+    `Evidence: ${proposal.evidenceCount ?? "unknown"}`,
+    "",
+    `Vấn đề: ${problem}`,
+    "",
+    `Thay đổi đề xuất: ${proposedChange}`,
+    "",
+    `Target files: ${targetFiles}`,
+  ].join("\n");
+}
+
+function compactMarkdownSection(markdown: string, heading: string, maxLength = 240) {
+  const marker = new RegExp(`^## ${heading}\\s*$`, "m");
+  const match = marker.exec(markdown);
+  if (!match) return "";
+  const sectionStart = match.index + match[0].length;
+  const remaining = markdown.slice(sectionStart).replace(/^\r?\n/, "");
+  const nextHeading = remaining.search(/^## /m);
+  const section = (nextHeading >= 0 ? remaining.slice(0, nextHeading) : remaining)
+    .replace(/^[-*]\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return section.length > maxLength ? `${section.slice(0, maxLength - 1).trimEnd()}…` : section;
+}
+
+function printProposalList(proposals: HarnessProposal[]) {
+  console.log(proposals.map((proposal) => [
+    `${proposal.id} [${proposal.status ?? "draft"}/${proposal.target ?? "unknown"}/${proposal.risk ?? "unknown"}] ${proposal.title}`,
+    proposal.filePath ? `  ${proposal.filePath}` : undefined,
+  ].filter(Boolean).join("\n")).join("\n"));
+}
+
+function normalizeProposalId(value: string | undefined) {
+  return value?.toUpperCase();
 }
 
 async function withHarnessErrors(ctx: ExtensionCommandContext, fn: () => Promise<void>) {

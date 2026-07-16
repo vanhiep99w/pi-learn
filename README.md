@@ -262,9 +262,10 @@ Mặc định các lệnh dùng **5 session gần nhất**; có thể truyền s
 /harness-status          # xem trạng thái tổng hợp, session gần đây, warnings, automation
 /harness-report          # xem report session gần đây
 /harness-improve         # dùng model hiện tại tạo draft improvement proposals
-/harness-proposals       # xem proposal đã tạo
-/harness-approve P-0001  # approve proposal muốn apply
-/harness-apply P-0001    # apply nếu proposal có patch machine-readable
+/harness-proposals       # mở modal review: xem chi tiết, approve hoặc reject
+/harness-approve          # mở modal với action approve được chọn sẵn
+/harness-reject           # mở modal với action reject được chọn sẵn
+/harness-apply P-0001     # apply nếu proposal có patch machine-readable
 ```
 
 ### Danh sách command chính
@@ -274,8 +275,9 @@ Mặc định các lệnh dùng **5 session gần nhất**; có thể truyền s
 | `/harness-status [last]` | Hiển thị session gần đây, warning summary và trạng thái automation. |
 | `/harness-report [last]` | Scan session gần đây và preview report Markdown. |
 | `/harness-improve [last]` | Gửi prompt vào model hiện tại; model gọi `harness_import_llm_reflection` để tạo draft proposals. |
-| `/harness-proposals` | List + preview draft proposals. |
-| `/harness-approve P-0001` | Approve proposal. |
+| `/harness-proposals` | Mở modal chọn proposal, xem tóm tắt/Markdown đầy đủ, approve hoặc reject. |
+| `/harness-approve [P-0001]` | Mở modal review với approve được chọn sẵn; ID tùy chọn trong TUI. |
+| `/harness-reject [P-0001]` | Mở modal review với reject được chọn sẵn; ID tùy chọn trong TUI. |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu có JSON Patch. Không auto-push. |
 | `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite/scenario/proposal check. |
 | `/harness-mark success\|failure\|note [text]` | Ghi note hoặc tag outcome cho current session leaf. |

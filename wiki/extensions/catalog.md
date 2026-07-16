@@ -39,7 +39,8 @@ Recommended commands include:
 /harness-report [last]
 /harness-improve [last]
 /harness-proposals
-/harness-approve P-0001
+/harness-approve [P-0001]
+/harness-reject [P-0001]
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note [text]
@@ -49,6 +50,8 @@ Recommended commands include:
 /harness-wiki-ask <question>
 /harness-wiki-status
 ```
+
+Trong TUI, ba command review proposal dùng chung một modal: `/harness-proposals` mở danh sách, còn `/harness-approve [P-0001]` và `/harness-reject [P-0001]` mở cùng workflow với action tương ứng được chọn sẵn. Modal cho xem tóm tắt, mở Markdown đầy đủ, quay lại danh sách và xác nhận trước khi đổi trạng thái. Print/JSON mode vẫn yêu cầu proposal ID cho approve/reject.
 
 The old `/wiki-*` commands and separate `extensions/wiki/` entrypoint are removed. Harness Wiki uses reviewed `wiki/**/_rules.md` prompt rules that the model loads lazily through `AGENTS.md` and `wiki/quickstart.md`.
 
