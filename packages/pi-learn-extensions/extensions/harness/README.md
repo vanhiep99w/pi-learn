@@ -41,6 +41,7 @@ The old `/wiki-*` commands are intentionally removed without compatibility alias
 - Creates deterministic empty `_rules.md` scaffolds for root/final sections when missing.
 - Blocks Pi tool turns from modifying `_rules.md` or `.last-update.json` through write/edit and common shell mutation paths; active Wiki runs also protect `wiki/INSTRUCTIONS.md`.
 - Excludes `INSTRUCTIONS.md`, `_rules.md`, `.last-update.json`, `_plan.md`, hidden files, and temporary files from the documentation snapshot.
+- Tracks substantial areas deferred by the initial page budget in a concise `## Backlog` at the end of `wiki/quickstart.md`; update runs preserve or resolve entries using repository evidence.
 - Treats prompt-rule, Wiki brief, source, and configuration changes as meaningful repository changes for update/no-op decisions.
 
 ## Persistent Wiki brief
@@ -71,7 +72,9 @@ repository: langchain-ai/openwiki
 commit: 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
 short:  23428de fix: use dash-delimited Anthropic model id for Opus (claude-opus-4-8) (#113)
 date checked locally: 2026-07-06
-latest prompt review: fa9a9b519d65ea6a31b5d063ba5d97edb1fca0f0 (OpenWiki 0.1.1, 2026-07-11)
+latest upstream check: e1a2fea77048f342c6317c457b3dca6efe5ec209 (2026-07-15)
+latest prompt review: e1a2fea77048f342c6317c457b3dca6efe5ec209 (after OpenWiki 0.1.2, 2026-07-15)
+latest prompt behavior ported: 2fb44a876db8cca461ad1c0767931d95495763a3 (documentation coverage backlog)
 ```
 
 Kept/adapted:
@@ -79,7 +82,7 @@ Kept/adapted:
 - Wiki init/update/chat concepts.
 - `wiki/` output and `.last-update.json` metadata.
 - Git evidence collection and no-op update behavior.
-- Documentation quality, planning, privacy, and update discipline.
+- Documentation quality, planning, privacy, update discipline, and deferred-area backlog tracking.
 - User-owned persistent Wiki brief adapted from OpenWiki `openwiki/INSTRUCTIONS.md`.
 
 Intentionally different:

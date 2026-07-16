@@ -32,6 +32,16 @@ The old `/wiki-*` commands are intentionally absent; there are no deprecated or 
 
 The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt. When present, the user-owned `wiki/INSTRUCTIONS.md` brief is also included in init/update/ask prompts.
 
+## Documentation coverage backlog
+
+Init and update runs perform a coverage self-check so a substantial repository area is not silently lost because of the initial page budget. An area discovered but not documented is recorded in a concise `## Backlog` section at the end of `wiki/quickstart.md` with:
+
+- The area name.
+- A repository-relative source anchor.
+- A one-line reason for deferral.
+
+Update runs read the backlog before planning. They resolve an entry when recent source changes or the user's explicit instruction affect that area, then remove the entry after documenting it. Still-valid entries remain in place; an entry may also be removed when repository evidence confirms the area no longer exists. Spare page budget alone does not justify broadening an otherwise surgical update. Normal `/harness-wiki-ask` turns do not review or mutate the backlog unless the user explicitly requests a documentation change.
+
 ## Persistent Wiki brief
 
 `wiki/INSTRUCTIONS.md` is optional user-owned control metadata for documentation scope, priorities, language, exclusions, and intended audience. Harness reads at most 64 KiB from a regular non-symlink file and includes the content in init/update/ask prompts.
@@ -128,7 +138,7 @@ It may skip when all committed changes since the previous update are normal Wiki
 
 ## OpenWiki provenance
 
-The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. The prompt was reviewed through `fa9a9b519d65ea6a31b5d063ba5d97edb1fca0f0` (OpenWiki 0.1.1); Harness selectively adapted the user-owned persistent Wiki brief rather than porting OpenWiki's personal-wiki/connectors runtime.
+The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. Upstream prompt and workflow changes were reviewed through `e1a2fea77048f342c6317c457b3dca6efe5ec209` on 2026-07-15, after OpenWiki 0.1.2. Harness selectively adapted the user-owned persistent Wiki brief and the deferred documentation-area backlog from `2fb44a876db8cca461ad1c0767931d95495763a3`, rather than porting OpenWiki's personal-wiki/connectors runtime.
 
 Harness Wiki intentionally does not use OpenWiki's CLI/Ink UI, credential flow, LangChain/DeepAgents runtime, SQLite checkpointer, or separate model/provider key. See `packages/pi-learn-extensions/extensions/harness/README.md` for the upgrade checklist.
 

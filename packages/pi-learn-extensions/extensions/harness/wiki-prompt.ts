@@ -189,6 +189,12 @@ Required documentation structure:
 - Source Map sections are optional. Add one only when it materially improves navigation for that page. Prefer inline source references for short pages.
 - The Pi extension, not the agent, tracks the last successful documentation update in ${UPDATE_METADATA_PATH}.
 
+Documentation coverage discipline:
+- During init and update runs, verify before finishing that every substantial repository area identified during discovery is either documented or explicitly deferred.
+- Keep deferred areas in a concise \`## Backlog\` section at the end of ${WIKI_DIR}/quickstart.md; do not create a separate backlog page.
+- Each backlog entry must include the area name, a repository-relative source anchor, and a one-line reason for deferral.
+- Do not add, remove, or review backlog entries during a chat run unless the user explicitly asks to modify documentation.
+
 Mode-specific behavior:
 ${createModeInstructions(command)}
 `.trim();
@@ -214,6 +220,7 @@ function createModeInstructions(command: HarnessWikiCommand): string {
 - If the repo already has substantial docs, create a wiki that functions as an opinionated map and synthesis layer over those docs.
 - Create ${WIKI_DIR}/quickstart.md first, then the linked section pages.
 - Use at most 8 documentation pages on the initial run unless the repository clearly needs more.
+- Do not silently omit a real domain or workflow because of the initial page budget. If it is not documented, record it in the \`## Backlog\` section of ${WIKI_DIR}/quickstart.md with its area name, repository-relative source anchor, and a one-line reason.
 - Do not try to document every source file. Document the main architecture, workflows, domain concepts, data models, integrations, operations, tests, and known extension points at the right level of detail.
 - The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if Harness Wiki content changed.
 `.trim();
@@ -222,6 +229,7 @@ function createModeInstructions(command: HarnessWikiCommand): string {
   return `
 - This is a maintenance update run.
 - Inspect the existing ${WIKI_DIR}/ documentation before editing.
+- Read the existing \`## Backlog\` section in ${WIKI_DIR}/quickstart.md before planning changes, if present.
 - Read ${UPDATE_METADATA_PATH} if it exists, but do not edit it.
 - Always use git-oriented repository evidence to understand recent changes. Inspect commits added since the previous successful run using the recorded gitHead when available. If shell execution is unavailable, use source inspection and existing docs to infer what changed.
 - Before editing, build a docs impact plan from the changed source files: source change -> docs affected -> edit needed -> why. If a page cannot be tied to a relevant source, workflow, product, or existing-doc change, do not edit it.
@@ -231,9 +239,11 @@ function createModeInstructions(command: HarnessWikiCommand): string {
 - Do not make formatting-only edits. Do not reformat Markdown tables, normalize blank lines, reorder source lists, or polish wording unless the surrounding content is already being changed for accuracy.
 - Do not update Source Map sections, git evidence lists, or generic "things to watch" sections during an update unless they are materially wrong because of the source changes.
 - Do not include or refresh persistent commit hash lists unless a specific commit explains an important historical decision.
-- Use a soft diff budget: if fewer than about 5 source files changed, update at most 1-2 wiki pages. Avoid touching quickstart unless the top-level product behavior, setup, or navigation changed. If you believe more than 3 wiki pages need edits, think carefully about why before making broad changes.
+- Use a soft diff budget: if fewer than about 5 source files changed, update at most 1-2 wiki pages. Avoid touching quickstart unless the top-level product behavior, setup, navigation, or a relevant backlog entry changed. If you believe more than 3 wiki pages need edits, think carefully about why before making broad changes.
 - Update stale pages, add missing pages, remove obsolete claims, and keep quickstart links accurate only when needed by the docs impact plan.
-- Updates may be a no-op. If there are no relevant source, workflow, product, or existing-doc changes since the previous successful run, and the current wiki is already accurate, do not edit files. Say that the wiki is already current.
+- When recent source changes or the user's explicit instruction affect a backlogged area, document that area and remove its backlog entry. Do not expand update scope merely because page budget remains.
+- Preserve still-valid backlog entries. Remove one only after documenting the area or confirming from repository evidence that the area no longer exists.
+- Updates may be a no-op. If there are no relevant source, workflow, product, existing-doc, or backlog changes since the previous successful run, and the current wiki is already accurate, do not edit files. Say that the wiki is already current.
 - The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if Harness Wiki content changed.
 `.trim();
 }

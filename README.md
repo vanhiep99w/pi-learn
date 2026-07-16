@@ -149,6 +149,7 @@ Ghi chú:
 - Normal docs được tạo/cập nhật trong `wiki/`; reviewed prompt rules nằm tại `wiki/**/_rules.md`.
 - Pi tự nạp bootstrap trong `AGENTS.md`; model đọc `wiki/quickstart.md`, root rules và section rules phù hợp bằng tool `read`. Extension không inject toàn bộ rules vào system prompt.
 - Metadata do extension ghi tại `wiki/.last-update.json` sau khi agent settle và normal documentation thực sự thay đổi. `_rules.md` không nằm trong docs snapshot.
+- Domain/workflow quan trọng chưa được document vì giới hạn page budget phải được giữ trong `## Backlog` ở cuối `wiki/quickstart.md`; update run chỉ resolve entry khi có source evidence liên quan hoặc user yêu cầu rõ.
 - Prompt-rule content thay đổi không cần `/reload`; extension source thay đổi vẫn cần `/reload`.
 - Rule edits chỉ đi qua proposal → approval → controlled apply; critical protection vẫn được enforce bằng code.
 - Base upstream: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem `packages/pi-learn-extensions/extensions/harness/README.md`.
