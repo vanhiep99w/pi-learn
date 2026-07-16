@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
 import { DynamicBorder, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Box, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
+import { Box, Key, matchesKey, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import { registerHarnessWikiCommands } from "./wiki-commands.js";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
@@ -349,7 +349,8 @@ async function selectModalItem(
     panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
     panel.addChild(new Text(theme.fg("customMessageLabel", theme.bold("HARNESS  /  PROPOSAL REVIEW")), 0, 0));
     panel.addChild(new Text(theme.fg("accent", theme.bold(options.title)), 0, 0));
-    panel.addChild(new Text(theme.fg("customMessageText", options.body), 0, 1));
+    const detailText = new ScrollableText(theme.fg("customMessageText", options.body), 10);
+    panel.addChild(detailText);
 
     const list = new SelectList(options.items, Math.min(options.items.length, 8), {
       selectedPrefix: (text) => theme.bg("selectedBg", theme.fg("accent", text)),
@@ -363,14 +364,16 @@ async function selectModalItem(
     list.onSelect = (item) => done(item.value);
     list.onCancel = () => done(undefined);
     panel.addChild(list);
-    panel.addChild(new Text(theme.fg("dim", "↑↓ di chuyển    Enter chọn    Esc đóng"), 0, 1));
+    panel.addChild(new Text(theme.fg("dim", "PgUp/PgDn cuộn chi tiết    ↑↓ chọn action    Enter xác nhận    Esc đóng"), 0, 1));
     panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
 
     return {
       render: (width: number) => panel.render(width),
       invalidate: () => panel.invalidate(),
       handleInput: (data: string) => {
-        list.handleInput(data);
+        if (matchesKey(data, Key.pageUp)) detailText.scroll(-8);
+        else if (matchesKey(data, Key.pageDown)) detailText.scroll(8);
+        else list.handleInput(data);
         tui.requestRender();
       },
     };
@@ -383,6 +386,33 @@ async function selectModalItem(
       margin: 1,
     },
   });
+}
+
+class ScrollableText {
+  private readonly text: Text;
+  private readonly maxVisibleLines: number;
+  private offset = 0;
+
+  constructor(value: string, maxVisibleLines: number) {
+    this.text = new Text(value, 0, 0);
+    this.maxVisibleLines = maxVisibleLines;
+  }
+
+  render(width: number): string[] {
+    const lines = this.text.render(width);
+    const maxOffset = Math.max(0, lines.length - this.maxVisibleLines);
+    this.offset = Math.min(this.offset, maxOffset);
+    return lines.slice(this.offset, this.offset + this.maxVisibleLines);
+  }
+
+  scroll(delta: number) {
+    this.offset = Math.max(0, this.offset + delta);
+    this.text.invalidate();
+  }
+
+  invalidate() {
+    this.text.invalidate();
+  }
 }
 
 async function confirmProposalTransition(
