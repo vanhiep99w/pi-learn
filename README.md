@@ -254,24 +254,22 @@ Harness giúp xem lại các Pi sessions gần đây của project và tạo pro
 ~/.pi/harness/projects/<project-key>/
 ```
 
-Mặc định các lệnh dùng **5 session gần nhất**; có thể truyền số khác như `/harness-report 10`.
+Mặc định dashboard dùng **5 session gần nhất**; có thể truyền số khác như `/harness 10`.
 
 ### Workflow khuyến nghị
 
 ```txt
-/harness-status          # xem trạng thái tổng hợp, session gần đây, warnings, automation
-/harness-report          # xem report session gần đây
-/harness-improve         # dùng model hiện tại tạo draft improvement proposals
+/harness 10             # status + report Markdown trong một modal, có scroll
+/harness-improve        # dùng model hiện tại tạo draft improvement proposals
 /harness-proposals       # chọn proposal, xem chi tiết, approve/reject hoặc approve & apply
-/harness-apply P-0001     # apply nếu proposal có patch machine-readable
+/harness-apply P-0001    # apply nếu proposal có patch machine-readable
 ```
 
 ### Danh sách command chính
 
 | Command | Tác dụng |
 |---|---|
-| `/harness-status [last]` | Hiển thị session gần đây, warning summary và trạng thái automation. |
-| `/harness-report [last]` | Scan session gần đây và preview report Markdown. |
+| `/harness [last]` | Gộp status, session gần đây, warning, automation và report Markdown vào một dashboard modal. |
 | `/harness-improve [last]` | Gửi prompt vào model hiện tại; model gọi `harness_import_llm_reflection` để tạo draft proposals. |
 | `/harness-proposals` | Workflow review duy nhất: chọn proposal, xem chi tiết, approve/reject hoặc approve & apply với bước xác nhận. |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu có JSON Patch. Không auto-push. |

@@ -718,8 +718,7 @@ Không implement business logic riêng trong extension. Extension gọi core run
 ### Commands
 
 ```txt
-/harness-status [last]
-/harness-report [last]
+/harness [last]
 /harness-improve [last]
 /harness-proposals
 /harness-apply P-0001
@@ -733,8 +732,7 @@ Không implement business logic riêng trong extension. Extension gọi core run
 - [x] Add extension source under package if integrating into `pi-learn`.
 - [x] Register slash commands.
 - [x] Guard UI calls with `ctx.hasUI` / `ctx.ui?.`.
-- [x] `/harness-report` calls runtime report.
-- [x] `/harness-status` consolidates sessions, warnings, and automation state.
+- [x] `/harness` calls runtime report and combines it with status data in one Markdown dashboard modal.
 - [x] `/harness-improve` uses the current Pi model and normalized evidence.
 - [x] `/harness-proposals` lists draft proposals.
 - [x] `/harness-mark` records note/success/failure session entries.
@@ -745,10 +743,10 @@ Không implement business logic riêng trong extension. Extension gọi core run
 Inside Pi:
 
 ```txt
-/harness-report
+/harness
 ```
 
-shows latest report path/summary and does not slow startup significantly.
+shows status and the latest Markdown report in one scrollable modal without slowing startup significantly.
 
 ---
 

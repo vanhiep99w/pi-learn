@@ -44,7 +44,7 @@ Root `package.json` expose package này như sau:
 Nếu thấy quá nhiều command, dùng theo thứ tự này:
 
 ```txt
-1. /harness-report          Xem report session gần đây của project.
+1. /harness                 Xem status + report Markdown trong một dashboard modal.
 2. /harness-improve         Nhờ model hiện tại tạo improvement proposals.
 3. /harness-proposals       Chọn, xem chi tiết, approve/reject hoặc approve & apply trong một modal.
 4. /harness-apply P-0001    Apply proposal đã approve, nếu proposal có patch.
@@ -102,11 +102,10 @@ Harness đọc Pi session logs đã redact/normalize để tạo report, proposa
 └── evals/latest.md
 ```
 
-Mặc định các command dùng **5 session gần nhất**. Có thể truyền số khác, ví dụ:
+Mặc định dashboard dùng **5 session gần nhất**. Có thể truyền số khác, ví dụ:
 
 ```txt
-/harness-status 10
-/harness-report 10
+/harness 10
 /harness-improve 10
 ```
 
@@ -114,8 +113,7 @@ Mặc định các command dùng **5 session gần nhất**. Có thể truyền 
 
 | Command | Tác dụng | Ví dụ |
 |---|---|---|
-| `/harness-status [last]` | Trạng thái tổng hợp: session gần đây, warning summary, automation state. | `/harness-status` hoặc `/harness-status 10` |
-| `/harness-report [last]` | Scan session gần đây, tạo và preview report Markdown. | `/harness-report` hoặc `/harness-report 10` |
+| `/harness [last]` | Gộp status, session gần đây, warning, automation và report Markdown vào một dashboard modal có scroll. | `/harness` hoặc `/harness 10` |
 | `/harness-improve [last]` | Gửi reflection prompt vào model hiện tại; model phải gọi tool import để tạo draft proposals. | Cách chính để tạo proposal bằng LLM. |
 | `/harness-proposals` | Workflow review duy nhất: chọn proposal, xem chi tiết, approve/reject hoặc approve & apply với bước xác nhận. | Sau `/harness-improve`. |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu proposal có JSON Patch machine-readable. | `/harness-apply P-0001` |

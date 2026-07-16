@@ -46,8 +46,7 @@ Most functions accept the same option shape:
 ## Pi extension commands
 
 ```txt
-/harness-status [last]
-/harness-report [last]
+/harness [last]
 /harness-improve [last]
 /harness-proposals
 /harness-apply P-0001
@@ -60,7 +59,7 @@ Most functions accept the same option shape:
 /harness-wiki-status
 ```
 
-`/harness-proposals` is the single interactive review command in TUI mode: it opens the proposal picker and provides detail, approve, reject, and approve-and-apply actions with confirmation. Proposals with a JSON Patch expose `Approve & Apply`; already approved proposals expose `Apply`. Approve/reject/apply remain runtime operations used internally or by the dedicated apply command. In print and JSON modes, `/harness-proposals` only prints the proposal list.
+`/harness [last]` is the single interactive observability command in TUI mode: it combines status and the generated Markdown report in one scrollable dashboard modal. `/harness-proposals` is the single interactive review command in TUI mode: it opens the proposal picker and provides detail, approve, reject, and approve-and-apply actions with confirmation. Proposals with a JSON Patch expose `Approve & Apply`; already approved proposals expose `Apply`. Approve/reject/apply remain runtime operations used internally or by the dedicated apply command. In print and JSON modes, `/harness-proposals` only prints the proposal list.
 
 Harness Wiki is registered from the same public `harness/index.ts` entrypoint. The legacy `/wiki-*` commands and `extensions/wiki/` entrypoint are removed.
 

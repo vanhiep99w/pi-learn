@@ -2,8 +2,8 @@ import { readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
-import { DynamicBorder, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Box, Key, matchesKey, type SelectItem, SelectList, Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { DynamicBorder, getMarkdownTheme, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { Box, Key, Markdown, matchesKey, type SelectItem, SelectList, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { registerHarnessWikiCommands } from "./wiki-commands.js";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
@@ -65,53 +65,45 @@ export default function harnessExtension(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("harness-status", {
-    description: "Show consolidated Harness status, recent sessions, warnings, and automation state",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const parts = splitArgs(args ?? "");
-      const last = parts.find((part) => /^\d+$/.test(part)) ?? DEFAULT_LAST;
-      const sessionsOutput = parseJson((await runHarness(ctx, ["sessions", "--project", ctx.cwd, "--last", last, "--json"])).stdout);
-      const scanOutput = parseJson((await runHarness(ctx, ["scan", "--project", ctx.cwd, "--last", last, "--json"])).stdout);
-      const automationOutput = parseJson((await runHarness(ctx, ["automation-status", "--project", ctx.cwd, "--json"])).stdout);
-      const sessions = sessionsOutput?.sessions ?? [];
-      const scanResults = scanOutput?.results ?? [];
-      const warningCount = scanResults.reduce((sum: number, result: any) => sum + (result.warningsCount ?? 0), 0);
-      const status = automationOutput?.status;
-      const lines = [
-        `project: ${sessionsOutput?.project?.projectRoot ?? ctx.cwd}`,
-        `sessionDir: ${sessionsOutput?.sessionDir ?? "(unknown)"}`,
-        `recent sessions: ${sessions.length}/${last}`,
-        `warnings: ${warningCount}`,
-        `automation: ${status?.allowed ? "allowed" : "disabled/skipped"} (${status?.reason ?? "unknown"})`,
-        "",
-        "Recent sessions",
-        ...(sessions.length ? sessions.slice(0, 5).map((s: any) => `- ${s.timestamp ?? s.mtime}  ${s.sessionId}`) : ["- none found"]),
-        "",
-        "Warnings",
-        ...(warningCount
-          ? scanResults.flatMap((result: any) => (result.warnings ?? []).slice(0, 3).map((warning: any) => `- ${result.sessionId}: ${warning.code} — ${warning.message}`)).slice(0, 10)
-          : ["- none found"]),
-      ];
-      await showText(ctx, `🧭 Harness status (${last} sessions)`, lines.join("\n").trimEnd() || "No Harness status available.");
-    }),
-  });
-
-  pi.registerCommand("harness-report", {
-    description: "Generate and preview latest Pi Harness report",
+  pi.registerCommand("harness", {
+    description: "Open the Harness status and Markdown report dashboard. Usage: /harness [last]",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
       const last = firstArg(args) ?? DEFAULT_LAST;
-      const run = await runHarness(ctx, ["report", "--project", ctx.cwd, "--last", last, "--json"]);
-      const output = parseJson(run.stdout);
-      const reportPath = output?.report?.latestPath;
+      const [sessionsRun, reportRun, automationRun] = await Promise.all([
+        runHarness(ctx, ["sessions", "--project", ctx.cwd, "--last", last, "--json"]),
+        runHarness(ctx, ["report", "--project", ctx.cwd, "--last", last, "--json"]),
+        runHarness(ctx, ["automation-status", "--project", ctx.cwd, "--json"]),
+      ]);
+      const sessionsOutput = parseJson(sessionsRun.stdout);
+      const reportOutput = parseJson(reportRun.stdout);
+      const automationOutput = parseJson(automationRun.stdout);
+      const reportPath = reportOutput?.report?.latestPath;
       if (!reportPath) return notifyOrLog(ctx, "Harness report did not return latestPath.", "warning");
 
-      const markdown = await readFile(reportPath, "utf8");
-      if (ctx.hasUI && ctx.ui?.editor) {
-        await ctx.ui.editor(`📊 Harness report: ${reportPath}`, markdown);
+      const reportMarkdown = await readFile(reportPath, "utf8");
+      const dashboardMarkdown = formatHarnessDashboard({
+        last,
+        sessionsOutput,
+        reportOutput,
+        automationOutput,
+        reportPath,
+        reportMarkdown,
+      });
+
+      if (ctx.mode === "tui" && ctx.hasUI) {
+        await showHarnessDashboard(ctx, {
+          last,
+          markdown: dashboardMarkdown,
+          projectName: sessionsOutput?.project?.projectKey ?? "current project",
+          sessionCount: sessionsOutput?.sessions?.length ?? 0,
+          warningCount: countHarnessWarnings(reportOutput?.results ?? []),
+          automationAllowed: Boolean(automationOutput?.status?.allowed),
+        });
+      } else if (ctx.hasUI && ctx.ui?.editor) {
+        await ctx.ui.editor(`Harness dashboard: ${reportPath}`, dashboardMarkdown);
       } else {
-        console.log(markdown);
+        console.log(dashboardMarkdown);
       }
-      notifyOrLog(ctx, `Harness report: ${reportPath}`, "info");
     }),
   });
 
@@ -228,8 +220,140 @@ export default function harnessExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui?.notify("🧪 Harness: /harness-status, /harness-report, /harness-improve, /harness-wiki-status", "info");
+    ctx.ui?.notify("🧪 Harness: /harness, /harness-improve, /harness-proposals, /harness-wiki-status", "info");
   });
+}
+
+function countHarnessWarnings(results: any[]) {
+  return results.reduce((sum: number, result: any) => sum + (result.warningsCount ?? result.warnings?.length ?? 0), 0);
+}
+
+function formatHarnessDashboard({
+  last,
+  sessionsOutput,
+  reportOutput,
+  automationOutput,
+  reportPath,
+  reportMarkdown,
+}: {
+  last: string;
+  sessionsOutput: any;
+  reportOutput: any;
+  automationOutput: any;
+  reportPath: string;
+  reportMarkdown: string;
+}) {
+  const sessions = sessionsOutput?.sessions ?? [];
+  const results = reportOutput?.results ?? [];
+  const warningCount = countHarnessWarnings(results);
+  const automation = automationOutput?.status;
+  const recentWarnings = results
+    .flatMap((result: any) => (result.warnings ?? []).slice(0, 3).map((warning: any) => ({
+      sessionId: result.sessionId,
+      code: warning.code,
+      message: warning.message,
+    })))
+    .slice(0, 10);
+  const renderedReport = reportMarkdown.trim().replace(/^#\s+/, "## ");
+
+  return [
+    "## Trạng thái hiện tại",
+    `- **Project:** ${markdownCode(sessionsOutput?.project?.projectRoot ?? "(unknown)")}`,
+    `- **Session source:** ${markdownCode(sessionsOutput?.sessionDir ?? "(unknown)")}`,
+    `- **Session gần đây:** **${sessions.length}/${last}**`,
+    `- **Warnings:** **${warningCount}**`,
+    `- **Automation:** **${automation?.allowed ? "allowed" : "disabled/skipped"}** — ${markdownInline(automation?.reason ?? "unknown")}`,
+    `- **Report:** ${markdownCode(reportPath)}`,
+    "",
+    "## Session gần đây",
+    ...(sessions.length
+      ? sessions.slice(0, 5).map((session: any) => `- ${markdownInline(session.timestamp ?? session.mtime ?? "unknown time")} — ${markdownCode(session.sessionId ?? "unknown")}`)
+      : ["_Không tìm thấy session nào._"]),
+    "",
+    "## Warning gần đây",
+    ...(recentWarnings.length
+      ? recentWarnings.map((warning: any) => `- ${markdownCode(warning.sessionId ?? "unknown")} · **${markdownInline(warning.code ?? "warning")}** — ${markdownInline(warning.message ?? "")}`)
+      : ["_Không có parser/normalizer warning._"]),
+    "",
+    "---",
+    "",
+    renderedReport,
+  ].join("\n").trimEnd();
+}
+
+async function showHarnessDashboard(
+  ctx: ExtensionCommandContext,
+  options: {
+    last: string;
+    markdown: string;
+    projectName: string;
+    sessionCount: number;
+    warningCount: number;
+    automationAllowed: boolean;
+  },
+) {
+  if (ctx.mode !== "tui" || !ctx.hasUI) return;
+
+  await ctx.ui.custom<void>((tui, theme, keybindings, done) => {
+    const panel = new Box(2, 1, (text: string) => theme.bg("customMessageBg", text));
+    panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
+    panel.addChild(new Text(theme.fg("customMessageLabel", theme.bold("HARNESS  /  DASHBOARD")), 0, 0));
+    panel.addChild(new Text(theme.fg("accent", theme.bold(options.projectName)), 0, 0));
+    panel.addChild(new Text([
+      theme.fg("muted", `${options.sessionCount}/${options.last} sessions`),
+      theme.fg(options.warningCount ? "warning" : "success", `${options.warningCount} warnings`),
+      theme.fg(options.automationAllowed ? "success" : "dim", `automation ${options.automationAllowed ? "allowed" : "off"}`),
+    ].join(theme.fg("dim", "  •  ")), 0, 0));
+
+    const dashboard = new ScrollableMarkdown(
+      options.markdown,
+      () => Math.max(1, Math.min(30, Math.floor(tui.terminal.rows * 0.95) - 9)),
+      (text: string) => theme.fg("dim", text),
+    );
+    panel.addChild(dashboard);
+    panel.addChild(new Text(
+      theme.fg("dim", "↑↓ cuộn  •  PgUp/PgDn hoặc Ctrl+U/D cuộn nhanh  •  Home/End đầu/cuối  •  Esc đóng"),
+      0,
+      1,
+    ));
+    panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
+
+    return {
+      render: (width: number) => panel.render(width),
+      invalidate: () => panel.invalidate(),
+      handleInput: (data: string) => {
+        const cancel = keybindings.matches(data, "tui.select.cancel") || matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"));
+        if (cancel || matchesKey(data, "q")) {
+          done(undefined);
+          return;
+        }
+        if (keybindings.matches(data, "tui.select.up") || matchesKey(data, Key.up)) dashboard.scroll(-3);
+        else if (keybindings.matches(data, "tui.select.down") || matchesKey(data, Key.down)) dashboard.scroll(3);
+        else if (keybindings.matches(data, "tui.select.pageUp") || matchesKey(data, Key.ctrl("u"))) dashboard.scroll(-12);
+        else if (keybindings.matches(data, "tui.select.pageDown") || matchesKey(data, Key.ctrl("d")) || matchesKey(data, Key.space)) dashboard.scroll(12);
+        else if (matchesKey(data, Key.home)) dashboard.scrollToStart();
+        else if (matchesKey(data, Key.end)) dashboard.scrollToEnd();
+        tui.requestRender();
+      },
+    };
+  }, {
+    overlay: true,
+    overlayOptions: {
+      anchor: "center",
+      width: "92%",
+      minWidth: 60,
+      maxHeight: "95%",
+      margin: 1,
+    },
+  });
+}
+
+function markdownCode(value: unknown) {
+  return `\`${markdownInline(value).replace(/`/g, "'")}\``;
+}
+
+function markdownInline(value: unknown) {
+  return String(value ?? "").replace(/\r?\n/g, " ").trim();
 }
 
 async function reviewHarnessProposals(ctx: ExtensionCommandContext) {
@@ -416,6 +540,48 @@ async function selectModalItem(
       margin: 1,
     },
   });
+}
+
+class ScrollableMarkdown {
+  private readonly markdown: Markdown;
+  private readonly maxVisibleLines: () => number;
+  private readonly statusFn: (text: string) => string;
+  private offset = 0;
+
+  constructor(value: string, maxVisibleLines: () => number, statusFn: (text: string) => string) {
+    this.markdown = new Markdown(value, 0, 0, getMarkdownTheme());
+    this.maxVisibleLines = maxVisibleLines;
+    this.statusFn = statusFn;
+  }
+
+  render(width: number): string[] {
+    const lines = this.markdown.render(width);
+    const viewportSize = this.maxVisibleLines();
+    const maxOffset = Math.max(0, lines.length - viewportSize);
+    this.offset = Math.min(this.offset, maxOffset);
+    const visible = lines.slice(this.offset, this.offset + viewportSize);
+    while (visible.length < viewportSize) visible.push("");
+    const status = lines.length > viewportSize
+      ? `↕ Nội dung ${this.offset + 1}-${Math.min(this.offset + viewportSize, lines.length)}/${lines.length}`
+      : "";
+    return [...visible, this.statusFn(status)];
+  }
+
+  scroll(delta: number) {
+    this.offset = Math.max(0, this.offset + delta);
+  }
+
+  scrollToStart() {
+    this.offset = 0;
+  }
+
+  scrollToEnd() {
+    this.offset = Number.MAX_SAFE_INTEGER;
+  }
+
+  invalidate() {
+    this.markdown.invalidate();
+  }
 }
 
 class ScrollableText {

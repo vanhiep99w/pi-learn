@@ -65,7 +65,7 @@ Examples:
 - Prompt templates: create or edit a small test prompt under `.pi/agent/model-prompts/`, `/reload`, then run the generated command.
 - Aurora UI: verify startup banner, editor border, footer/status rendering, theme switching, and terminal cleanup after session shutdown.
 - Harness Wiki: run `/harness-wiki-status`, `/harness-wiki-ask`, a no-op `/harness-wiki-update`, and a small forced update when changing Wiki behavior. Confirm `/wiki-*` commands are absent and Wiki turns cannot edit `_rules.md`.
-- Harness: run `/harness-status`, `/harness-report`, and targeted `/harness-eval` after runtime changes.
+- Harness: run `/harness`, exercise dashboard scrolling/Markdown rendering, and run targeted `/harness-eval` after runtime changes.
 
 ## Security and privacy rules
 

@@ -30,13 +30,12 @@ Change guidance:
 
 Source: `packages/pi-learn-extensions/extensions/harness/index.ts`; runtime: `packages/harness-runtime/`
 
-The Harness extension is the single public entrypoint for session observability, improvement workflows, and Harness Wiki repository knowledge. Core parsing/report/proposal behavior is delegated to the runtime API; Wiki orchestration lives in `harness/wiki-commands.ts` and `harness/wiki-prompt.ts`.
+The Harness extension is the single public entrypoint for session observability, improvement workflows, and Harness Wiki repository knowledge. `/harness [last]` combines status and the generated Markdown report in one scrollable dashboard modal. Core parsing/report/proposal behavior is delegated to the runtime API; Wiki orchestration lives in `harness/wiki-commands.ts` and `harness/wiki-prompt.ts`.
 
 Recommended commands include:
 
 ```txt
-/harness-status [last]
-/harness-report [last]
+/harness [last]
 /harness-improve [last]
 /harness-proposals
 /harness-apply P-0001
