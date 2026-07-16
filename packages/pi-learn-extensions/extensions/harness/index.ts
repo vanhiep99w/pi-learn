@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
 import { DynamicBorder, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
+import { Box, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import { registerHarnessWikiCommands } from "./wiki-commands.js";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +25,7 @@ type HarnessProposal = {
   filePath?: string;
 };
 
-type ProposalAction = "details" | "approve" | "reject" | "back";
+type ProposalAction = "details" | "approve" | "apply" | "reject" | "back";
 
 export default function harnessExtension(pi: ExtensionAPI) {
   registerHarnessWikiCommands(pi);
@@ -168,35 +168,9 @@ export default function harnessExtension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("harness-proposals", {
-    description: "Review Harness proposals in an interactive approve/reject modal",
+    description: "Review, approve, or reject Harness proposals in one interactive modal",
     handler: async (_args, ctx) => withHarnessErrors(ctx, async () => {
       await reviewHarnessProposals(ctx);
-    }),
-  });
-
-  pi.registerCommand("harness-approve", {
-    description: "Review and approve a Harness proposal. Usage: /harness-approve [P-0001]",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const id = normalizeProposalId(firstArg(args));
-      if (!ctx.hasUI) {
-        if (!id) return notifyOrLog(ctx, "Usage: /harness-approve P-0001", "warning");
-        await transitionHarnessProposal(ctx, id, "approve");
-        return;
-      }
-      await reviewHarnessProposals(ctx, { preferredId: id, initialAction: "approve" });
-    }),
-  });
-
-  pi.registerCommand("harness-reject", {
-    description: "Review and reject a Harness proposal. Usage: /harness-reject [P-0001]",
-    handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
-      const id = normalizeProposalId(firstArg(args));
-      if (!ctx.hasUI) {
-        if (!id) return notifyOrLog(ctx, "Usage: /harness-reject P-0001", "warning");
-        await transitionHarnessProposal(ctx, id, "reject");
-        return;
-      }
-      await reviewHarnessProposals(ctx, { preferredId: id, initialAction: "reject" });
     }),
   });
 
@@ -212,15 +186,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
         const ok = await ctx.ui.confirm("Apply Harness proposal", `Apply ${id}${dirty} on a harness/* branch? This may edit files listed in the proposal patch.`);
         if (!ok) return notifyOrLog(ctx, `Harness apply cancelled: ${id}`, "info");
       }
-      const run = await runHarness(ctx, ["apply", id, ...flags, "--project", ctx.cwd, "--json"]);
-      const output = parseJson(run.stdout);
-      const lines = [
-        `${output?.proposal?.id ?? id}: ${output?.proposal?.status ?? "applied"}`,
-        output?.branchName ? `branch: ${output.branchName}` : undefined,
-        output?.changedPaths?.length ? `changed: ${output.changedPaths.join(", ")}` : undefined,
-        output?.diff ? `\nDiff\n${output.diff}` : undefined,
-      ].filter(Boolean).join("\n");
-      await showText(ctx, `🧩 Harness apply ${id}`, lines);
+      await applyHarnessProposal(ctx, id, flags);
     }),
   });
 
@@ -266,10 +232,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
   });
 }
 
-async function reviewHarnessProposals(
-  ctx: ExtensionCommandContext,
-  options: { preferredId?: string; initialAction?: "approve" | "reject" } = {},
-) {
+async function reviewHarnessProposals(ctx: ExtensionCommandContext) {
   const run = await runHarness(ctx, ["proposals", "--project", ctx.cwd, "--json"]);
   const output = parseJson(run.stdout);
   const proposals = (output?.proposals ?? []) as HarnessProposal[];
@@ -283,16 +246,10 @@ async function reviewHarnessProposals(
     return;
   }
 
-  let proposal = options.preferredId
-    ? proposals.find((item) => item.id.toUpperCase() === options.preferredId)
-    : await selectHarnessProposal(ctx, proposals);
-  if (options.preferredId && !proposal) {
-    throw new Error(`Proposal not found: ${options.preferredId}`);
-  }
-
+  let proposal = await selectHarnessProposal(ctx, proposals);
   while (proposal) {
     const markdown = proposal.filePath ? await readFile(proposal.filePath, "utf8") : "";
-    const action = await selectProposalAction(ctx, proposal, markdown, options.initialAction);
+    const action = await selectProposalAction(ctx, proposal, markdown);
     if (!action) return;
 
     if (action === "back") {
@@ -307,6 +264,16 @@ async function reviewHarnessProposals(
       continue;
     }
 
+    if (action === "apply") {
+      const confirmed = await confirmProposalApply(ctx, proposal, markdown);
+      if (!confirmed) continue;
+      if (proposal.status !== "approved") {
+        await transitionHarnessProposal(ctx, proposal.id, "approve", { notify: false });
+      }
+      await applyHarnessProposal(ctx, proposal.id, []);
+      return;
+    }
+
     const confirmed = await confirmProposalTransition(ctx, proposal, action);
     if (!confirmed) continue;
     await transitionHarnessProposal(ctx, proposal.id, action);
@@ -318,11 +285,15 @@ async function selectHarnessProposal(ctx: ExtensionCommandContext, proposals: Ha
   const items: SelectItem[] = proposals.map((proposal) => ({
     value: proposal.id,
     label: `${proposal.id}  ${proposal.title}`,
-    description: `${proposal.status ?? "draft"} • target: ${proposal.target ?? "unknown"} • risk: ${proposal.risk ?? "unknown"}`,
+    description: [
+      (proposal.status ?? "draft").toUpperCase(),
+      (proposal.target ?? "unknown").toUpperCase(),
+      `RISK ${(proposal.risk ?? "unknown").toUpperCase()}`,
+    ].join("  •  "),
   }));
   const selected = await selectModalItem(ctx, {
-    title: "📋 Chọn Harness proposal",
-    body: `${proposals.length} proposal • Chọn một proposal để xem chi tiết và quyết định approve/reject.`,
+    title: "Chọn proposal để review",
+    body: `${proposals.length} proposal khả dụng. Xem nội dung và quyết định approve hoặc reject.`,
     items,
   });
   return proposals.find((proposal) => proposal.id === selected);
@@ -332,7 +303,6 @@ async function selectProposalAction(
   ctx: ExtensionCommandContext,
   proposal: HarnessProposal,
   markdown: string,
-  initialAction?: "approve" | "reject",
 ): Promise<ProposalAction | undefined> {
   const items: SelectItem[] = [
     {
@@ -340,27 +310,38 @@ async function selectProposalAction(
       label: "▣ Xem toàn bộ chi tiết",
       description: "Mở Markdown đầy đủ; mọi chỉnh sửa trong preview sẽ không được lưu.",
     },
-    {
+  ];
+  if (proposal.status !== "applied") {
+    items.push({
       value: "approve",
       label: "✓ Approve proposal",
       description: "Đánh dấu approved để proposal có thể được apply.",
-    },
-    {
+    });
+    if (hasMachineApplicablePatch(markdown)) {
+      items.push({
+        value: "apply",
+        label: proposal.status === "approved" ? "⚡ Apply proposal" : "⚡ Approve & Apply",
+        description: proposal.status === "approved"
+          ? "Áp dụng patch trên branch harness của proposal."
+          : "Approve và áp dụng patch ngay sau bước xác nhận.",
+      });
+    }
+    items.push({
       value: "reject",
       label: "✕ Reject proposal",
       description: "Đánh dấu rejected; vẫn có thể review và approve lại sau.",
-    },
-    {
-      value: "back",
-      label: "← Chọn proposal khác",
-      description: "Quay lại danh sách proposal.",
-    },
-  ];
+    });
+  }
+  items.push({
+    value: "back",
+    label: "← Chọn proposal khác",
+    description: "Quay lại danh sách proposal.",
+  });
   const selected = await selectModalItem(ctx, {
     title: `${proposal.id} — ${proposal.title}`,
     body: formatProposalPreview(proposal, markdown),
     items,
-    selectedValue: initialAction ?? "details",
+    selectedValue: "details",
   });
   return selected as ProposalAction | undefined;
 }
@@ -377,14 +358,15 @@ async function selectModalItem(
   }
 
   return ctx.ui.custom<string | undefined>((tui, theme, _keybindings, done) => {
-    const container = new Container();
-    container.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
-    container.addChild(new Text(theme.fg("accent", theme.bold(options.title)), 1, 0));
-    container.addChild(new Text(theme.fg("muted", options.body), 1, 1));
+    const panel = new Box(2, 1, (text: string) => theme.bg("customMessageBg", text));
+    panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
+    panel.addChild(new Text(theme.fg("customMessageLabel", theme.bold("HARNESS  /  PROPOSAL REVIEW")), 0, 0));
+    panel.addChild(new Text(theme.fg("accent", theme.bold(options.title)), 0, 0));
+    panel.addChild(new Text(theme.fg("customMessageText", options.body), 0, 1));
 
-    const list = new SelectList(options.items, Math.min(options.items.length, 10), {
-      selectedPrefix: (text) => theme.fg("accent", text),
-      selectedText: (text) => theme.fg("accent", theme.bold(text)),
+    const list = new SelectList(options.items, Math.min(options.items.length, 8), {
+      selectedPrefix: (text) => theme.bg("selectedBg", theme.fg("accent", text)),
+      selectedText: (text) => theme.bg("selectedBg", theme.fg("accent", theme.bold(text))),
       description: (text) => theme.fg("muted", text),
       scrollInfo: (text) => theme.fg("dim", text),
       noMatch: (text) => theme.fg("warning", text),
@@ -393,13 +375,13 @@ async function selectModalItem(
     if (selectedIndex >= 0) list.setSelectedIndex(selectedIndex);
     list.onSelect = (item) => done(item.value);
     list.onCancel = () => done(undefined);
-    container.addChild(list);
-    container.addChild(new Text(theme.fg("dim", "↑↓ di chuyển • Enter chọn • Esc đóng"), 1, 0));
-    container.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
+    panel.addChild(list);
+    panel.addChild(new Text(theme.fg("dim", "↑↓ di chuyển    Enter chọn    Esc đóng"), 0, 1));
+    panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
 
     return {
-      render: (width: number) => container.render(width),
-      invalidate: () => container.invalidate(),
+      render: (width: number) => panel.render(width),
+      invalidate: () => panel.invalidate(),
       handleInput: (data: string) => {
         list.handleInput(data);
         tui.requestRender();
@@ -409,10 +391,9 @@ async function selectModalItem(
     overlay: true,
     overlayOptions: {
       anchor: "center",
-      width: "80%",
-      minWidth: 56,
-      maxHeight: "80%",
-      margin: 1,
+      width: 92,
+      maxHeight: "85%",
+      margin: 2,
     },
   });
 }
@@ -432,15 +413,52 @@ async function confirmProposalTransition(
   );
 }
 
+async function confirmProposalApply(
+  ctx: ExtensionCommandContext,
+  proposal: HarnessProposal,
+  markdown: string,
+) {
+  if (!ctx.hasUI || !ctx.ui?.confirm) return true;
+  const isApproved = proposal.status === "approved";
+  const targetFiles = compactMarkdownSection(markdown, "Target files", 160) || "TBD";
+  return ctx.ui.confirm(
+    isApproved ? "⚡ Apply Harness proposal" : "⚡ Approve & Apply Harness proposal",
+    [
+      isApproved
+        ? `Apply ${proposal.id} ngay bây giờ?`
+        : `Approve ${proposal.id} và apply ngay bây giờ?`,
+      `Target files: ${targetFiles}`,
+      "Harness sẽ yêu cầu git worktree sạch và tạo/sử dụng branch harness/*.",
+    ].join("\n"),
+  );
+}
+
 async function transitionHarnessProposal(
   ctx: ExtensionCommandContext,
   id: string,
   action: "approve" | "reject",
+  options: { notify?: boolean } = {},
 ) {
   const run = await runHarness(ctx, [action, id, "--project", ctx.cwd, "--json"]);
   const output = parseJson(run.stdout);
   const status = output?.proposal?.status ?? (action === "approve" ? "approved" : "rejected");
-  notifyOrLog(ctx, `Harness proposal ${output?.proposal?.id ?? id}: ${status}`, action === "approve" ? "info" : "warning");
+  if (options.notify !== false) {
+    notifyOrLog(ctx, `Harness proposal ${output?.proposal?.id ?? id}: ${status}`, action === "approve" ? "info" : "warning");
+  }
+  return output;
+}
+
+async function applyHarnessProposal(ctx: ExtensionCommandContext, id: string, flags: string[]) {
+  const run = await runHarness(ctx, ["apply", id, ...flags, "--project", ctx.cwd, "--json"]);
+  const output = parseJson(run.stdout);
+  const lines = [
+    `${output?.proposal?.id ?? id}: ${output?.proposal?.status ?? "applied"}`,
+    output?.branchName ? `branch: ${output.branchName}` : undefined,
+    output?.changedPaths?.length ? `changed: ${output.changedPaths.join(", ")}` : undefined,
+    output?.diff ? `\nDiff\n${output.diff}` : undefined,
+  ].filter(Boolean).join("\n");
+  await showText(ctx, `🧩 Harness apply ${id}`, lines);
+  return output;
 }
 
 function formatProposalPreview(proposal: HarnessProposal, markdown: string) {
@@ -448,29 +466,52 @@ function formatProposalPreview(proposal: HarnessProposal, markdown: string) {
   const proposedChange = compactMarkdownSection(markdown, "Proposed change") || "Không có mô tả.";
   const targetFiles = compactMarkdownSection(markdown, "Target files") || "TBD";
   return [
-    `Trạng thái: ${proposal.status ?? "draft"}  •  Target: ${proposal.target ?? "unknown"}  •  Risk: ${proposal.risk ?? "unknown"}`,
-    `Evidence: ${proposal.evidenceCount ?? "unknown"}`,
+    `STATUS  ${(proposal.status ?? "draft").toUpperCase()}    TARGET  ${(proposal.target ?? "unknown").toUpperCase()}    RISK  ${(proposal.risk ?? "unknown").toUpperCase()}    EVIDENCE  ${proposal.evidenceCount ?? "?"}`,
     "",
-    `Vấn đề: ${problem}`,
+    "VẤN ĐỀ",
+    problem,
     "",
-    `Thay đổi đề xuất: ${proposedChange}`,
+    "THAY ĐỔI ĐỀ XUẤT",
+    proposedChange,
     "",
-    `Target files: ${targetFiles}`,
+    "TARGET FILES",
+    targetFiles,
   ].join("\n");
 }
 
 function compactMarkdownSection(markdown: string, heading: string, maxLength = 240) {
+  const section = extractMarkdownSection(markdown, heading)
+    .replace(/^[-*]\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return section.length > maxLength ? `${section.slice(0, maxLength - 1).trimEnd()}…` : section;
+}
+
+function hasMachineApplicablePatch(markdown: string) {
+  const section = extractMarkdownSection(markdown, "Patch");
+  if (!section.trim()) return false;
+  const fenced = section.match(/```(?:json)?\s*\n([\s\S]*?)\n```/i)?.[1] ?? section.trim();
+  try {
+    const parsed = JSON.parse(fenced);
+    const patches = Array.isArray(parsed) ? parsed : [parsed];
+    return patches.length > 0 && patches.every((patch) =>
+      patch
+      && typeof patch.path === "string"
+      && typeof patch.oldText === "string"
+      && typeof patch.newText === "string");
+  } catch {
+    return false;
+  }
+}
+
+function extractMarkdownSection(markdown: string, heading: string) {
   const marker = new RegExp(`^## ${heading}\\s*$`, "m");
   const match = marker.exec(markdown);
   if (!match) return "";
   const sectionStart = match.index + match[0].length;
   const remaining = markdown.slice(sectionStart).replace(/^\r?\n/, "");
   const nextHeading = remaining.search(/^## /m);
-  const section = (nextHeading >= 0 ? remaining.slice(0, nextHeading) : remaining)
-    .replace(/^[-*]\s+/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return section.length > maxLength ? `${section.slice(0, maxLength - 1).trimEnd()}…` : section;
+  return (nextHeading >= 0 ? remaining.slice(0, nextHeading) : remaining).trim();
 }
 
 function printProposalList(proposals: HarnessProposal[]) {
@@ -478,10 +519,6 @@ function printProposalList(proposals: HarnessProposal[]) {
     `${proposal.id} [${proposal.status ?? "draft"}/${proposal.target ?? "unknown"}/${proposal.risk ?? "unknown"}] ${proposal.title}`,
     proposal.filePath ? `  ${proposal.filePath}` : undefined,
   ].filter(Boolean).join("\n")).join("\n"));
-}
-
-function normalizeProposalId(value: string | undefined) {
-  return value?.toUpperCase();
 }
 
 async function withHarnessErrors(ctx: ExtensionCommandContext, fn: () => Promise<void>) {

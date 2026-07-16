@@ -46,9 +46,8 @@ Nếu thấy quá nhiều command, dùng theo thứ tự này:
 ```txt
 1. /harness-report          Xem report session gần đây của project.
 2. /harness-improve         Nhờ model hiện tại tạo improvement proposals.
-3. /harness-proposals       Mở modal review: xem chi tiết, approve hoặc reject.
-4. /harness-approve          Mở modal với action approve được chọn sẵn.
-5. /harness-apply P-0001     Apply proposal đã approve, nếu proposal có patch.
+3. /harness-proposals       Chọn, xem chi tiết, approve/reject hoặc approve & apply trong một modal.
+4. /harness-apply P-0001    Apply proposal đã approve, nếu proposal có patch.
 ```
 
 Các command còn lại chủ yếu để debug, kiểm tra, hoặc quản lý nâng cao.
@@ -118,9 +117,7 @@ Mặc định các command dùng **5 session gần nhất**. Có thể truyền 
 | `/harness-status [last]` | Trạng thái tổng hợp: session gần đây, warning summary, automation state. | `/harness-status` hoặc `/harness-status 10` |
 | `/harness-report [last]` | Scan session gần đây, tạo và preview report Markdown. | `/harness-report` hoặc `/harness-report 10` |
 | `/harness-improve [last]` | Gửi reflection prompt vào model hiện tại; model phải gọi tool import để tạo draft proposals. | Cách chính để tạo proposal bằng LLM. |
-| `/harness-proposals` | Mở modal chọn proposal, xem tóm tắt/Markdown đầy đủ, approve hoặc reject. | Sau `/harness-improve`. |
-| `/harness-approve [P-0001]` | Mở modal review với action approve được chọn sẵn; ID là tùy chọn trong TUI. | `/harness-approve` hoặc `/harness-approve P-0001` |
-| `/harness-reject [P-0001]` | Mở modal review với action reject được chọn sẵn; ID là tùy chọn trong TUI. | `/harness-reject` hoặc `/harness-reject P-0001` |
+| `/harness-proposals` | Workflow review duy nhất: chọn proposal, xem chi tiết, approve/reject hoặc approve & apply với bước xác nhận. | Sau `/harness-improve`. |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu proposal có JSON Patch machine-readable. | `/harness-apply P-0001` |
 | `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite hoặc scenario/proposal cụ thể. | `/harness-eval`, `/harness-eval redaction-fixture` |
 | `/harness-mark success\|failure\|note [text]` | Mark current session bằng success/failure hoặc ghi note riêng. | `/harness-mark success fixed Redis config` |

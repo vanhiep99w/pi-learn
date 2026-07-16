@@ -15,14 +15,12 @@ wiki-prompt.ts    # Pi-native documentation task prompt
 /harness-report [last]
 /harness-improve [last]
 /harness-proposals
-/harness-approve [P-0001]
-/harness-reject [P-0001]
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note [text]
 ```
 
-Trong TUI, `/harness-proposals`, `/harness-approve` và `/harness-reject` mở modal review chung: chọn proposal, xem tóm tắt, mở Markdown đầy đủ, rồi approve hoặc reject với bước xác nhận. Có thể bỏ proposal ID để chọn trực tiếp trong modal. Ở print/JSON mode, `harness-approve` và `harness-reject` vẫn yêu cầu ID.
+Trong TUI, `/harness-proposals` là workflow review duy nhất: chọn proposal, xem tóm tắt, mở Markdown đầy đủ, rồi approve, reject hoặc approve & apply với bước xác nhận. Proposal có JSON Patch sẽ hiện action `Approve & Apply`; proposal đã approved sẽ hiện `Apply`. Các operation approve/reject/apply vẫn nằm trong Harness runtime nhưng không còn được đăng ký thành slash command riêng cho approve/reject. Ở print/JSON mode, command này chỉ in danh sách proposal.
 
 ## Harness Wiki commands
 

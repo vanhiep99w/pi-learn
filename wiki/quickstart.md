@@ -91,8 +91,6 @@ Common package commands documented by the READMEs and extension sources include:
 /harness-report [last]
 /harness-improve [last]
 /harness-proposals
-/harness-approve [P-0001]
-/harness-reject [P-0001]
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note [text]

@@ -869,10 +869,8 @@ Apply proposal sau khi user approve.
 ### Commands
 
 ```txt
-/harness-proposals
-/harness-approve P-0001
+/harness-proposals       # review + approve/reject/approve&apply trong modal
 /harness-apply P-0001
-/harness-reject P-0001
 ```
 
 ### Apply flow
@@ -1231,9 +1229,7 @@ harness eval --scenario smart-commit-basic
 /harness-tag success|failure <reason>
 /harness-proposals
 /harness-show P-0001
-/harness-approve P-0001
 /harness-apply P-0001
-/harness-reject P-0001
 /harness-eval P-0001
 ```
 

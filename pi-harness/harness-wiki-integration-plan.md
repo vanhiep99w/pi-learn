@@ -158,7 +158,6 @@ Harness extension hiện đăng ký:
 /harness-report
 /harness-improve
 /harness-proposals
-/harness-approve
 /harness-apply
 /harness-eval
 /harness-mark
@@ -303,7 +302,6 @@ sẽ được xóa. Nội dung provenance/upgrade có giá trị phải được
 /harness-report [last]
 /harness-improve [last]
 /harness-proposals
-/harness-approve P-0001
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note [text]
@@ -820,8 +818,7 @@ wiki/_plan.md
 ```txt
 normalized evidence
   → deterministic/LLM proposal
-  → user review
-  → /harness-approve P-xxxx
+  → /harness-proposals (user review + approve/reject/approve&apply)
   → /harness-apply P-xxxx
   → Markdown/path lint
   → relevant tests/eval

@@ -722,7 +722,6 @@ Không implement business logic riêng trong extension. Extension gọi core run
 /harness-report [last]
 /harness-improve [last]
 /harness-proposals
-/harness-approve P-0001
 /harness-apply P-0001
 /harness-eval [scenario|P-0001]
 /harness-mark success|failure|note [text]
@@ -847,9 +846,8 @@ harness rollback P-0001
 Pi:
 
 ```txt
-/harness-approve P-0001
+/harness-proposals       # review + approve/reject/approve&apply trong modal
 /harness-apply P-0001
-/harness-reject P-0001
 ```
 
 ### Apply flow
@@ -876,7 +874,7 @@ Pi:
 - [x] Do not execute `## Test plan` commands during apply; test plans remain review/eval guidance only.
 - [x] Support optional `--commit` with proposal id in commit message.
 - [x] Support rollback for uncommitted applies and committed applies.
-- [x] Add Pi wrapper commands: `/harness-approve`, `/harness-reject`, `/harness-apply`, `/harness-history`.
+- [x] Add Pi review/apply wrappers: `/harness-proposals` owns approve/reject/approve&apply UI; `/harness-apply` remains the advanced apply command.
 
 ### Definition of Done
 

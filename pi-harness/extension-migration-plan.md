@@ -594,10 +594,7 @@ Do not inject into LLM context.
 Commands:
 
 ```txt
-/harness-proposals
-/harness-show P-0001
-/harness-approve P-0001
-/harness-reject P-0001
+/harness-proposals  # picker + detail + approve/reject/approve&apply
 ```
 
 No apply initially.
@@ -824,10 +821,7 @@ pi -e ./packages/pi-learn-extensions/extensions/harness/index.ts
 ### Step 7 — Proposal UI
 
 ```txt
-/harness-proposals
-/harness-show
-/harness-approve
-/harness-reject
+/harness-proposals  # picker + detail + approve/reject/approve&apply
 ```
 
 ---
