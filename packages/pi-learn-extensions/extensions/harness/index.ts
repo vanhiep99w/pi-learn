@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
 import { DynamicBorder, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Box, Key, matchesKey, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
+import { Box, Key, matchesKey, type SelectItem, SelectList, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { registerHarnessWikiCommands } from "./wiki-commands.js";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
@@ -329,13 +329,14 @@ async function selectProposalAction(
     body: formatProposalPreview(proposal, markdown),
     items,
     selectedValue: proposal.status === "applied" ? "back" : "approve",
+    horizontal: true,
   });
   return selected as ProposalAction | undefined;
 }
 
 async function selectModalItem(
   ctx: ExtensionCommandContext,
-  options: { title: string; body: string; items: SelectItem[]; selectedValue?: string },
+  options: { title: string; body: string; items: SelectItem[]; selectedValue?: string; horizontal?: boolean },
 ): Promise<string | undefined> {
   if (ctx.mode !== "tui") {
     if (!ctx.hasUI || !ctx.ui?.select) return undefined;
@@ -356,7 +357,7 @@ async function selectModalItem(
     );
     panel.addChild(detailText);
 
-    const list = new SelectList(options.items, Math.min(options.items.length, 8), {
+    const list = options.horizontal ? undefined : new SelectList(options.items, Math.min(options.items.length, 8), {
       selectedPrefix: (text) => theme.bg("selectedBg", theme.fg("accent", text)),
       selectedText: (text) => theme.bg("selectedBg", theme.fg("accent", theme.bold(text))),
       description: (text) => theme.fg("muted", text),
@@ -364,11 +365,29 @@ async function selectModalItem(
       noMatch: (text) => theme.fg("warning", text),
     });
     const selectedIndex = options.items.findIndex((item) => item.value === options.selectedValue);
-    if (selectedIndex >= 0) list.setSelectedIndex(selectedIndex);
-    list.onSelect = (item) => done(item.value);
-    list.onCancel = () => done(undefined);
-    panel.addChild(list);
-    panel.addChild(new Text(theme.fg("dim", "PgUp/PgDn hoặc Ctrl+U/D cuộn chi tiết    ↑↓ chọn action    Enter xác nhận    Esc đóng"), 0, 1));
+    if (list && selectedIndex >= 0) list.setSelectedIndex(selectedIndex);
+    let actionBar: HorizontalActionBar | undefined;
+    if (list) {
+      list.onSelect = (item) => done(item.value);
+      list.onCancel = () => done(undefined);
+      panel.addChild(list);
+    } else {
+      actionBar = new HorizontalActionBar(
+        options.items,
+        options.selectedValue,
+        (text) => theme.bg("selectedBg", theme.fg("accent", theme.bold(text))),
+        (text) => theme.fg("muted", text),
+        done,
+      );
+      panel.addChild(actionBar);
+    }
+    panel.addChild(new Text(
+      theme.fg("dim", options.horizontal
+        ? "↑↓ cuộn chi tiết    ←→ chọn action    Enter xác nhận    Esc đóng"
+        : "PgUp/PgDn hoặc Ctrl+U/D cuộn chi tiết    ↑↓ chọn    Enter xác nhận    Esc đóng"),
+      0,
+      1,
+    ));
     panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
 
     return {
@@ -377,9 +396,14 @@ async function selectModalItem(
       handleInput: (data: string) => {
         const pageUp = keybindings.matches(data, "tui.select.pageUp") || matchesKey(data, Key.ctrl("u"));
         const pageDown = keybindings.matches(data, "tui.select.pageDown") || matchesKey(data, Key.ctrl("d")) || matchesKey(data, Key.space);
-        if (pageUp) detailText.scroll(-7);
-        else if (pageDown) detailText.scroll(7);
-        else list.handleInput(data);
+        const detailUp = options.horizontal && (keybindings.matches(data, "tui.select.up") || matchesKey(data, Key.up));
+        const detailDown = options.horizontal && (keybindings.matches(data, "tui.select.down") || matchesKey(data, Key.down));
+        if (pageUp || detailUp) detailText.scroll(-7);
+        else if (pageDown || detailDown) detailText.scroll(7);
+        else if (options.horizontal) actionBar?.handleInput(data);
+        else {
+          list?.handleInput(data);
+        }
         tui.requestRender();
       },
     };
@@ -425,6 +449,53 @@ class ScrollableText {
   invalidate() {
     this.text.invalidate();
   }
+}
+
+class HorizontalActionBar {
+  private readonly items: SelectItem[];
+  private readonly selectedStyle: (text: string) => string;
+  private readonly normalStyle: (text: string) => string;
+  private readonly done: (value: string | undefined) => void;
+  private selectedIndex: number;
+
+  constructor(
+    items: SelectItem[],
+    selectedValue: string | undefined,
+    selectedStyle: (text: string) => string,
+    normalStyle: (text: string) => string,
+    done: (value: string | undefined) => void,
+  ) {
+    this.items = items;
+    this.selectedStyle = selectedStyle;
+    this.normalStyle = normalStyle;
+    this.done = done;
+    const initialIndex = items.findIndex((item) => item.value === selectedValue);
+    this.selectedIndex = initialIndex >= 0 ? initialIndex : 0;
+  }
+
+  render(width: number): string[] {
+    const line = this.items.map((item, index) => {
+      const label = ` ${item.label} `;
+      return index === this.selectedIndex
+        ? this.selectedStyle(label)
+        : this.normalStyle(label);
+    }).join("  ");
+    return [truncateToWidth(line, width, "")];
+  }
+
+  handleInput(data: string) {
+    if (matchesKey(data, Key.left)) {
+      this.selectedIndex = (this.selectedIndex - 1 + this.items.length) % this.items.length;
+    } else if (matchesKey(data, Key.right)) {
+      this.selectedIndex = (this.selectedIndex + 1) % this.items.length;
+    } else if (matchesKey(data, Key.enter) || matchesKey(data, Key.return)) {
+      this.done(this.items[this.selectedIndex]?.value);
+    } else if (matchesKey(data, Key.escape)) {
+      this.done(undefined);
+    }
+  }
+
+  invalidate() {}
 }
 
 async function confirmProposalTransition(

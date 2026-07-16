@@ -20,7 +20,7 @@ wiki-prompt.ts    # Pi-native documentation task prompt
 /harness-mark success|failure|note [text]
 ```
 
-Trong TUI, `/harness-proposals` là workflow review duy nhất: chọn proposal sẽ mở ngay màn hình chi tiết cùng các action approve, reject hoặc approve & apply; không còn action xem chi tiết riêng. Khu vực chi tiết có viewport cố định và cuộn bằng `PgUp`/`PgDn`, nên các action luôn nằm trong modal thay vì bị đẩy khỏi màn hình. Proposal có JSON Patch sẽ hiện action `Approve & Apply`; proposal đã approved sẽ hiện `Apply`. Các operation approve/reject/apply vẫn nằm trong Harness runtime nhưng không còn được đăng ký thành slash command riêng cho approve/reject. Ở print/JSON mode, command này chỉ in danh sách proposal.
+Trong TUI, `/harness-proposals` là workflow review duy nhất: chọn proposal sẽ mở ngay màn hình chi tiết cùng các action approve, reject hoặc approve & apply; không còn action xem chi tiết riêng. Khu vực chi tiết có viewport cố định: dùng `↑/↓` để cuộn từng đoạn, `PgUp`/`PgDn` hoặc `Ctrl+U/D` để cuộn nhanh; dùng `←/→` để đổi action. Các action luôn nằm trong modal thay vì bị đẩy khỏi màn hình. Proposal có JSON Patch sẽ hiện action `Approve & Apply`; proposal đã approved sẽ hiện `Apply`. Các operation approve/reject/apply vẫn nằm trong Harness runtime nhưng không còn được đăng ký thành slash command riêng cho approve/reject. Ở print/JSON mode, command này chỉ in danh sách proposal.
 
 ## Harness Wiki commands
 
