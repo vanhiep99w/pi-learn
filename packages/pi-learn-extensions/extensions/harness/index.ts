@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type } from "@sinclair/typebox";
-import { DynamicBorder, getMarkdownTheme, type ExtensionAPI, type ExtensionCommandContext, type Theme } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, getMarkdownTheme, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Box, Key, Markdown, matchesKey, type SelectItem, SelectList, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { registerHarnessWikiCommands } from "./wiki-commands.js";
 
@@ -481,7 +481,7 @@ async function selectModalItem(
     );
     panel.addChild(detailText);
 
-    const selectedInModal = (text: string) => selectedWithRestoredPanelBg(theme, text);
+    const selectedInModal = (text: string) => theme.fg("accent", theme.bold(text));
     const list = options.horizontal ? undefined : new SelectList(options.items, Math.min(options.items.length, 8), {
       selectedPrefix: selectedInModal,
       selectedText: selectedInModal,
@@ -541,13 +541,6 @@ async function selectModalItem(
       margin: 1,
     },
   });
-}
-
-function selectedWithRestoredPanelBg(theme: Theme, text: string) {
-  // theme.bg("selectedBg", ...) ends with SGR 49 (reset background). Inside a
-  // Box that already painted customMessageBg, that reset creates a default/black
-  // strip for the rest of the terminal row. Restore the panel background instead.
-  return `${theme.getBgAnsi("selectedBg")}${theme.fg("accent", theme.bold(text))}${theme.getBgAnsi("customMessageBg")}`;
 }
 
 class ScrollableMarkdown {
