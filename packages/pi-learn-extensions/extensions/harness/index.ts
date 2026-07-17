@@ -534,14 +534,6 @@ async function selectModalItem(
         tui.requestRender();
       },
     };
-  }, {
-    overlay: true,
-    overlayOptions: {
-      anchor: "center",
-      width: 92,
-      maxHeight: "95%",
-      margin: 1,
-    },
   });
 }
 
