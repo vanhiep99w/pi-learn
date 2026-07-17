@@ -93,6 +93,20 @@ type StoredAccountsFile = {
   accounts: StoredChatGptAccount[];
 };
 
+type AuthPromptCompat = {
+  type: "text" | "secret" | "select" | "manual_code";
+  message: string;
+  placeholder?: string;
+  signal?: AbortSignal;
+  options?: ReadonlyArray<{ id: string; label: string; description?: string }>;
+};
+
+type AuthEventCompat =
+  | { type: "auth_url"; url: string; instructions?: string }
+  | { type: "device_code"; userCode: string; verificationUri: string }
+  | { type: "info"; message: string; links?: ReadonlyArray<{ url: string; label?: string }> }
+  | { type: "progress"; message: string };
+
 let cache: UsageState = { kind: "idle", fetchedAt: 0 };
 let pending: Promise<UsageState> | undefined;
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -323,42 +337,7 @@ async function loginChatGptAccount(pi: ExtensionAPI, ctx: any) {
   const manualInputController = new AbortController();
 
   try {
-    await ctx.modelRegistry.authStorage.login("openai-codex", {
-      onAuth: (info: { url: string; instructions?: string }) => {
-        ctx.ui.setWidget(STATUS_ID, [
-          ctx.ui.theme.fg("accent", "ChatGPT login"),
-          ctx.ui.theme.fg("muted", info.instructions ?? "Mở URL sau để login:"),
-          ctx.ui.theme.fg("dim", "Nếu Pi không tự bắt callback, paste full redirect URL/code ở prompt."),
-          info.url,
-        ], { placement: "belowEditor" });
-        void pi.exec("xdg-open", [info.url], { timeout: 5_000 }).catch(() => undefined);
-      },
-      onPrompt: async (prompt: { message: string; placeholder?: string; allowEmpty?: boolean }) => {
-        const value = await ctx.ui.input(
-          prompt.message,
-          prompt.placeholder ?? "Paste authorization code hoặc full redirect URL",
-          { signal: manualInputController.signal },
-        );
-        return value ?? "";
-      },
-      onManualCodeInput: async () => {
-        const value = await ctx.ui.input(
-          "Paste redirect URL nếu browser callback không tự hoàn tất:",
-          "http://localhost:1455/auth/callback?code=...&state=...",
-          { signal: manualInputController.signal },
-        );
-        return value ?? "";
-      },
-      onSelect: async (prompt: { message: string; options: Array<{ id: string; label: string }> }) => {
-        const labels = prompt.options.map((option) => option.label);
-        const selected = await ctx.ui.select(prompt.message, labels, { signal: manualInputController.signal });
-        return prompt.options.find((option) => option.label === selected)?.id;
-      },
-      onProgress: (message: string) => ctx.ui.notify(message, "info"),
-      signal: manualInputController.signal,
-    });
-
-    const credential = ctx.modelRegistry.authStorage.get("openai-codex") as Partial<AuthRecord> | undefined;
+    const credential = await loginProviderOauth(pi, ctx, "openai-codex", manualInputController);
     const account = accountFromCredential(credential);
     if (!account) {
       ctx.ui.notify("Login xong nhưng không đọc được credential openai-codex.", "error");
@@ -377,6 +356,142 @@ async function loginChatGptAccount(pi: ExtensionAPI, ctx: any) {
   }
 }
 
+async function loginProviderOauth(
+  pi: ExtensionAPI,
+  ctx: any,
+  provider: string,
+  controller: AbortController,
+): Promise<Partial<AuthRecord> | undefined> {
+  const legacyStorage = ctx.modelRegistry?.authStorage;
+  if (typeof legacyStorage?.login === "function") {
+    await legacyStorage.login(provider, {
+      onAuth: (info: { url: string; instructions?: string }) => {
+        showAuthUrl(pi, ctx, info.url, info.instructions);
+      },
+      onDeviceCode: (info: { userCode: string; verificationUri: string }) => {
+        showDeviceCode(pi, ctx, info.userCode, info.verificationUri);
+      },
+      onPrompt: async (prompt: { message: string; placeholder?: string }) => {
+        return (
+          (await ctx.ui.input(prompt.message, prompt.placeholder, { signal: controller.signal })) ?? ""
+        );
+      },
+      onManualCodeInput: async () => {
+        return (
+          (await ctx.ui.input(
+            "Paste redirect URL nếu browser callback không tự hoàn tất:",
+            "http://localhost:1455/auth/callback?code=...&state=...",
+            { signal: controller.signal },
+          )) ?? ""
+        );
+      },
+      onSelect: async (prompt: { message: string; options: Array<{ id: string; label: string }> }) => {
+        const labels = prompt.options.map((option) => option.label);
+        const selected = await ctx.ui.select(prompt.message, labels, { signal: controller.signal });
+        return prompt.options.find((option) => option.label === selected)?.id;
+      },
+      onProgress: (message: string) => ctx.ui.notify(message, "info"),
+      signal: controller.signal,
+    });
+    return readProviderCredential(ctx, provider);
+  }
+
+  const runtime = getModelRuntime(ctx);
+  if (typeof runtime?.login !== "function") {
+    throw new Error("Phiên bản Pi hiện tại không cung cấp API quản lý OAuth tương thích.");
+  }
+
+  return runtime.login(provider, "oauth", {
+    signal: controller.signal,
+    prompt: async (prompt: AuthPromptCompat) => {
+      const signal = prompt.signal ?? controller.signal;
+      if (prompt.type === "select") {
+        const options = prompt.options ?? [];
+        const labels = options.map((option) => option.description
+          ? `${option.label} — ${option.description}`
+          : option.label);
+        const selected = await ctx.ui.select(prompt.message, labels, { signal });
+        const index = selected === undefined ? -1 : labels.indexOf(selected);
+        if (index < 0) throw new Error("Đã huỷ đăng nhập ChatGPT.");
+        return options[index].id;
+      }
+
+      const value = await ctx.ui.input(prompt.message, prompt.placeholder, { signal });
+      if (value === undefined) throw new Error("Đã huỷ đăng nhập ChatGPT.");
+      return value;
+    },
+    notify: (event: AuthEventCompat) => {
+      if (event.type === "auth_url") {
+        showAuthUrl(pi, ctx, event.url, event.instructions);
+      } else if (event.type === "device_code") {
+        showDeviceCode(pi, ctx, event.userCode, event.verificationUri);
+      } else if (event.type === "progress") {
+        ctx.ui.notify(event.message, "info");
+      } else {
+        const links = event.links?.map((link) => link.label ? `${link.label}: ${link.url}` : link.url) ?? [];
+        ctx.ui.setWidget(STATUS_ID, [ctx.ui.theme.fg("muted", event.message), ...links], {
+          placement: "belowEditor",
+        });
+      }
+    },
+  }) as Promise<Partial<AuthRecord>>;
+}
+
+function showAuthUrl(pi: ExtensionAPI, ctx: any, url: string, instructions?: string) {
+  ctx.ui.setWidget(STATUS_ID, [
+    ctx.ui.theme.fg("accent", "ChatGPT login"),
+    ctx.ui.theme.fg("muted", instructions ?? "Mở URL sau để login:"),
+    ctx.ui.theme.fg("dim", "Nếu Pi không tự bắt callback, paste full redirect URL/code ở prompt."),
+    url,
+  ], { placement: "belowEditor" });
+  void pi.exec("xdg-open", [url], { timeout: 5_000 }).catch(() => undefined);
+}
+
+function showDeviceCode(pi: ExtensionAPI, ctx: any, userCode: string, verificationUri: string) {
+  ctx.ui.setWidget(STATUS_ID, [
+    ctx.ui.theme.fg("accent", "ChatGPT device login"),
+    `${ctx.ui.theme.fg("muted", "Code:")} ${ctx.ui.theme.bold(userCode)}`,
+    verificationUri,
+  ], { placement: "belowEditor" });
+  void pi.exec("xdg-open", [verificationUri], { timeout: 5_000 }).catch(() => undefined);
+}
+
+function getModelRuntime(ctx: any): any {
+  // Pi 0.80.8+ keeps the mutable credential store on ModelRuntime while
+  // extensions still receive the compatibility ModelRegistry facade.
+  return ctx.modelRegistry?.runtime;
+}
+
+async function readProviderCredential(ctx: any, provider: string): Promise<Partial<AuthRecord> | undefined> {
+  const legacyStorage = ctx.modelRegistry?.authStorage;
+  if (typeof legacyStorage?.get === "function") {
+    return legacyStorage.get(provider) as Partial<AuthRecord> | undefined;
+  }
+
+  const runtime = getModelRuntime(ctx);
+  if (typeof runtime?.credentials?.read === "function") {
+    return await runtime.credentials.read(provider) as Partial<AuthRecord> | undefined;
+  }
+
+  return (await readJson(piAuthPath()))[provider] as Partial<AuthRecord> | undefined;
+}
+
+async function writeProviderCredential(ctx: any, provider: string, credential: AuthRecord) {
+  const legacyStorage = ctx.modelRegistry?.authStorage;
+  if (typeof legacyStorage?.set === "function") {
+    await legacyStorage.set(provider, credential);
+    return;
+  }
+
+  const runtime = getModelRuntime(ctx);
+  if (typeof runtime?.credentials?.modify !== "function") {
+    throw new Error("Phiên bản Pi hiện tại không cung cấp API đổi ChatGPT account tương thích.");
+  }
+
+  await runtime.credentials.modify(provider, async () => credential);
+  if (typeof runtime.refresh === "function") await runtime.refresh({ allowNetwork: false });
+}
+
 async function switchChatGptAccount(ctx: any) {
   await importCurrentAuthIntoAccounts(ctx);
 
@@ -390,7 +505,7 @@ async function switchChatGptAccount(ctx: any) {
     return;
   }
 
-  const current = accountFromCredential(ctx.modelRegistry.authStorage.get("openai-codex") as Partial<AuthRecord> | undefined);
+  const current = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
   const currentId = current?.accountId || store.activeAccountId;
   const currentIndex = Math.max(0, store.accounts.findIndex((account) => account.accountId === currentId));
   const next = store.accounts[(currentIndex + 1) % store.accounts.length];
@@ -402,7 +517,7 @@ async function switchChatGptAccount(ctx: any) {
 async function showChatGptAccounts(ctx: any) {
   await importCurrentAuthIntoAccounts(ctx);
   const store = await loadAccountsStore();
-  const active = accountFromCredential(ctx.modelRegistry.authStorage.get("openai-codex") as Partial<AuthRecord> | undefined);
+  const active = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
   const activeId = active?.accountId || store.activeAccountId;
 
   if (store.accounts.length === 0) {
@@ -430,7 +545,7 @@ async function showChatGptAccounts(ctx: any) {
 async function deleteChatGptAccount(ctx: any) {
   await importCurrentAuthIntoAccounts(ctx);
   const store = await loadAccountsStore();
-  const active = accountFromCredential(ctx.modelRegistry.authStorage.get("openai-codex") as Partial<AuthRecord> | undefined);
+  const active = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
   const activeId = active?.accountId || store.activeAccountId;
 
   if (store.accounts.length === 0) {
@@ -458,8 +573,8 @@ async function deleteChatGptAccount(ctx: any) {
 
   if (chosen === allChoice) {
     await clearStoredAccounts();
-    removeProviderCredential(ctx, "openai-codex");
-    removeProviderCredential(ctx, "chatgpt");
+    await removeProviderCredential(ctx, "openai-codex");
+    await removeProviderCredential(ctx, "chatgpt");
     cache = { kind: "idle", fetchedAt: 0 };
     clearGlobalUsage();
     ctx.ui?.setStatus(STATUS_ID, undefined);
@@ -481,8 +596,8 @@ async function deleteChatGptAccount(ctx: any) {
       await activateStoredAccount(ctx, next);
       ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}. Active account mới: ${accountDisplayName(next)}.`, "info");
     } else {
-      removeProviderCredential(ctx, "openai-codex");
-      removeProviderCredential(ctx, "chatgpt");
+      await removeProviderCredential(ctx, "openai-codex");
+      await removeProviderCredential(ctx, "chatgpt");
       cache = { kind: "idle", fetchedAt: 0 };
       clearGlobalUsage();
       ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}. Không còn ChatGPT account nào đã lưu.`, "info");
@@ -495,7 +610,7 @@ async function deleteChatGptAccount(ctx: any) {
 
 async function activateStoredAccount(ctx: any, account: StoredChatGptAccount) {
   const fresh = await ensureFreshStoredAccount(account);
-  ctx.modelRegistry.authStorage.set("openai-codex", {
+  await writeProviderCredential(ctx, "openai-codex", {
     type: "oauth",
     access: fresh.access,
     refresh: fresh.refresh,
@@ -602,7 +717,7 @@ function toStoredAccount(auth: AuthRecord): StoredChatGptAccount {
 }
 
 async function importCurrentAuthIntoAccounts(ctx: any) {
-  const current = accountFromCredential(ctx.modelRegistry.authStorage.get("openai-codex") as Partial<AuthRecord> | undefined);
+  const current = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
   if (current) await upsertStoredAccount(current, true);
 }
 
@@ -651,11 +766,18 @@ async function clearStoredAccounts() {
   });
 }
 
-function removeProviderCredential(ctx: any, provider: string) {
-  const storage = ctx.modelRegistry?.authStorage;
-  if (!storage) return;
-  if (typeof storage.remove === "function") storage.remove(provider);
-  else if (typeof storage.logout === "function") storage.logout(provider);
+async function removeProviderCredential(ctx: any, provider: string) {
+  const legacyStorage = ctx.modelRegistry?.authStorage;
+  if (legacyStorage) {
+    if (typeof legacyStorage.remove === "function") await legacyStorage.remove(provider);
+    else if (typeof legacyStorage.logout === "function") await legacyStorage.logout(provider);
+    return;
+  }
+
+  const runtime = getModelRuntime(ctx);
+  if (typeof runtime?.credentials?.delete !== "function") return;
+  await runtime.credentials.delete(provider);
+  if (typeof runtime.refresh === "function") await runtime.refresh({ allowNetwork: false });
 }
 
 async function ensureFreshStoredAccount(account: StoredChatGptAccount): Promise<StoredChatGptAccount> {
