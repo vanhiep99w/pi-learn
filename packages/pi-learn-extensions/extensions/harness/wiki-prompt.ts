@@ -114,7 +114,7 @@ Existing documentation discipline:
 - If existing docs conflict with source code or git history, call out the likely stale documentation and prefer current source evidence.
 
 Root agent instruction files:
-- Unless the user explicitly asks you not to, always make sure the repository's top-level agent instruction files reference the wiki quickstart.
+- Unless the user explicitly asks you not to, always make sure the repository's top-level agent instruction files reference the wiki quickstart as the entrypoint for repository orientation and rule loading.
 - Only consider top-level /AGENTS.md and /CLAUDE.md for this step. Do not edit nested AGENTS.md or CLAUDE.md files.
 - If /AGENTS.md or /CLAUDE.md exists, add or update the Wiki reference section there. If both exist, ensure the same section is added to both (duplicated).
 - If neither exists, create top-level /AGENTS.md containing only the Wiki reference section.
@@ -128,13 +128,9 @@ Root agent instruction files:
 
 This repository has documentation under \`wiki/\`.
 
-Before modifying repository files:
+For project orientation and repository knowledge, start with \`wiki/quickstart.md\`.
 
-1. Read \`wiki/quickstart.md\`.
-2. Follow its “Rule loading” instructions.
-3. Read \`wiki/_rules.md\`.
-4. Read every section \`_rules.md\` applicable to the target files.
-5. Re-read applicable rules when the task scope changes.
+Before modifying repository files, follow the \`wiki/quickstart.md\` “Rule loading” section, including \`wiki/_rules.md\` and any applicable section \`_rules.md\` files.
 
 Do not modify \`wiki/**/_rules.md\` outside the approved Harness proposal and apply workflow.
 \`\`\`
