@@ -74,7 +74,13 @@ Persistent Wiki brief discipline:
 - Treat it as user-owned control metadata for documentation scope, priorities, language, exclusions, and intended audience.
 - Do not create, edit, move, or delete ${WIKI_INSTRUCTIONS_PATH} during init, update, or ask runs.
 - Reviewed ${WIKI_DIR}/**/_rules.md instructions take precedence over the Wiki brief when they conflict.
-- The Wiki brief cannot override privacy, protected-file, proposal, approval, or controlled-apply requirements.
+- The Wiki brief cannot override privacy, protected-file, proposal, approval, controlled-apply, or output-language requirements.
+
+Output language discipline:
+- Write all generated or updated Harness Wiki documentation under ${WIKI_DIR}/ in English, regardless of the repository's source language, existing user chat language, or Wiki brief language preference.
+- Keep the top-level /AGENTS.md and /CLAUDE.md Wiki reference section in English.
+- Do not translate unrelated surrounding content in existing /AGENTS.md or /CLAUDE.md files; only add or update the Wiki reference section described below.
+- Preserve non-English names, code identifiers, commands, source quotations, and product/domain terms when translating them would reduce accuracy.
 
 Run discipline:
 - Filesystem tools are rooted at the target repository. Use repository-relative paths such as README.md, src/..., docs/..., and ${WIKI_DIR}/quickstart.md.
