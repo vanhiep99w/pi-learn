@@ -399,15 +399,17 @@ async function reviewHarnessProposals(ctx: ExtensionCommandContext) {
 }
 
 async function selectHarnessProposal(ctx: ExtensionCommandContext, proposals: HarnessProposal[]) {
-  const items: SelectItem[] = proposals.map((proposal) => ({
-    value: proposal.id,
-    label: `${proposal.id}  ${proposal.title}`,
-    description: [
+  const items: SelectItem[] = proposals.map((proposal) => {
+    const meta = [
       (proposal.status ?? "draft").toUpperCase(),
       (proposal.target ?? "unknown").toUpperCase(),
       `RISK ${(proposal.risk ?? "unknown").toUpperCase()}`,
-    ].join("  •  "),
-  }));
+    ].join("  •  ");
+    return {
+      value: proposal.id,
+      label: `${proposal.id}  ${truncateToWidth(proposal.title, 32, "")}  ${meta}`,
+    };
+  });
   const selected = await selectModalItem(ctx, {
     title: "Chọn proposal để review",
     body: `${proposals.length} proposal khả dụng. Xem nội dung và quyết định approve hoặc reject.`,
@@ -464,7 +466,7 @@ async function selectModalItem(
 ): Promise<string | undefined> {
   if (ctx.mode !== "tui") {
     if (!ctx.hasUI || !ctx.ui?.select) return undefined;
-    const labels = options.items.map((item) => `${item.label} — ${item.description ?? ""}`);
+    const labels = options.items.map((item) => item.description ? `${item.label} — ${item.description}` : (item.label ?? item.value));
     const chosen = await ctx.ui.select(options.title, labels);
     return chosen ? options.items[labels.indexOf(chosen)]?.value : undefined;
   }
