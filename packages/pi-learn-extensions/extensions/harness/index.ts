@@ -518,7 +518,7 @@ async function selectModalItem(
     panel.addChild(new DynamicBorder((text: string) => theme.fg("borderAccent", text)));
 
     return {
-      render: (width: number) => panel.render(width),
+      render: (width: number) => panel.render(width).map(solidPanelSpaces),
       invalidate: () => panel.invalidate(),
       handleInput: (data: string) => {
         const pageUp = keybindings.matches(data, "tui.select.pageUp") || matchesKey(data, Key.ctrl("u"));
@@ -534,7 +534,22 @@ async function selectModalItem(
         tui.requestRender();
       },
     };
+  }, {
+    overlay: true,
+    overlayOptions: {
+      anchor: "center",
+      width: 92,
+      maxHeight: "95%",
+      margin: 1,
+    },
   });
+}
+
+function solidPanelSpaces(line: string) {
+  // Some VTE/XFCE Terminal setups do not repaint background color for plain
+  // space cells inside overlays, so stale/image cells behind the modal leak
+  // through. NBSP has the same terminal width but forces those cells to render.
+  return line.replaceAll(" ", "\u00A0");
 }
 
 class ScrollableMarkdown {
