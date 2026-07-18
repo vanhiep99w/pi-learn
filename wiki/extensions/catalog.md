@@ -47,7 +47,7 @@ Recommended commands include:
 /harness-wiki-ask <question>
 ```
 
-Trong TUI, `/harness-proposals` là workflow review duy nhất: chọn proposal sẽ mở ngay màn hình chi tiết cùng các action approve, reject hoặc approve & apply; không còn action xem chi tiết riêng. Khu vực chi tiết có viewport cố định: dùng `↑/↓` để cuộn từng đoạn, `PgUp`/`PgDn` hoặc `Ctrl+U/D` để cuộn nhanh; dùng `←/→` để đổi action. Các action luôn nằm trong modal thay vì bị đẩy khỏi màn hình. Proposal có JSON Patch sẽ hiện `Approve & Apply`; proposal đã approved sẽ hiện `Apply`. Approve/reject/apply vẫn là runtime operations được modal hoặc apply command gọi, không còn approve/reject slash commands riêng. Print/JSON mode chỉ in danh sách proposal.
+In TUI mode, `/harness-proposals` is the only proposal-review workflow. Selecting a proposal opens its details and the approve, reject, or approve-and-apply actions immediately; there is no separate detail action. The detail pane has a fixed viewport: use `↑/↓` for incremental scrolling, `PgUp`/`PgDn` or `Ctrl+U/D` for larger jumps, and `←/→` to change actions. Actions remain visible inside the modal. A proposal with a JSON Patch exposes `Approve & Apply`; an already approved proposal exposes `Apply`. Approve, reject, and apply remain runtime operations invoked by the modal or `/harness-apply`, not separate approve/reject slash commands. Print/JSON mode only prints the proposal list.
 
 The old `/wiki-*` commands and separate `extensions/wiki/` entrypoint are removed. Harness Wiki uses reviewed `wiki/**/_rules.md` prompt rules that the model loads lazily through `AGENTS.md` and `wiki/quickstart.md`.
 

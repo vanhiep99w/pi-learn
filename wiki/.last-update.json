@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-07-06T08:28:49.912Z",
+  "updatedAt": "2026-07-18T01:17:48.534Z",
   "command": "init",
-  "gitHead": "204d927730990fce7bfaaba05af45ba36998f66c",
-  "model": "openai-codex/gpt-5.5"
+  "gitHead": "25794cef393921a7169f6704ff9d4c9e0c4b44a2",
+  "model": "openai-codex/gpt-5.6-sol"
 }

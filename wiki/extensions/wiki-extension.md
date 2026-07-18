@@ -22,6 +22,12 @@ packages/harness-runtime/src/analysis/wiki-prompt-rules.js
 
 The old `/wiki-*` commands and `/harness-wiki-status` are intentionally absent; there are no deprecated or hidden aliases.
 
+## Known reviewed-rule mismatch
+
+Current source, READMEs, git history, and the `harness-wiki-command-surface` eval agree that `/harness-wiki-status` was intentionally removed. However, reviewed rule `EXT-CMD-001` in `wiki/extensions/_rules.md` still lists that command as required. This Wiki run cannot repair the rule because `_rules.md` changes must use the Harness proposal, approval, and controlled-apply workflow.
+
+Before changing the Harness Wiki command surface, treat this as an unresolved policy/source mismatch: do not silently re-add or further remove commands. First create and review a proposal that reconciles `EXT-CMD-001` with the intended public contract, then keep source, tests/evals, READMEs, and Wiki docs aligned.
+
 ## Command behavior
 
 - `/harness-wiki-init` creates missing deterministic prompt-rule scaffolds, then starts an initial documentation run with the current Pi model/tools.
@@ -150,8 +156,8 @@ Then reload Pi and verify:
 
 ```txt
 /reload
-/harness-wiki-ask Prompt rules được load vào context thế nào?
+/harness-wiki-ask How are prompt rules loaded into context?
 /harness-wiki-update
 ```
 
-Also verify `/wiki-status` is absent and a normal Harness Wiki turn cannot modify `_rules.md`.
+Also verify legacy `/wiki-*` commands and `/harness-wiki-status` are absent, and that a normal Harness Wiki turn cannot modify `_rules.md`.

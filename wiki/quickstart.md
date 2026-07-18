@@ -132,6 +132,7 @@ See [Architecture overview](architecture/overview.md) for package boundaries and
 4. **Guard UI work.** TUI extensions should check `ctx.hasUI`, use `ctx.ui?.` when appropriate, and clean up timers/compositors/listeners on shutdown.
 5. **Prefer runtime tests for harness changes.** The root package has no root `test` script, but `packages/harness-runtime/package.json` defines `npm test` as `node --test`.
 6. **Reload Pi after extension/theme changes.** The normal verification loop is source edit → targeted static/test check → restart Pi or `/reload` → run the relevant slash command.
+7. **Resolve the current Wiki command-rule mismatch before changing that surface.** Source and evals intentionally omit `/harness-wiki-status`, while reviewed rule `EXT-CMD-001` still lists it; see [Harness Wiki capability](extensions/wiki-extension.md#known-reviewed-rule-mismatch).
 
 ## Wiki sections
 
