@@ -45,6 +45,15 @@ export function collectNormalizeWarnings(parsed) {
           entryId: entry.id,
         }));
       }
+      if (role === "toolResult" && typeof entry.message?.isError !== "boolean") {
+        warnings.push(createSessionWarning({
+          code: "nonboolean_tool_result_status",
+          message: "Tool result isError status must be boolean",
+          sessionFile: parsed.sessionFile,
+          lineNumber: entry.__lineNumber,
+          entryId: entry.id,
+        }));
+      }
     }
   }
 

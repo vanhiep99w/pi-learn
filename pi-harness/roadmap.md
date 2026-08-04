@@ -5,6 +5,8 @@
 > Kế hoạch nâng cấp rút ra từ so sánh với Better Harness nằm tại [`better-harness-comparison-and-improvement-plan.md`](./better-harness-comparison-and-improvement-plan.md). Tài liệu đó là backlog thiết kế cho frozen evidence, Task Episode, findings, verified repair và longitudinal evaluation; roadmap này vẫn là owner của current implementation status và phase sequencing.
 >
 > Mục tiêu: mô tả **current status**, thứ tự triển khai thực tế, deliverables, Definition of Done, dependencies, và tiêu chí không được nhảy phase.
+>
+> **Canonical implementation tracker:** [`implementation-status.md`](./implementation-status.md). Use it for published slices, the unpublished working tree, verification evidence, risks, and the next decision; this roadmap keeps the phase contracts and sequencing.
 
 ---
 
@@ -1038,13 +1040,14 @@ Do not enter next phase unless gate passes.
 
 ## 17. Current next actions
 
-Immediate recommended next steps:
+The canonical status, evidence, risks, and ordered backlog are tracked in [`implementation-status.md`](./implementation-status.md).
 
 ```txt
-1. Live-test `/harness-improve` on `prasac` and verify targets match target files.
-2. Live-test `/harness-automation-status` and `/harness-automate` inside Pi after `/reload`.
-3. Decide whether Phase 12 should be dashboard/status UI or richer automation scheduling.
-4. Keep automation opt-in and proposal-first; do not add silent auto-apply or auto-push.
+Published: Slice 1 (Frozen Analysis Run) and Slice 2 (Existing Coverage Before Proposal).
+Working tree: Slice 3 Task Episode candidate lane is implemented but unpublished.
+Immediate: review, commit, and push Slice 3; publication is not automatic.
+Next decision: implement the bounded Project Harness Evidence Lane and/or decide its sequencing before P1 Findings work.
+Constraint: do not claim full workspace topology, findings, or semantic one-goal Task Episodes yet.
 ```
 
 Current implementation choice:
@@ -1124,11 +1127,14 @@ MVP must guarantee:
 Updated roadmap:
 
 ```txt
-Current: Phase 8 LLM reflection MVP + Phase 9 controlled apply MVP + Phase 10 eval harness MVP + Phase 11 gated automation MVP implemented
-Next: live Pi UI verification and decide Phase 12
-Then: broader auto-improvement only after eval gates
-Finally: no silent auto-apply/auto-push
+Current: Slices 1 and 2 are published; Slice 3 is implemented in the dirty working tree but is not committed or pushed.
+Next: review and explicitly publish Slice 3, then choose/implement the bounded Project Harness Evidence Lane before or alongside the P1 Findings sequencing decision.
+Then: evidence states, Findings ledger, proposal linkage, findings-backed projections, validation receipts, applied-vs-verified state, stale revision protection, and post-fix review.
+Later: P2 longitudinal outcomes, followed by optional P3 capabilities only when evidence justifies them.
+Finally: no automatic commit/push, silent auto-apply, or raw/private evidence in the repository.
 ```
+
+See [`implementation-status.md`](./implementation-status.md) for the canonical tracker.
 
 Most important sequencing rule:
 

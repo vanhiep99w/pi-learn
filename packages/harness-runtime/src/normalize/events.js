@@ -48,9 +48,16 @@ export function normalizeSessionEvents({ parsed, tree, project }) {
           contentStats: { chars: String(entry.summary ?? "").length },
         });
         break;
-      case "custom":
-        events.push({ ...base, kind: "custom", summary: `custom entry ${entry.customType ?? "unknown"}` });
+      case "custom": {
+        const harnessMarker = normalizeHarnessMarker(entry);
+        events.push({
+          ...base,
+          kind: "custom",
+          summary: harnessMarker ? "harness marker" : `custom entry ${entry.customType ?? "unknown"}`,
+          harnessMarker,
+        });
         break;
+      }
       case "custom_message":
         events.push(withExcerpt({ ...base, kind: "custom_message", summary: `custom message ${entry.customType ?? "unknown"}` }, entry.content, 1000));
         break;
@@ -65,7 +72,16 @@ export function normalizeSessionEvents({ parsed, tree, project }) {
     }
   }
 
-  return events.map(finalizeEvent);
+  // Ordinals are assigned only after one source entry has expanded into its
+  // final event sequence. Event IDs remain unchanged for cache compatibility.
+  return events.map((event, index) => finalizeEvent({ ...event, ordinal: index + 1 }));
+}
+
+function normalizeHarnessMarker(entry) {
+  if (entry.customType !== "harness-tag") return undefined;
+  const tag = entry.data?.tag;
+  if (tag !== "success" && tag !== "failure") return undefined;
+  return { tag };
 }
 
 function normalizeMessage(base, entry) {
@@ -113,14 +129,15 @@ function normalizeMessage(base, entry) {
   }
 
   if (role === "toolResult") {
+    const isError = typeof message.isError === "boolean" ? message.isError : undefined;
     return [withExcerpt({
       ...base,
       kind: "tool_result",
-      summary: `${message.toolName ?? "tool"} result${message.isError ? " error" : ""}`,
+      summary: `${message.toolName ?? "tool"} result${isError === true ? " error" : ""}`,
       tool: {
         name: message.toolName,
         callId: message.toolCallId,
-        isError: Boolean(message.isError),
+        ...(typeof isError === "boolean" ? { isError } : {}),
       },
     }, message.content, 2000)];
   }

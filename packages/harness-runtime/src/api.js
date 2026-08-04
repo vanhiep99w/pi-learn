@@ -14,9 +14,11 @@ import { runEvalHarness } from "./eval/eval-harness.js";
 import { createEvalFixtureDraftProposal, getAutomationStatus } from "./automation/gated-automation.js";
 import { runRuleEngine } from "./analysis/rules.js";
 import { publicCandidateReview, reviewCandidateSignals } from "./analysis/candidate-review.js";
+import { buildTaskEpisodeArtifacts } from "./analysis/task-episodes.js";
 import { generateTargetedImprovements } from "./improve/target-proposals.js";
 import { writeMemoryDrafts } from "./memory/memory-drafts.js";
 import { beginCandidateReviewAttempt, finalizeCandidateReviewAttempt } from "./storage/candidate-review-writer.js";
+import { writeTaskEpisodeArtifacts } from "./storage/task-episodes-writer.js";
 import { findDraftProposal, readDraftProposals, writeDraftProposals } from "./proposals/proposal-writer.js";
 import { approveProposal, applyProposal, readProposalHistory, rejectProposal, rollbackProposal } from "./proposals/lifecycle.js";
 import { pathExists, resolvePath } from "./utils/path.js";
@@ -121,6 +123,43 @@ export async function scan(options = {}) {
       results: consumed.results.map(publicScanResult),
       warnings: [...run.warnings, ...consumed.warnings],
     };
+  } catch (error) {
+    fail(logger, project, error);
+    throw error;
+  }
+}
+
+export async function taskEpisodes(options = {}) {
+  const { config, project, logger } = createHarnessContext("task-episodes", options);
+  ensureHarnessHome(config);
+  try {
+    const run = resolveAnalysisRun({ options, config, project, logger });
+    const consumed = await consumeAnalysisRun({
+      analysisRun: run,
+      config,
+      project,
+      logger,
+      consumer: "task-episodes",
+    });
+    const artifacts = buildTaskEpisodeArtifacts({
+      analysisRun: consumed.analysisRun,
+      sessionResults: consumed.results,
+      projectRoot: project.projectRoot,
+    });
+    const publication = writeTaskEpisodeArtifacts({
+      config,
+      project,
+      analysisRun: consumed.analysisRun,
+      privateArtifact: artifacts.privateArtifact,
+      readerArtifact: artifacts.readerArtifact,
+    });
+    end(logger, project, {
+      runId: run.runId,
+      status: publication.reader.status,
+      candidates: publication.reader.counts.candidates,
+      retained: publication.reader.counts.retained,
+    });
+    return publication.reader;
   } catch (error) {
     fail(logger, project, error);
     throw error;

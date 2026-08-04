@@ -38,6 +38,13 @@ test("writeSessionCache writes manifest events metrics and warnings", async () =
   assert.equal(metrics.topTools.read, 1);
   assert.equal(events.some((event) => event.kind === "assistant_tool_call"), true);
   assert.equal(events.every((event) => event.rawRef?.sessionFile === sessionFile), true);
+  assert.deepEqual(events.map((event) => event.ordinal), [1, 2, 3, 4]);
+  assert.deepEqual(events.map((event) => event.eventId), [
+    "m1_000001",
+    "m2_000002",
+    "m2_000002_tool_1",
+    "m3_000003",
+  ]);
 });
 
 test("writeSessionCache enriches normalize warnings with project and session ids", async () => {

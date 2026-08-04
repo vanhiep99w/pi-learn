@@ -9,6 +9,7 @@ import {
   projectResolve,
   sessions,
   scan,
+  taskEpisodes,
   report,
   reflect,
   importReflection,
@@ -26,6 +27,7 @@ import {
 } from "../src/api.js";
 import { analysisRunConsumerReceiptPath, analysisRunContextPath } from "../src/analysis/analysis-run.js";
 import { candidateReviewReceiptPath } from "../src/storage/candidate-review-writer.js";
+import { taskEpisodeArtifactPaths } from "../src/storage/task-episodes-writer.js";
 
 const packageCwd = path.resolve(new URL("..", import.meta.url).pathname);
 
@@ -84,6 +86,76 @@ test("api scan writes cache files", async () => {
   assert.equal(output.count, 1);
   assert.equal(fs.existsSync(path.join(output.results[0].outDir, "manifest.json")), true);
   assert.equal(fs.existsSync(path.join(output.results[0].outDir, "events.jsonl")), true);
+});
+
+test("api taskEpisodes consumes an independent frozen lane and returns only the bound reader projection", async () => {
+  const fixture = createFixture();
+  const options = baseOptions(fixture);
+  writeEpisodeSession(path.join(fixture.sessionDir, "episode.jsonl"), {
+    id: "private-session-id",
+    cwd: fixture.project,
+    timestamp: "2026-06-14T01:00:00.000Z",
+  });
+  const run = analysisRun(options);
+  const project = projectResolve(options);
+  const contextPath = analysisRunContextPath({ config: options, project, runId: run.runId });
+  const contextBefore = fs.readFileSync(contextPath, "utf8");
+
+  const output = await taskEpisodes({ ...options, analysisRun: run });
+  const replay = await taskEpisodes({ ...options, analysisRun: run });
+  const paths = taskEpisodeArtifactPaths({ config: options, project, runId: run.runId });
+  const receiptPath = analysisRunConsumerReceiptPath({ config: options, project, runId: run.runId, consumer: "task-episodes" });
+
+  assert.equal(output.kind, "pi-harness.task-episode-candidate-reader");
+  assert.equal(output.policy, "task-episode-candidate-v1");
+  assert.equal(output.status, "complete");
+  assert.equal(output.runBinding.runId, run.runId);
+  assert.equal(output.runBinding.selectedCount, 1);
+  assert.equal(output.counts.candidates, 1);
+  assert.equal(output.counts.retained, 1);
+  assert.equal(output.episodes[0].closure.status, "closed");
+  assert.equal(output.episodes[0].closure.deliveryStatus, "unobserved");
+  assert.deepEqual(replay, output);
+  assert.equal(fs.statSync(paths.privatePath).mode & 0o777, 0o600);
+  assert.equal(fs.statSync(paths.readerPath).mode & 0o777, 0o600);
+  assert.equal(JSON.parse(fs.readFileSync(receiptPath, "utf8")).consumer, "task-episodes");
+  assert.equal(fs.readFileSync(contextPath, "utf8"), contextBefore);
+  const outputText = JSON.stringify(output);
+  assert.doesNotMatch(outputText, /private-session-id|SECRET_MARK_REASON|sourceFingerprint|commandFingerprint|eventId|entryId|sessionId/);
+  assert.equal(Object.hasOwn(output, "privateArtifact"), false);
+  assert.equal(Object.hasOwn(output, "paths"), false);
+});
+
+test("api taskEpisodes preserves malformed raw evidence as partial and keeps genuine empty evidence honest", async () => {
+  const malformedFixture = createFixture();
+  const malformedPath = path.join(malformedFixture.sessionDir, "malformed.jsonl");
+  fs.writeFileSync(malformedPath, [
+    JSON.stringify({ type: "session", version: 3, id: "malformed", cwd: fs.realpathSync(malformedFixture.project), timestamp: "2026-06-14T01:00:00.000Z" }),
+    JSON.stringify({ type: "message", id: "m1", parentId: null, timestamp: "2026-06-14T01:00:00.000Z", message: { role: "user", content: "synthetic" } }),
+    "{malformed-json",
+    JSON.stringify({ type: "message", id: "m2", parentId: "m1", timestamp: "2026-06-14T01:00:00.000Z", message: { role: "assistant", content: "work" } }),
+  ].join("\n") + "\n");
+  const malformed = await taskEpisodes(baseOptions(malformedFixture));
+  assert.equal(malformed.status, "partial");
+  assert.equal(malformed.counts.selectedSessions, 1);
+  assert.equal(malformed.counts.acceptedSessions, 1);
+  assert.equal(malformed.counts.candidates, 0);
+  assert.equal(malformed.episodes.length, 0);
+
+  const emptyFixture = createFixture();
+  fs.writeFileSync(path.join(emptyFixture.sessionDir, "empty.jsonl"), `${JSON.stringify({
+    type: "session",
+    version: 3,
+    id: "empty",
+    cwd: fs.realpathSync(emptyFixture.project),
+    timestamp: "2026-06-14T01:00:00.000Z",
+  })}\n`);
+  const empty = await taskEpisodes(baseOptions(emptyFixture));
+  assert.equal(empty.status, "complete");
+  assert.equal(empty.counts.selectedSessions, 1);
+  assert.equal(empty.counts.acceptedSessions, 1);
+  assert.equal(empty.counts.candidates, 0);
+  assert.deepEqual(empty.episodes, []);
 });
 
 test("api report writes latest Markdown report", async () => {
@@ -461,6 +533,16 @@ function assertEventSequenceIncludes(events, expected) {
 
 function writeSession(file, { id, cwd, timestamp, userContent = "hi" }) {
   fs.writeFileSync(file, `${JSON.stringify({ type: "session", version: 3, id, cwd: fs.realpathSync(cwd), timestamp })}\n${JSON.stringify({ type: "message", id: "m1", parentId: null, timestamp, message: { role: "user", content: userContent } })}\n`);
+}
+
+function writeEpisodeSession(file, { id, cwd, timestamp }) {
+  const lines = [
+    { type: "session", version: 3, id, cwd: fs.realpathSync(cwd), timestamp },
+    { type: "message", id: "m1", parentId: null, timestamp, message: { role: "user", content: "private task prompt" } },
+    { type: "message", id: "m2", parentId: "m1", timestamp, message: { role: "assistant", provider: "test", model: "model", content: "done" } },
+    { type: "custom", id: "m3", parentId: "m2", timestamp, customType: "harness-tag", data: { tag: "success", reason: "SECRET_MARK_REASON", cwd: "/private/cwd", leafId: "private-leaf", createdAt: timestamp } },
+  ];
+  fs.writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
 }
 
 function writeErrorSession(file, { id, cwd, timestamp }) {
