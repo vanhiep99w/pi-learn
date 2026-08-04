@@ -38,6 +38,28 @@ test("renderProposalMarkdown includes required evidence/test/rollback sections",
   assert.match(markdown, /## Rollback/);
 });
 
+test("candidate metadata is additive and remains readable after write", () => {
+  const fixture = createFixture();
+  const proposal = {
+    ...createProposal({ fingerprint: "fp-candidate" }),
+    candidateId: "candidate-1234567890abcdef12345678",
+    detectorId: "R-0002",
+    reviewFingerprint: "review-fingerprint-1",
+  };
+
+  const result = writeDraftProposals({ config: fixture.config, project: fixture.project, proposals: [proposal] });
+  const markdown = fs.readFileSync(result.written[0].filePath, "utf8");
+  const read = readDraftProposals({ config: fixture.config, project: fixture.project })[0];
+
+  assert.match(markdown, /candidate_id: candidate-1234567890abcdef12345678/);
+  assert.match(markdown, /detector_id: R-0002/);
+  assert.match(markdown, /review_fingerprint: review-fingerprint-1/);
+  assert.equal(read.candidateId, proposal.candidateId);
+  assert.equal(read.detectorId, proposal.detectorId);
+  assert.equal(read.reviewFingerprint, proposal.reviewFingerprint);
+  assert.match(markdown, /## Proposed change/);
+});
+
 test("renderProposalMarkdown includes machine-applicable patch section when provided", () => {
   const markdown = renderProposalMarkdown({
     id: "P-9998",

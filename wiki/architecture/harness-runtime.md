@@ -27,7 +27,9 @@ The main flow through `src/api.js` is:
 4. **Parse session JSONL** — `parseSessionFile()` reads each unchanged selected JSONL file line by line, extracts the session header, keeps entries, and emits parser warnings for malformed/missing/duplicate structure.
 5. **Guard and normalize** — before canonical persistence, `writeSessionCache()` verifies parsed header identity/timestamp and final size/mtime against the frozen snapshot. A mismatch cannot create or overwrite canonical cache. Matching parses proceed to tree building, normalization, metrics, and enriched warnings.
 6. **Write private cache and receipt** — normalized session artifacts and independent atomic consumer receipts are written under the harness home, not into the source repo by default.
-7. **Generate outputs** — report, reflection, proposal, eval, or automation functions consume normalized session results.
+7. **Review deterministic candidates before proposal** — R-0001 through R-0004 emit proposal-free `CandidateSignal` objects whose private evidence refs include the frozen session `sourceFingerprint` and normalized event ID when available. One reviewer filters by API mode, inventories bounded applicable project `AGENTS.md`/`wiki/**/_rules.md` ancestry, evaluates executable per-block coverage signatures and eligibility, then retains promoted/deferred/rejected decisions.
+8. **Begin, write, and finalize one proposal attempt** — before proposal files are touched, the runtime exclusively persists a pending attempt receipt. It then writes/skips promoted proposals and atomically finalizes that same receipt. Begin failure prevents proposal writing; finalize failure leaves the pending receipt intact.
+9. **Generate outputs** — report, reflection, reviewed proposal, eval, or automation functions consume normalized session results.
 
 Representative source files:
 
@@ -42,8 +44,11 @@ Representative source files:
 - `src/reflection/reflection.js` — redacted reflection prompt and response-to-proposal conversion
 - `src/proposals/*` — draft proposal writing and lifecycle
 - `src/eval/eval-harness.js` — deterministic eval scenarios
-- `src/analysis/rules.js` — built-in deterministic detector implementations/defaults
-- `src/analysis/wiki-prompt-rules.js` — `_rules.md` discovery, classification, scaffolding, and lint; it does not configure detectors
+- `src/analysis/rules.js` — built-in deterministic detectors that emit CandidateSignals
+- `src/analysis/project-agent-assets.js` — project-only applicability, bounded secure asset reads, H2 extraction, and privacy-safe inventory projection
+- `src/analysis/candidate-review.js` — detector-owned coverage signatures, eligibility decisions, and promoted proposal templates
+- `src/storage/candidate-review-writer.js` — atomic run-bound candidate review receipts
+- `src/analysis/wiki-prompt-rules.js` — `_rules.md` discovery, classification, scaffolding, and lint; it does not configure detectors or coverage signatures
 
 ## Storage model
 
@@ -64,7 +69,8 @@ Normalized outputs are stored below:
 ~/.pi/harness/projects/<project-key>/
 ├── analysis-runs/<run-id>/
 │   ├── context.json
-│   └── consumers/<consumer>.json
+│   ├── consumers/<consumer>.json
+│   └── candidate-reviews/<mode>/<attempt-id>.json
 ├── sessions/<session-id>/
 │   ├── manifest.json
 │   ├── events.jsonl
@@ -85,6 +91,11 @@ Harness is designed to avoid raw-log exposure in normal workflows:
 - The runtime README states that reflection prompts are built from normalized redacted cache excerpts, not raw JSONL.
 - Analysis-run `context.json` stores identity/stat metadata and warnings only; it does not store raw prompt or message content. It is immutable after creation, has a self-fingerprint bound to the public run, and is never rewritten for consumer status.
 - Consumer status is stored in per-consumer atomic receipts. Concurrent report and reflection consumers therefore retain separate audit records.
+- Candidate-review attempts are append-only at the directory level: each same-run/mode invocation gets a collision-resistant, traversal-safe attempt ID. An exclusive `0600` pending receipt is durable before proposal writing and is finalized through a receipt-specific `0600`, fsynced atomic replace with temporary-file cleanup. Write/rename failure preserves the original pending receipt. The receipt binds to `runId` plus `selectedFingerprint`, retains bounded candidate counts/required-review data and structured `sourceFingerprint` evidence refs, stores decisions and project-relative asset digests/routes, and never rewrites frozen `context.json`. R-0001 signal audit contains only an allowlisted command class plus stable hash; other detector signals use finite allowlisted classifications. No excerpts, contents, raw command arguments, credentials, tokens, assignments, or raw paths enter the receipt.
+- Agent-asset authority is `{ project: true, userHome: false }`. Applicable assets are only root/nested `AGENTS.md` and `wiki/**/_rules.md` ancestor chains for candidate owner routes; discovery never ascends above the real project root or visits siblings/descendants. File and directory symlinks are not followed.
+- Asset opening is limited to regular files, 64 KiB per file, 256 KiB aggregate and 128 applicable assets. The runtime performs no-follow open, verifies the opened descriptor's real target, intended pathname/inode and project containment, reads bounded bytes through the fd, then repeats fstat and binding/containment checks. Static symlinks, intermediate-directory races, mutation, unreadable/oversized/invalid content, and count/aggregate limits make review partial. Strong verification currently depends on an OS descriptor namespace such as `/proc/self/fd` or `/dev/fd`; when unavailable or unverifiable, review fails closed.
+- `AGENTS.md` content before the first H2—including H1-only or list-only files—is preserved as one opaque synthetic block and is never merged with later H2 sections. Wiki `_rules.md` preamble remains excluded. Only validated explicit rule IDs are public section IDs; all other headings/preambles use opaque digest IDs.
+- Public candidate/review projections exclude asset contents, evidence excerpts, raw/session/cache absolute paths, user-home paths and source heading words. Project-relative asset routes and explicit/opaque section IDs are the only content locators exposed by this lane.
 - Frozen session fingerprints cover provider, session id/private stable ref, header timestamp, file size/mtime, and project/workspace identity. The active session follows the same explicit-partial mutation policy as every selected session.
 - Public authority records `rawSessionContent: false`, `userHomeAssets: false`, and `normalizedLookup: single-exact-ref`. The route-only `workspaceTarget` is `{ kind: "repo-root" | "standalone", route: ".", packageRoute: null, ownerRoute: "." }`; it contains no absolute paths and does not implement workspace-member topology.
 - `src/safety/redaction.js` redacts common API keys/tokens, bearer headers, sensitive assignments, long opaque tokens, sensitive object keys, and sensitive paths such as `.env`, Pi auth stores, Pi sessions, and `.pi/logs/llm-payloads/`.
@@ -102,10 +113,13 @@ Important API functions in `src/api.js`:
 - `reflect()` consumes unchanged sessions from the frozen selection and writes a redacted reflection prompt with evidence references.
 - Both artifacts render a bounded run summary containing run ID, selected fingerprint, selected/accepted/skipped counts, consumer status, and explicit partial or observed-empty scope text.
 - `importReflectionResponse()` converts a model response with `{ proposals: [...] }` into draft proposal Markdown files.
-- `propose()` can run the deterministic rule engine or targeted improvement generation for `memory`, `rules`, `parser`, or `redaction`.
-- `target=rules` now means reviewed Markdown prompt guidance in `wiki/**/_rules.md`; deterministic detector behavior/default changes target runtime analysis source and tests.
+- `propose({ rules: true })` reviews all R-0001 through R-0004 CandidateSignals. `target=rules` selects R-0001/R-0002, `target=parser` selects R-0004, and `target=redaction` selects R-0003 through the same detector/reviewer/promoter path; the former duplicate targeted producers are removed.
+- Deterministic proposal results keep `written`/`skipped`, define `candidates` as the CandidateSignal count, and add promoted/deferred/rejected counts plus privacy-safe `candidateSignals`, `decisions`, and agent-asset summaries. Promoted proposal frontmatter adds candidate ID, detector ID, and review fingerprint without changing legacy proposal sections/lifecycle. Review fingerprints bind inspected asset digests; proposal fingerprints separately bind stable candidate/repair identity and therefore remain stable across unrelated non-covering asset edits.
+- Exact-edit coverage requires oldText/exact-edit, inspect-current-block, exact whitespace/punctuation, and unique-match concepts in one applicable block, independent of rule ID. Applicable Wiki content uses H2 blocks; applicable AGENTS preamble is its own opaque block. Scattered concepts do not match; deterministic near-matches are ambiguous and defer. Existing `GLOBAL-EDIT-001` therefore defers R-0002 as `existing-coverage` with `observedUse: "unobserved"` and writes no duplicate proposal.
+- R-0003 remains a review lead and defers without an observed authorization/exposure consequence. R-0004 can promote only mapped warning codes with distinct structured evidence refs, a concrete deterministic consequence, existing project-relative package owners, bounded repair, validation route, and project authority.
+- `target=rules` still means reviewed Markdown guidance in `wiki/**/_rules.md`; detector defaults and coverage signatures remain executable runtime code and never come from parsing prompt prose.
 
-The Pi extension command `/harness-improve` bridges runtime and current Pi model by reading the generated reflection prompt and sending a follow-up user message that instructs the model to call `harness_import_llm_reflection`.
+The Pi extension command `/harness-improve` bridges runtime and current Pi model by reading the generated reflection prompt and sending a follow-up user message that instructs the model to call `harness_import_llm_reflection`. LLM reflection/import, `target=memory`, and automation eval-fixture drafts remain outside this deterministic semantic gate; writer fingerprints only deduplicate identical fingerprints and do not solve semantic duplication on those residual paths.
 
 ## Proposal lifecycle and controlled apply
 
@@ -127,6 +141,7 @@ This lifecycle is intentionally conservative. Keep target-file enforcement, git 
 redaction-fixture
 parser-unknown-entry
 edit-oldText-workflow
+existing-coverage-before-proposal
 file-protection
 smart-commit-basic
 ts-extension-safety
@@ -138,7 +153,7 @@ harness-wiki-command-surface
 
 The eval runner writes JSON and Markdown reports under the harness project's `evals/` directory. It checks redaction, parser resilience, rule generation, file protection, controlled apply, and TypeScript extension safety.
 
-Automation is gated by config and disabled by default. Runtime and README evidence say automation can scan/report/draft/eval, but does not apply, commit, push, or bypass the normal normalized scan path. When any scan/report/propose stage is enabled, `automate()` freezes one run and passes it to every session-consuming stage. Top-level and per-action output expose the shared run ID and selected fingerprint for audit; eval/status stages do not consume the run.
+Automation is gated by config and disabled by default. Runtime and README evidence say automation can scan/report/draft/eval, but does not apply, commit, push, or bypass the normal normalized scan path. When any scan/report/propose stage is enabled, `automate()` freezes one run and passes it to every session-consuming stage. Top-level and per-action output expose the shared run ID and selected fingerprint for audit; deterministic proposal actions additionally expose promoted/deferred/rejected counts. Eval/status stages do not consume the run.
 
 ## Change guidance
 

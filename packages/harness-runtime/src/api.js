@@ -13,8 +13,10 @@ import { buildReflection, reflectionResponseToProposals, writeReflectionPrompt }
 import { runEvalHarness } from "./eval/eval-harness.js";
 import { createEvalFixtureDraftProposal, getAutomationStatus } from "./automation/gated-automation.js";
 import { runRuleEngine } from "./analysis/rules.js";
+import { publicCandidateReview, reviewCandidateSignals } from "./analysis/candidate-review.js";
 import { generateTargetedImprovements } from "./improve/target-proposals.js";
 import { writeMemoryDrafts } from "./memory/memory-drafts.js";
+import { beginCandidateReviewAttempt, finalizeCandidateReviewAttempt } from "./storage/candidate-review-writer.js";
 import { findDraftProposal, readDraftProposals, writeDraftProposals } from "./proposals/proposal-writer.js";
 import { approveProposal, applyProposal, readProposalHistory, rejectProposal, rollbackProposal } from "./proposals/lifecycle.js";
 import { pathExists, resolvePath } from "./utils/path.js";
@@ -210,18 +212,40 @@ export async function propose(options = {}) {
   try {
     const run = resolveAnalysisRun({ options, config, project, logger });
     const consumed = await consumeAnalysisRun({ analysisRun: run, config, project, logger, consumer: "propose" });
-    let proposals;
-    let memoryWriteResult = { written: [] };
-    if (options.target) {
-      const improvement = generateTargetedImprovements({ project, sessionResults: consumed.results, target: options.target });
-      proposals = improvement.proposals;
-      if (improvement.memoryItems?.length) memoryWriteResult = writeMemoryDrafts({ config, project, items: improvement.memoryItems });
-    } else {
-      proposals = runRuleEngine({ project, sessionResults: consumed.results });
+    const mode = options.target ? `target:${options.target}` : "rules";
+    if (options.target === "memory") {
+      const improvement = generateTargetedImprovements({ project, sessionResults: consumed.results, target: "memory" });
+      const memoryWriteResult = improvement.memoryItems?.length
+        ? writeMemoryDrafts({ config, project, items: improvement.memoryItems })
+        : { written: [] };
+      const writeResult = writeDraftProposals({ config, project, proposals: improvement.proposals });
+      end(logger, project, { candidates: improvement.proposals.length, written: writeResult.written.length, skipped: writeResult.skipped.length, memoryDrafts: memoryWriteResult.written.length, runId: run.runId });
+      return { project, sessionDir: config.sessionDir, scannedFiles: run.selection.scannedFiles, sessionsScanned: consumed.results.length, mode, candidates: improvement.proposals.length, draftDir: writeResult.draftDir, memory: memoryWriteResult.draftPath ? { draftPath: memoryWriteResult.draftPath, written: memoryWriteResult.written } : undefined, written: writeResult.written.map(publicProposalSummary), skipped: writeResult.skipped.map(publicProposalSummary), warnings: [...run.warnings, ...consumed.warnings], analysisRun: consumed.analysisRun, sources };
     }
-    const writeResult = writeDraftProposals({ config, project, proposals });
-    end(logger, project, { candidates: proposals.length, written: writeResult.written.length, skipped: writeResult.skipped.length, memoryDrafts: memoryWriteResult.written.length, runId: run.runId });
-    return { project, sessionDir: config.sessionDir, scannedFiles: run.selection.scannedFiles, sessionsScanned: consumed.results.length, mode: options.target ? `target:${options.target}` : "rules", candidates: proposals.length, draftDir: writeResult.draftDir, memory: memoryWriteResult.draftPath ? { draftPath: memoryWriteResult.draftPath, written: memoryWriteResult.written } : undefined, written: writeResult.written.map(publicProposalSummary), skipped: writeResult.skipped.map(publicProposalSummary), warnings: [...run.warnings, ...consumed.warnings], analysisRun: consumed.analysisRun, sources };
+
+    const detected = runRuleEngine({ project, sessionResults: consumed.results });
+    const candidateSignals = selectCandidateSignals(detected, options.target);
+    const review = reviewCandidateSignals({ project, candidates: candidateSignals });
+    const attempt = beginCandidateReviewAttempt({ config, project, analysisRun: consumed.analysisRun, mode, review });
+    const writeResult = writeDraftProposals({ config, project, proposals: review.proposals });
+    finalizeCandidateReviewAttempt({ attempt, config, project, analysisRun: consumed.analysisRun, mode, review, writeResult });
+    const projection = publicCandidateReview(review);
+    end(logger, project, { candidates: projection.candidates, promoted: projection.promoted, deferred: projection.deferred, rejected: projection.rejected, written: writeResult.written.length, skipped: writeResult.skipped.length, runId: run.runId });
+    return {
+      project,
+      sessionDir: config.sessionDir,
+      scannedFiles: run.selection.scannedFiles,
+      sessionsScanned: consumed.results.length,
+      mode,
+      ...projection,
+      draftDir: writeResult.draftDir,
+      reviewReceipt: { stored: true, mode, attemptId: attempt.attemptId },
+      written: writeResult.written.map(publicProposalSummary),
+      skipped: writeResult.skipped.map(publicProposalSummary),
+      warnings: [...run.warnings, ...consumed.warnings],
+      analysisRun: consumed.analysisRun,
+      sources,
+    };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -324,7 +348,7 @@ export async function automate(options = {}) {
   }
   if (status.automation.proposeRules) {
     const result = await propose({ ...stageOptions, rules: true });
-    actions.push({ name: "propose:rules", status: "done", written: result.written.length, skipped: result.skipped.length, analysisRun: automationRunBinding(result.analysisRun) });
+    actions.push({ name: "propose:rules", status: "done", promoted: result.promoted, deferred: result.deferred, rejected: result.rejected, written: result.written.length, skipped: result.skipped.length, analysisRun: automationRunBinding(result.analysisRun) });
   }
   for (const target of status.automation.proposeTargets) {
     if (!["memory", "rules", "parser", "redaction"].includes(target)) {
@@ -332,7 +356,7 @@ export async function automate(options = {}) {
       continue;
     }
     const result = await propose({ ...stageOptions, target });
-    actions.push({ name: `propose:${target}`, status: "done", written: result.written.length, skipped: result.skipped.length, memoryDrafts: result.memory?.written?.length ?? 0, analysisRun: automationRunBinding(result.analysisRun) });
+    actions.push({ name: `propose:${target}`, status: "done", promoted: result.promoted, deferred: result.deferred, rejected: result.rejected, written: result.written.length, skipped: result.skipped.length, memoryDrafts: result.memory?.written?.length ?? 0, analysisRun: automationRunBinding(result.analysisRun) });
   }
 
   let evalResult;
@@ -451,7 +475,19 @@ function publicScanResult(result) {
 }
 
 function publicProposalSummary(proposal = {}) {
-  return { id: proposal.id, title: proposal.title, status: proposal.status, target: proposal.target, risk: proposal.risk, ruleId: proposal.ruleId, fingerprint: proposal.fingerprint, evidenceCount: proposal.evidenceCount ?? proposal.evidence?.length, filePath: proposal.filePath, reason: proposal.reason };
+  return { id: proposal.id, title: proposal.title, status: proposal.status, target: proposal.target, risk: proposal.risk, ruleId: proposal.ruleId, candidateId: proposal.candidateId, detectorId: proposal.detectorId, reviewFingerprint: proposal.reviewFingerprint, fingerprint: proposal.fingerprint, evidenceCount: proposal.evidenceCount ?? proposal.evidence?.length, filePath: proposal.filePath, reason: proposal.reason };
+}
+
+function selectCandidateSignals(candidates, target) {
+  if (!target) return candidates;
+  const detectorIds = target === "rules"
+    ? new Set(["R-0001", "R-0002"])
+    : target === "parser"
+      ? new Set(["R-0004"])
+      : target === "redaction"
+        ? new Set(["R-0003"])
+        : new Set();
+  return candidates.filter((candidate) => detectorIds.has(candidate.detectorId));
 }
 
 function publicConfigSummary(config) {

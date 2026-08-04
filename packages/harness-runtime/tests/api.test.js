@@ -25,6 +25,7 @@ import {
   inspect,
 } from "../src/api.js";
 import { analysisRunConsumerReceiptPath, analysisRunContextPath } from "../src/analysis/analysis-run.js";
+import { candidateReviewReceiptPath } from "../src/storage/candidate-review-writer.js";
 
 const packageCwd = path.resolve(new URL("..", import.meta.url).pathname);
 
@@ -199,7 +200,14 @@ test("api propose writes deterministic draft proposals and dedupes", async () =>
   writeErrorSession(path.join(fixture.sessionDir, "error-session.jsonl"), { id: "s-propose", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
 
   const first = await propose({ ...baseOptions(fixture), rules: true });
-  assert.equal(first.written.length >= 1, true);
+  assert.equal(first.candidates, 1);
+  assert.equal(first.promoted, 1);
+  assert.equal(first.deferred, 0);
+  assert.equal(first.rejected, 0);
+  assert.equal(first.written.length, 1);
+  assert.equal(first.candidateSignals[0].detectorId, "R-0002");
+  assert.equal(first.decisions[0].candidateId, first.candidateSignals[0].id);
+  assert.equal(first.written[0].candidateId, first.candidateSignals[0].id);
 
   const second = await propose({ ...baseOptions(fixture), rules: true });
   assert.equal(second.written.length, 0);
@@ -209,6 +217,124 @@ test("api propose writes deterministic draft proposals and dedupes", async () =>
   assert.equal(list.count >= 1, true);
   const shown = showProposal({ ...baseOptions(fixture), id: list.proposals[0].id });
   assert.match(fs.readFileSync(shown.filePath, "utf8"), /## Evidence/);
+});
+
+test("rules:true and target:rules share R1/R2 candidates and decisions", async () => {
+  const fixture = createFixture();
+  writeErrorSession(path.join(fixture.sessionDir, "error-session.jsonl"), { id: "s-shared-rules", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const options = baseOptions(fixture);
+  const run = analysisRun(options);
+
+  const allRules = await propose({ ...options, analysisRun: run, rules: true });
+  const targeted = await propose({ ...options, analysisRun: run, target: "rules" });
+  const repeated = await propose({ ...options, analysisRun: run, rules: true });
+
+  assert.deepEqual(allRules.candidateSignals, targeted.candidateSignals);
+  assert.deepEqual(allRules.decisions, targeted.decisions);
+  assert.equal(allRules.written.length, 1);
+  assert.equal(targeted.written.length, 0);
+  assert.equal(targeted.skipped.length, 1);
+  assert.equal(targeted.skipped[0].id, allRules.written[0].id);
+  assert.equal(repeated.written.length, 0);
+  assert.equal(repeated.skipped[0].id, allRules.written[0].id);
+  const project = projectResolve(options);
+  const receiptPath = candidateReviewReceiptPath({ config: options, project, runId: run.runId, mode: "target:rules", attemptId: targeted.reviewReceipt.attemptId });
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+  assert.deepEqual(receipt.reviews[0].proposal, {
+    id: allRules.written[0].id,
+    fingerprint: allRules.written[0].fingerprint,
+    status: "draft",
+    writeStatus: "skipped",
+    reason: "duplicate_fingerprint",
+  });
+  const firstRulesReceipt = candidateReviewReceiptPath({ config: options, project, runId: run.runId, mode: "rules", attemptId: allRules.reviewReceipt.attemptId });
+  const repeatedRulesReceipt = candidateReviewReceiptPath({ config: options, project, runId: run.runId, mode: "rules", attemptId: repeated.reviewReceipt.attemptId });
+  assert.notEqual(firstRulesReceipt, repeatedRulesReceipt);
+  assert.equal(JSON.parse(fs.readFileSync(firstRulesReceipt, "utf8")).reviews[0].proposal.writeStatus, "written");
+  assert.equal(JSON.parse(fs.readFileSync(repeatedRulesReceipt, "utf8")).reviews[0].proposal.writeStatus, "skipped");
+});
+
+test("existing GLOBAL-EDIT-001 coverage defers before API proposal write and retains receipt", async () => {
+  const fixture = createFixture();
+  fs.mkdirSync(path.join(fixture.project, "wiki"), { recursive: true });
+  fs.writeFileSync(path.join(fixture.project, "wiki", "_rules.md"), [
+    "# Rules",
+    "## GLOBAL-EDIT-001 — Inspect before exact-text edits",
+    "Read the current target block before applying an exact-text edit.",
+    "Confirm oldText exactly matches current whitespace and punctuation.",
+    "Confirm the match is unique.",
+  ].join("\n"));
+  writeErrorSession(path.join(fixture.sessionDir, "error-session.jsonl"), { id: "s-covered", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const options = baseOptions(fixture);
+  const run = analysisRun(options);
+  const project = projectResolve(options);
+  const contextPath = analysisRunContextPath({ config: options, project, runId: run.runId });
+  const contextBefore = fs.readFileSync(contextPath, "utf8");
+
+  const output = await propose({ ...options, analysisRun: run, rules: true });
+  const receiptPath = candidateReviewReceiptPath({ config: options, project, runId: run.runId, mode: "rules", attemptId: output.reviewReceipt.attemptId });
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+
+  assert.equal(output.candidates, 1);
+  assert.equal(output.promoted, 0);
+  assert.equal(output.deferred, 1);
+  assert.equal(output.written.length, 0);
+  assert.equal(output.decisions[0].reasonCode, "existing-coverage");
+  assert.equal(output.decisions[0].observedUse, "unobserved");
+  assert.equal(fs.readFileSync(contextPath, "utf8"), contextBefore);
+  assert.equal(receipt.runId, run.runId);
+  assert.equal(receipt.selectedFingerprint, run.selection.selectedFingerprint);
+  assert.equal(receipt.attemptStatus, "complete");
+  assert.equal(receipt.candidates[0].count, 2);
+  assert.equal(receipt.candidates[0].evidenceRefs.length, 2);
+  assert.match(receipt.candidates[0].evidenceRefs[0].sourceFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(receipt.candidates[0].evidenceRefsTruncated, false);
+  assert.equal(receipt.reviews[0].state, "deferred");
+  assert.equal(receipt.reviews[0].proposal, undefined);
+  assert.equal(JSON.stringify({ signals: output.candidateSignals, decisions: output.decisions, assets: output.agentAssets }).includes(fixture.root), false);
+});
+
+test("candidate receipt begin failure prevents proposal writing and preserves context", async () => {
+  const fixture = createFixture();
+  writeErrorSession(path.join(fixture.sessionDir, "error-session.jsonl"), { id: "s-begin-failure", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const options = baseOptions(fixture);
+  const run = analysisRun(options);
+  const project = projectResolve(options);
+  const contextPath = analysisRunContextPath({ config: options, project, runId: run.runId });
+  const contextBefore = fs.readFileSync(contextPath, "utf8");
+  fs.writeFileSync(path.join(path.dirname(contextPath), "candidate-reviews"), "block directory creation");
+
+  await assert.rejects(() => propose({ ...options, analysisRun: run, rules: true }));
+
+  assert.equal(proposals(options).count, 0);
+  assert.equal(fs.readFileSync(contextPath, "utf8"), contextBefore);
+});
+
+test("target parser promotes R4 through review while target redaction defers R3", async () => {
+  const parserFixture = createFixture();
+  for (const route of [
+    "packages/harness-runtime/src/session/warnings.js",
+    "packages/harness-runtime/src/normalize/events.js",
+    "packages/harness-runtime/tests/parse-tree.test.js",
+  ]) {
+    const file = path.join(parserFixture.project, ...route.split("/"));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "// owner\n");
+  }
+  writeUnknownEntrySession(path.join(parserFixture.sessionDir, "parser.jsonl"), { id: "s-parser-target", cwd: parserFixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const parser = await propose({ ...baseOptions(parserFixture), target: "parser" });
+  assert.equal(parser.candidates, 1);
+  assert.equal(parser.promoted, 1);
+  assert.equal(parser.written[0].detectorId, "R-0004");
+
+  const redactionFixture = createFixture();
+  writeSensitiveSession(path.join(redactionFixture.sessionDir, "sensitive.jsonl"), { id: "s-redaction-target", cwd: redactionFixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const redaction = await propose({ ...baseOptions(redactionFixture), target: "redaction" });
+  assert.equal(redaction.candidates, 1);
+  assert.equal(redaction.promoted, 0);
+  assert.equal(redaction.deferred, 1);
+  assert.equal(redaction.decisions[0].reasonCode, "no-observed-consequence");
+  assert.equal(redaction.written.length, 0);
 });
 
 test("api approve reject and history track proposal lifecycle", async () => {
@@ -274,6 +400,10 @@ test("api automate runs only gated draft actions when enabled", async () => {
   assert.equal(new Set(sessionActions.map((action) => action.analysisRun.selectedFingerprint)).size, 1);
   assert.equal(sessionActions[0].analysisRun.runId, output.analysisRun.runId);
   assert.equal(sessionActions[0].analysisRun.selectedFingerprint, output.analysisRun.selectedFingerprint);
+  const proposeAction = output.actions.find((action) => action.name === "propose:rules");
+  assert.equal(Number.isInteger(proposeAction.promoted), true);
+  assert.equal(Number.isInteger(proposeAction.deferred), true);
+  assert.equal(Number.isInteger(proposeAction.rejected), true);
   assert.equal(output.actions.some((action) => action.name === "apply"), false);
   assert.doesNotThrow(() => JSON.stringify(output));
 });
@@ -341,6 +471,23 @@ function writeErrorSession(file, { id, cwd, timestamp }) {
     { type: "message", id: "m3", parentId: "m2", timestamp, message: { role: "toolResult", toolCallId: "edit1", toolName: "edit", isError: true, content: [{ type: "text", text: "oldText must match a unique region of the original file" }] } },
     { type: "message", id: "m4", parentId: "m3", timestamp, message: { role: "assistant", provider: "test", model: "model", content: [{ type: "toolCall", id: "edit2", name: "edit", arguments: { path: "src/a.js", oldText: "x", newText: "y" } }] } },
     { type: "message", id: "m5", parentId: "m4", timestamp, message: { role: "toolResult", toolCallId: "edit2", toolName: "edit", isError: true, content: [{ type: "text", text: "oldText did not match" }] } },
+  ];
+  fs.writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
+}
+
+function writeUnknownEntrySession(file, { id, cwd, timestamp }) {
+  const lines = [
+    { type: "session", version: 3, id, cwd: fs.realpathSync(cwd), timestamp },
+    { type: "future_entry", id: "unknown-1", parentId: null, timestamp },
+  ];
+  fs.writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
+}
+
+function writeSensitiveSession(file, { id, cwd, timestamp }) {
+  const lines = [
+    { type: "session", version: 3, id, cwd: fs.realpathSync(cwd), timestamp },
+    { type: "message", id: "m1", parentId: null, timestamp, message: { role: "user", content: "inspect config" } },
+    { type: "message", id: "m2", parentId: "m1", timestamp, message: { role: "assistant", provider: "test", model: "model", content: [{ type: "toolCall", id: "read1", name: "read", arguments: { path: ".env" } }] } },
   ];
   fs.writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
 }

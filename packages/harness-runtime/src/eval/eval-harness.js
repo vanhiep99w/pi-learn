@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,7 @@ import { parseSessionFile } from "../session/parse-session.js";
 import { collectNormalizeWarnings } from "../session/warnings.js";
 import { redactString, redactValue, isSensitivePath } from "../safety/redaction.js";
 import { runRuleEngine } from "../analysis/rules.js";
+import { reviewCandidateSignals } from "../analysis/candidate-review.js";
 import { discoverWikiPromptRules } from "../analysis/wiki-prompt-rules.js";
 import { approveProposal, applyProposal } from "../proposals/lifecycle.js";
 import { findDraftProposal, writeDraftProposals } from "../proposals/proposal-writer.js";
@@ -16,6 +18,7 @@ export const BUILT_IN_SCENARIOS = [
   "redaction-fixture",
   "parser-unknown-entry",
   "edit-oldText-workflow",
+  "existing-coverage-before-proposal",
   "file-protection",
   "smart-commit-basic",
   "ts-extension-safety",
@@ -101,6 +104,8 @@ async function runScenario(name, context) {
         return scenarioResult(name, await parserUnknownEntryChecks());
       case "edit-oldText-workflow":
         return scenarioResult(name, editOldTextWorkflowChecks(context));
+      case "existing-coverage-before-proposal":
+        return scenarioResult(name, existingCoverageBeforeProposalChecks());
       case "file-protection":
         return scenarioResult(name, fileProtectionChecks());
       case "smart-commit-basic":
@@ -165,13 +170,52 @@ function editOldTextWorkflowChecks() {
       toolResultEvent("e2", "edit", "oldText did not match"),
     ],
   });
-  const proposals = runRuleEngine({ project: fixture.project, sessionResults: [session] });
-  const proposal = proposals.find((item) => item.ruleId === "R-0002");
+  const candidates = runRuleEngine({ project: fixture.project, sessionResults: [session] });
+  const candidate = candidates.find((item) => item.detectorId === "R-0002");
   return [
-    check("R-0002 proposal generated", Boolean(proposal)),
-    check("proposal targets global Markdown prompt rules", proposal?.target === "rules" && proposal?.targetFiles?.includes("wiki/_rules.md")),
-    check("proposal includes evidence refs", (proposal?.evidence?.length ?? 0) >= 2),
+    check("R-0002 CandidateSignal generated", Boolean(candidate)),
+    check("candidate retains project rules owner route", candidate?.scope?.ownerRoutes?.includes("wiki/_rules.md")),
+    check("candidate includes evidence refs", (candidate?.evidenceRefs?.length ?? 0) >= 2),
+    check("candidate is proposal-free", !candidate?.targetFiles && !candidate?.proposedChange),
   ];
+}
+
+function existingCoverageBeforeProposalChecks() {
+  const present = createProjectFixture("harness-eval-coverage-present-");
+  fs.mkdirSync(path.join(present.project.projectRoot, "wiki"), { recursive: true });
+  fs.writeFileSync(path.join(present.project.projectRoot, "wiki", "_rules.md"), [
+    "# Rules",
+    "",
+    "## DIFFERENT-ID — Exact edit workflow",
+    "",
+    "Read the current target block before an exact edit.",
+    "Confirm oldText preserves exact whitespace and punctuation.",
+    "Confirm the match is unique.",
+    "",
+  ].join("\n"));
+  const absent = createProjectFixture("harness-eval-coverage-absent-");
+
+  const presentCandidate = editMismatchCandidate(present);
+  const absentCandidate = editMismatchCandidate(absent);
+  const presentReview = reviewCandidateSignals({ project: present.project, candidates: [presentCandidate] });
+  const absentReview = reviewCandidateSignals({ project: absent.project, candidates: [absentCandidate] });
+  return [
+    check("equivalent coverage under a different ID is found", presentReview.decisions[0]?.coverage?.state === "covered"),
+    check("existing coverage defers without proposal", presentReview.decisions[0]?.reasonCode === "existing-coverage" && presentReview.proposals.length === 0),
+    check("fully inspected absent coverage promotes", absentReview.decisions[0]?.state === "promoted" && absentReview.proposals.length === 1),
+    check("promoted proposal retains candidate binding", absentReview.proposals[0]?.candidateId === absentCandidate.id && absentReview.proposals[0]?.detectorId === "R-0002"),
+  ];
+}
+
+function editMismatchCandidate(fixture) {
+  const session = writeCachedSession(fixture, {
+    sessionId: "s-edit-coverage",
+    events: [
+      toolResultEvent("e1", "edit", "oldText must match a unique region of the original file"),
+      toolResultEvent("e2", "edit", "oldText did not match"),
+    ],
+  });
+  return runRuleEngine({ project: fixture.project, sessionResults: [session] }).find((item) => item.detectorId === "R-0002");
 }
 
 function fileProtectionChecks() {
@@ -255,13 +299,13 @@ function wikiPromptRuleSectionRoutingChecks({ project }) {
       bashExecutionEvent("b2", "npm test", 1),
     ],
   });
-  const proposals = runRuleEngine({ project: fixture.project, sessionResults: [session] });
-  const editProposal = proposals.find((item) => item.ruleId === "R-0002");
-  const bashProposal = proposals.find((item) => item.ruleId === "R-0001");
+  const candidates = runRuleEngine({ project: fixture.project, sessionResults: [session] });
+  const editCandidate = candidates.find((item) => item.detectorId === "R-0002");
+  const bashCandidate = candidates.find((item) => item.detectorId === "R-0001");
   const ruleReport = discoverWikiPromptRules({ projectRoot: project.projectRoot });
   return [
-    check("edit workflow routes to global prompt rules", editProposal?.targetFiles?.includes("wiki/_rules.md")),
-    check("bash workflow routes to operations prompt rules", bashProposal?.targetFiles?.includes("wiki/operations/_rules.md")),
+    check("edit workflow routes to global prompt rules", editCandidate?.scope?.ownerRoutes?.includes("wiki/_rules.md")),
+    check("bash workflow routes to operations prompt rules", bashCandidate?.scope?.ownerRoutes?.includes("wiki/operations/_rules.md")),
     check("repository prompt-rule sections are valid", ruleReport.valid, ruleReport.errors.map((item) => item.message).join("; ")),
   ];
 }
@@ -382,7 +426,11 @@ function writeCachedSession(fixture, { sessionId, events, warnings = [] }) {
     ...event,
   })).join("\n") + (events.length ? "\n" : ""));
   fs.writeFileSync(warningsPath, warnings.map((warning) => JSON.stringify(warning)).join("\n") + (warnings.length ? "\n" : ""));
-  return { sessionId, sessionFile: "/tmp/session.jsonl", paths: { events: eventsPath, warnings: warningsPath }, warnings };
+  return { sessionId, sourceFingerprint: fixtureSourceFingerprint(sessionId), sessionFile: "/tmp/session.jsonl", paths: { events: eventsPath, warnings: warningsPath }, warnings };
+}
+
+function fixtureSourceFingerprint(value) {
+  return crypto.createHash("sha256").update(`eval-fixture:${value}`).digest("hex");
 }
 
 function toolResultEvent(entryId, toolName, excerpt) {

@@ -8,14 +8,15 @@ export function writeDraftProposals({ config, project, proposals }) {
   ensureDir(draftDir);
 
   const existing = readDraftProposals({ config, project });
-  const existingFingerprints = new Set(existing.map((proposal) => proposal.fingerprint).filter(Boolean));
+  const existingByFingerprint = new Map(existing.filter((proposal) => proposal.fingerprint).map((proposal) => [proposal.fingerprint, proposal]));
   const written = [];
   const skipped = [];
   let nextNumber = nextProposalNumber(existing);
 
   for (const proposal of proposals ?? []) {
-    if (proposal.fingerprint && existingFingerprints.has(proposal.fingerprint)) {
-      skipped.push({ ...proposal, reason: "duplicate_fingerprint" });
+    const duplicate = proposal.fingerprint ? existingByFingerprint.get(proposal.fingerprint) : undefined;
+    if (duplicate) {
+      skipped.push({ ...proposal, id: duplicate.id, status: duplicate.status, filePath: duplicate.filePath, reason: "duplicate_fingerprint" });
       continue;
     }
 
@@ -23,7 +24,7 @@ export function writeDraftProposals({ config, project, proposals }) {
     const finalProposal = { ...proposal, id, status: proposal.status ?? "draft" };
     const filePath = path.join(draftDir, `${id}-${slugify(proposal.title)}.md`);
     atomicWriteFile(filePath, renderProposalMarkdown(finalProposal));
-    existingFingerprints.add(proposal.fingerprint);
+    if (proposal.fingerprint) existingByFingerprint.set(proposal.fingerprint, { ...finalProposal, filePath });
     written.push({ ...finalProposal, filePath });
   }
 
@@ -63,6 +64,9 @@ export function renderProposalMarkdown(proposal) {
   lines.push(`target: ${proposal.target}`);
   lines.push(`risk: ${proposal.risk}`);
   lines.push(`rule_id: ${proposal.ruleId}`);
+  if (proposal.candidateId) lines.push(`candidate_id: ${proposal.candidateId}`);
+  if (proposal.detectorId) lines.push(`detector_id: ${proposal.detectorId}`);
+  if (proposal.reviewFingerprint) lines.push(`review_fingerprint: ${proposal.reviewFingerprint}`);
   lines.push(`fingerprint: ${proposal.fingerprint}`);
   lines.push(`created: ${proposal.createdAt ?? new Date().toISOString()}`);
   lines.push(`evidence_count: ${evidence.length}`);

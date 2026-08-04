@@ -136,7 +136,7 @@ export async function consumeAnalysisRun({ analysisRun, config, project, logger,
         logger,
         expectedSnapshot: frozen,
       });
-      results.push(result);
+      results.push({ ...result, sourceFingerprint: frozen.fingerprint });
       statuses.push(statusFor(frozen, "consumed"));
     } catch (error) {
       const reason = error?.code === FROZEN_SESSION_MISMATCH

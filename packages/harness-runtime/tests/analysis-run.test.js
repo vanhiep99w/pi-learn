@@ -95,6 +95,7 @@ test("analysis run canonicalizes offset and invalid header timestamps", async ()
   assert.equal(offsetRun.sessions[0].timestamp, "2026-08-03T01:00:00.000Z");
   assert.equal(offsetContext.population.selected[0].headerTimestamp, "2026-08-03T01:00:00.000Z");
   assert.equal(offsetConsumed.results[0].manifest.startedAt, "2026-08-03T01:00:00.000Z");
+  assert.equal(offsetConsumed.results[0].sourceFingerprint, offsetContext.population.selected[0].fingerprint);
   assert.equal(offsetConsumed.analysisRun.laneStatus.consumer, "complete");
 
   const invalidFixture = createFixture();

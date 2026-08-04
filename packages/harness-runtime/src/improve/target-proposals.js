@@ -2,19 +2,11 @@ import crypto from "node:crypto";
 import { loadDataset } from "../analysis/rules.js";
 
 export function generateTargetedImprovements({ project, sessionResults, target }) {
-  const dataset = loadDataset(sessionResults);
-  switch (target) {
-    case "memory":
-      return generateMemoryImprovements({ project, dataset });
-    case "rules":
-      return { proposals: generateRuleImprovementProposals({ dataset }), memoryItems: [] };
-    case "parser":
-      return { proposals: generateParserImprovementProposals({ dataset }), memoryItems: [] };
-    case "redaction":
-      return { proposals: generateRedactionImprovementProposals({ dataset }), memoryItems: [] };
-    default:
-      throw new Error(`Unsupported propose target: ${target}`);
+  if (target !== "memory") {
+    throw new Error(`Deterministic target ${target} must use the shared candidate review gate`);
   }
+  const dataset = loadDataset(sessionResults);
+  return generateMemoryImprovements({ project, dataset });
 }
 
 function generateMemoryImprovements({ project, dataset }) {
@@ -65,107 +57,6 @@ function generateMemoryImprovements({ project, dataset }) {
   return { proposals, memoryItems };
 }
 
-function generateRuleImprovementProposals({ dataset }) {
-  const proposals = [];
-  const editErrors = dataset.events
-    .filter((event) => event.activePath && event.kind === "tool_result" && event.tool?.name === "edit" && event.tool?.isError)
-    .map(evidenceFromEvent);
-  if (editErrors.length >= 2) {
-    proposals.push({
-      ruleId: "RULE-IMPROVE-0001",
-      title: "Add global prompt rule for repeated edit tool failures",
-      target: "rules",
-      targetFiles: ["wiki/_rules.md"],
-      risk: "low",
-      problem: `Edit tool failures appeared ${editErrors.length} times. The repeated workflow needs concise reviewed guidance before future edits.`,
-      proposedChange: "Add a Markdown prompt rule that requires re-reading the target block and verifying exact, unique oldText before retrying edit.",
-      testPlan: [
-        "Review the new rule ID, scope, instruction and checklist in `wiki/_rules.md`.",
-        "Run `npm --prefix packages/harness-runtime test`.",
-        "Run `/harness-eval wiki-prompt-rule-lazy-loading`.",
-      ],
-      rollbackPlan: "Revert the Markdown rule patch if it creates noisy or misleading edit guidance.",
-      evidence: editErrors.slice(0, 8),
-      fingerprint: stableHash(`rules|edit_tool_failure|${editErrors.map((item) => item.entryId).join("|")}`),
-    });
-  }
-
-  const bashFailures = dataset.events.filter((event) => event.activePath && isBashFailure(event)).map(evidenceFromEvent);
-  if (bashFailures.length >= 2) {
-    proposals.push({
-      ruleId: "RULE-IMPROVE-0002",
-      title: "Add operations prompt rule for repeated bash failures",
-      target: "rules",
-      targetFiles: ["wiki/operations/_rules.md"],
-      risk: "low",
-      problem: `Bash failures appeared ${bashFailures.length} times. Future operations tasks need reviewed retry and prerequisite guidance.`,
-      proposedChange: "Add a Markdown prompt rule that requires inspecting command prerequisites and failure output before retrying. Keep detector thresholds in runtime code.",
-      testPlan: [
-        "Review the rule scope in `wiki/operations/_rules.md`.",
-        "Run `npm --prefix packages/harness-runtime test`.",
-        "Run `/harness-eval wiki-prompt-rule-section-routing`.",
-      ],
-      rollbackPlan: "Revert the Markdown rule patch if it creates false or overly broad guidance.",
-      evidence: bashFailures.slice(0, 8),
-      fingerprint: stableHash(`rules|bash_failure|${bashFailures.map((item) => item.entryId).join("|")}`),
-    });
-  }
-
-  return proposals;
-}
-
-function generateParserImprovementProposals({ dataset }) {
-  const groups = new Map();
-  for (const warning of dataset.warnings) {
-    const key = warning.code ?? "unknown_warning";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(evidenceFromWarning(warning));
-  }
-
-  return [...groups.entries()].map(([code, evidence]) => ({
-    ruleId: "PARSER-IMPROVE-0001",
-    title: `Improve parser handling for ${code}`,
-    target: "parser",
-    targetFiles: ["packages/harness-runtime/src/session/parse-session.js", "packages/harness-runtime/src/session/warnings.js", "packages/harness-runtime/tests/parse-tree.test.js"],
-    risk: "medium",
-    problem: `Parser/normalizer warning \`${code}\` appeared ${evidence.length} times.`,
-    proposedChange: "Add explicit parser handling or a fixture documenting expected behavior for this warning shape.",
-    testPlan: [
-      "Add a focused parser fixture for this warning.",
-      "Run `npm --prefix packages/harness-runtime test`.",
-      "Run `/harness-warnings 5` in Pi and compare warnings count.",
-    ],
-    rollbackPlan: "Revert parser changes if active path or event normalization becomes less accurate.",
-    evidence: evidence.slice(0, 8),
-    fingerprint: stableHash(`parser|${code}|${evidence.map((item) => item.entryId).join("|")}`),
-  }));
-}
-
-function generateRedactionImprovementProposals({ dataset }) {
-  const evidence = dataset.events
-    .filter((event) => event.activePath && (event.safety?.secretDetected || event.safety?.sensitivePath))
-    .map((event) => evidenceFromEvent(event, { excerpt: firstNonEmpty(event.excerpt, event.summary, JSON.stringify(event.files ?? event.tool?.argsPreview ?? {})) }));
-
-  if (!evidence.length) return [];
-  return [{
-    ruleId: "REDACTION-IMPROVE-0001",
-    title: "Review redaction and sensitive path policy from flagged events",
-    target: "redaction",
-    targetFiles: ["packages/harness-runtime/src/safety/redaction.js", "packages/harness-runtime/tests/redaction.test.js", "AGENTS.md"],
-    risk: "high",
-    problem: `Normalized cache flagged ${evidence.length} secret/sensitive-path event(s).`,
-    proposedChange: "Review whether current redaction patterns and sensitive path patterns need a new fixture, path guard, or stricter policy.",
-    testPlan: [
-      "Add redaction fixtures for any new token/path pattern.",
-      "Run `npm --prefix packages/harness-runtime test`.",
-      "Run scan/report and confirm no raw secrets appear in normalized outputs.",
-    ],
-    rollbackPlan: "Revert redaction policy changes if they over-redact useful non-secret evidence or block legitimate local inspection.",
-    evidence: evidence.slice(0, 8),
-    fingerprint: stableHash(`redaction|${evidence.map((item) => `${item.sessionId}:${item.entryId}`).join("|")}`),
-  }];
-}
-
 function memoryCandidatesFromText(text) {
   const candidates = [];
   if (/packages\/pi-learn-extensions/.test(text)) {
@@ -199,29 +90,14 @@ function memoryCandidatesFromText(text) {
   return candidates;
 }
 
-function isBashFailure(event) {
-  return event.kind === "bash_execution" ? Number(event.bash?.exitCode ?? 0) !== 0 : event.kind === "tool_result" && event.tool?.name === "bash" && event.tool?.isError;
-}
-
-function evidenceFromEvent(event, overrides = {}) {
+function evidenceFromEvent(event) {
   return {
     sessionId: event.sessionId,
     sessionFile: event.sessionFile,
     entryId: event.entryId,
     timestamp: event.timestamp,
     kind: event.kind,
-    excerpt: truncateEvidence(firstNonEmpty(overrides.excerpt, event.excerpt, event.summary)),
-  };
-}
-
-function evidenceFromWarning(warning) {
-  return {
-    sessionId: warning.sessionId,
-    sessionFile: warning.sessionFile,
-    entryId: warning.entryId,
-    timestamp: warning.timestamp,
-    kind: warning.code,
-    excerpt: truncateEvidence(warning.message),
+    excerpt: truncateEvidence(firstNonEmpty(event.excerpt, event.summary)),
   };
 }
 

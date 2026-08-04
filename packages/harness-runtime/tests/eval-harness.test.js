@@ -35,6 +35,19 @@ test("runEvalHarness full suite passes at least three MVP scenarios", async () =
   assert.equal(report.results.some((result) => result.scenario === "smart-commit-basic"), true);
 });
 
+test("existing-coverage-before-proposal eval covers present and absent fixtures", async () => {
+  const fixture = createFixture();
+  const report = await runEvalHarness({
+    config: fixture.config,
+    project: fixture.project,
+    scenario: "existing-coverage-before-proposal",
+  });
+
+  assert.equal(report.summary.failed, 0);
+  assert.equal(report.results[0].scenario, "existing-coverage-before-proposal");
+  assert.equal(report.results[0].checks.length, 4);
+});
+
 test("renderEvalMarkdown renders summary and checkboxes", () => {
   const markdown = renderEvalMarkdown({
     schemaVersion: 1,
