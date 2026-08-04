@@ -10,6 +10,7 @@ packages/pi-learn-extensions/extensions/harness/wiki-commands.ts
 packages/pi-learn-extensions/extensions/harness/wiki-prompt.ts
 packages/pi-learn-extensions/extensions/harness/README.md
 packages/harness-runtime/src/analysis/wiki-prompt-rules.js
+packages/harness-runtime/src/analysis/wiki-links.js
 ```
 
 ## Commands
@@ -31,8 +32,8 @@ Before changing the Harness Wiki command surface, treat this as an unresolved po
 ## Command behavior
 
 - `/harness-wiki-init` creates missing deterministic prompt-rule scaffolds, then starts an initial documentation run with the current Pi model/tools.
-- `/harness-wiki-update` inspects existing docs, metadata, git history, and worktree changes. Without extra instructions it skips when only already-accounted-for documentation/metadata changes exist.
-- `/harness-wiki-ask` asks a repository/Wiki question without modifying docs by default.
+- `/harness-wiki-update` inspects existing docs, metadata, git history, worktree changes, and internal Wiki links. Without extra instructions it skips only when the previous run is complete and the repository and links are already accounted for.
+- `/harness-wiki-ask` reads `wiki/` first and consults source only when the Wiki is insufficient or stale, or when the user requests source verification. It does not modify docs by default.
 
 The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt. When present, the user-owned `wiki/INSTRUCTIONS.md` brief is also included in init/update/ask prompts.
 
@@ -106,12 +107,12 @@ hidden/temp files
 
 After `agent_settled`:
 
-1. Harness creates any missing final-section scaffolds.
-2. It recomputes the normal documentation snapshot.
-3. It writes `.last-update.json` only when that snapshot changed.
-4. Scaffold-only or prompt-rule-only changes do not create a fake documentation update.
+1. Harness creates any missing final-section scaffolds and recomputes the normal documentation snapshot.
+2. `validateWikiInternalLinks()` scans normal Wiki pages for relative Markdown file links and heading anchors. External URLs and images are ignored; checked links may target reserved Wiki Markdown such as `_rules.md`, but may not escape the Wiki root or resolve through symlink targets.
+3. A changed, valid, non-aborted run writes `.last-update.json` with `status: "complete"`. Invalid internal links, or an aborted/failed agent run that changed docs, write `status: "interrupted"`; session shutdown does the same when an active documentation run changed docs.
+4. A later successful no-change retry can clear stale interrupted status. Scaffold-only or prompt-rule-only changes still do not create a fake documentation update.
 
-A prompt-rule or `wiki/INSTRUCTIONS.md` Git change is still meaningful for no-op detection because normal docs may need to reflect updated workflow, policy, scope, or priorities.
+Link failures are reported with source path and line so they can be repaired on the retry. A prompt-rule or `wiki/INSTRUCTIONS.md` Git change remains meaningful for no-op detection because normal docs may need to reflect updated workflow, policy, scope, or priorities.
 
 ## Rule validation and controlled apply
 
@@ -132,23 +133,25 @@ Approved prompt-rule proposals patch exact Markdown blocks. Controlled apply val
 
 `/harness-wiki-update` runs when:
 
-- No previous update Git head exists.
+- No previous update Git head exists, or the previous status is `interrupted`.
+- Internal Wiki links are invalid.
 - The worktree has meaningful changes other than metadata.
 - Prompt rules changed.
 - Source/config paths changed.
 - Git changed but changed paths cannot be determined safely.
 
-It may skip when all committed changes since the previous update are normal Wiki documentation/metadata and the worktree is otherwise clean.
+It may skip when links are valid, the previous run is complete, all committed changes since that update are normal Wiki documentation/metadata, and the worktree is otherwise clean.
 
 ## OpenWiki provenance
 
-The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. Upstream prompt and workflow changes were reviewed through `e1a2fea77048f342c6317c457b3dca6efe5ec209` on 2026-07-15, after OpenWiki 0.1.2. Harness selectively adapted the user-owned persistent Wiki brief and the deferred documentation-area backlog from `2fb44a876db8cca461ad1c0767931d95495763a3`, rather than porting OpenWiki's personal-wiki/connectors runtime.
+The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. Later reviews selectively adapted the persistent brief, deferred-area backlog, interrupted-run retries, Wiki-first Q&A, coding-agent navigation guidance, and internal-link validation rather than importing OpenWiki's full runtime. The moving upstream review checkpoint and selected source commits are maintained in `packages/pi-learn-extensions/extensions/harness/README.md` instead of being duplicated here.
 
-Harness Wiki intentionally does not use OpenWiki's CLI/Ink UI, credential flow, LangChain/DeepAgents runtime, SQLite checkpointer, or separate model/provider key. See `packages/pi-learn-extensions/extensions/harness/README.md` for the upgrade checklist.
+Harness Wiki intentionally does not use OpenWiki's CLI/Ink UI, credential flow, LangChain/DeepAgents runtime, SQLite checkpointer, separate model/provider key, OKF/index/visualizer pipeline, forced diagrams, connectors, or personal-wiki features. See the extension README for the current upgrade checklist.
 
 ## Verification
 
 ```bash
+node --test packages/harness-runtime/tests/wiki-links.test.js
 npm --prefix packages/harness-runtime test
 ```
 

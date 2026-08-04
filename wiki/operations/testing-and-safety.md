@@ -15,6 +15,7 @@ This runs `node --test` over `packages/harness-runtime/tests/*.test.js`.
 
 Representative test files include:
 
+- `analysis-run.test.js`
 - `api.test.js`
 - `config.test.js`
 - `discover-sessions.test.js`
@@ -25,7 +26,16 @@ Representative test files include:
 - `reflection.test.js`
 - `rules.test.js`
 - `eval-harness.test.js`
+- `wiki-links.test.js`
 - `wiki-prompt-rules.test.js`
+
+For the new frozen-run and Wiki-link boundaries, a narrow root-level check is:
+
+```bash
+node --test packages/harness-runtime/tests/analysis-run.test.js packages/harness-runtime/tests/wiki-links.test.js
+```
+
+Use the full package suite before integrating a cross-cutting Harness runtime or Wiki orchestration change.
 
 Source references: `packages/harness-runtime/package.json`, `packages/harness-runtime/tests/`.
 

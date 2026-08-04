@@ -124,6 +124,17 @@ pi-learn/
 
 See [Architecture overview](architecture/overview.md) for package boundaries and source-of-truth rules.
 
+## Task routing
+
+| Change intent | Canonical guidance | Owning entrypoints or symbols | Focused check and minimal validation |
+|---|---|---|---|
+| Change package boundaries, manifests, or public entrypoints | [Architecture overview](architecture/overview.md) | Root and extension `package.json` Pi manifests; public files under `packages/pi-learn-extensions/` | Inspect both manifests, then use `git diff --check`; reload Pi when an exposed entrypoint changes. |
+| Change a public tool, command, TUI component, or theme | [Extensions catalog](extensions/catalog.md) | The relevant file under `packages/pi-learn-extensions/extensions/`; `themes/midnight-aurora.json` | Run any area-specific static check, then `/reload` and exercise the affected tool, command, or UI lifecycle. |
+| Change session selection, parsing, cache, report, reflection, or automation | [Harness runtime](architecture/harness-runtime.md) | `analysisRun()`, `report()`, `reflect()`, and `automate()` in `packages/harness-runtime/src/api.js`; `packages/harness-runtime/src/analysis/analysis-run.js` | Start with `analysis-run.test.js`, `api.test.js`, or the nearest component test; use `npm --prefix packages/harness-runtime test` before integration. |
+| Change proposal, controlled apply, or eval behavior | [Harness runtime](architecture/harness-runtime.md#proposal-lifecycle-and-controlled-apply) | `packages/harness-runtime/src/proposals/lifecycle.js`; `packages/harness-runtime/src/eval/eval-harness.js` | Run `node --test packages/harness-runtime/tests/proposal-lifecycle.test.js` or `eval-harness.test.js`, then the relevant `/harness-eval` scenario when Pi integration matters. |
+| Change Harness Wiki commands, prompts, links, or metadata | [Harness Wiki capability](extensions/wiki-extension.md) | `registerHarnessWikiCommands()` in `packages/pi-learn-extensions/extensions/harness/wiki-commands.ts`; `createHarnessWikiTaskPrompt()` in `wiki-prompt.ts`; `validateWikiInternalLinks()` in `packages/harness-runtime/src/analysis/wiki-links.js` | Run `node --test packages/harness-runtime/tests/wiki-links.test.js`, then `/reload` and exercise the affected `/harness-wiki-*` flow. |
+| Change install, documentation, versioning, or release behavior | [Development operations](operations/development.md) | Root/package READMEs and manifests; `docs/README.md` for new `docs/` pages | Use `git diff --check`, verify documented commands against source, and run only the package checks affected by the release surface. |
+
 ## Change-oriented guidance for future agents
 
 1. **Start with the relevant README and wiki page.** This repo already has substantial docs; the wiki should act as a map, not a replacement for source evidence.
