@@ -116,7 +116,7 @@ Git discipline:
 
 Existing documentation discipline:
 - Treat existing README files, docs/ trees, root documentation files, runbooks, AGENTS.md, CLAUDE.md, and SKILL.md files as primary source material.
-- Summarize and link to existing docs when they are still useful instead of duplicating them wholesale.
+- Summarize and reference existing docs when they are still useful instead of duplicating them wholesale. Use inline repository-relative code paths for files outside ${WIKI_DIR}/; reserve relative Markdown links for targets inside the Wiki.
 - If existing docs conflict with source code or git history, call out the likely stale documentation and prefer current source evidence.
 
 Root agent instruction files:
@@ -156,7 +156,7 @@ Security and privacy rules:
 - The only write-boundary exceptions are top-level /AGENTS.md and /CLAUDE.md, and only for the Wiki reference section described above.
 - ${WIKI_DIR}/_plan.md is temporary and must be removed before completion.
 - Never modify ${WIKI_DIR}/**/_rules.md, ${WIKI_INSTRUCTIONS_PATH}, or ${UPDATE_METADATA_PATH} in this run.
-- The Pi extension records successful run metadata after the agent settles if normal Wiki documentation changed.
+- The Pi extension owns complete/interrupted metadata finalization after the agent settles; the documentation agent must never edit metadata directly.
 
 Documentation goals:
 - Someone with zero knowledge of the repository should be able to start at ${WIKI_DIR}/quickstart.md and understand what the project is, how it is organized, what it does, and where to go next.
@@ -166,7 +166,11 @@ Documentation goals:
 - Prefer clear Markdown with stable links between pages.
 - Organize the docs like human documentation, not a raw file inventory.
 - Include change-oriented guidance for future agents: where to start, what to watch out for, and which tests or checks are relevant when changing each major area.
+- Optimize the route from a change intent to the owning source entrypoints and important symbols, relevant invariants, focused tests, and the narrowest non-destructive validation command.
+- Prefer stable source paths and symbol names over line numbers. Explain why each path or symbol matters instead of listing directories without ownership context.
+- Distinguish ordinary focused checks from conditional broad, integration, build, generated-artifact, or release checks. For a public or cross-package change surface, include registration/export/consumer boundaries and the narrowest consumer-facing verification when source evidence supports them.
 - Keep the docs concise enough to maintain. Avoid repeating the same concept across pages; give each concept one canonical home and link to it from other pages when needed.
+- Put evidence-backed links between canonical Wiki pages in the prose that explains their runtime, dependency, ownership, data-flow, lifecycle, or user-flow relationship. Do not add links only to increase link count or create thin pages for graph density.
 - Use git history for discovery, but do not include persistent commit hash lists in documentation unless a specific historical decision is important for future work.
 
 Section quality rules:
@@ -182,6 +186,7 @@ Section quality rules:
 Required documentation structure:
 - ${WIKI_DIR}/quickstart.md must be the entrypoint.
 - ${WIKI_DIR}/quickstart.md must include a high-level repository overview and links to every major section.
+- Include a compact task-routing table in ${WIKI_DIR}/quickstart.md when the repository has multiple substantial change areas. Route broad evidence-backed change intents to the canonical Wiki page, exact source entrypoints or symbols, focused tests, and minimal validation; do not turn the table into a file inventory.
 - Keep a \`## Rule loading\` section that links \`${ROOT_RULE_PATH}\` and every final section \`_rules.md\`, and tells future agents to read all applicable rule files before editing. This section is navigation only; do not put actual rule policy in quickstart.
 - When writing required documentation with Pi filesystem tools, use repository-relative paths such as ${WIKI_DIR}/quickstart.md.
 - When the repository is large enough to need section directories, create one directory per major section, for example architecture/, workflows/, domain/, api/, data-models/, operations/, integrations/, testing/, or similar names that fit the repo.
@@ -196,6 +201,11 @@ Documentation coverage discipline:
 - Each backlog entry must include the area name, a repository-relative source anchor, and a one-line reason for deferral.
 - Do not add, remove, or review backlog entries during a chat run unless the user explicitly asks to modify documentation.
 
+Internal link discipline:
+- Before completing init or update, audit every Markdown link added or changed in normal Wiki documentation and repair missing files or heading anchors.
+- Relative Wiki links must resolve inside ${WIKI_DIR}/; do not use a relative link to escape the Wiki root. External URLs and image destinations are outside this internal-link check.
+- The extension validates internal Wiki links after the agent settles. If any are broken, it reports the exact source line and withholds successful update metadata so a later update will retry.
+
 Mode-specific behavior:
 ${createModeInstructions(command)}
 `.trim();
@@ -206,6 +216,9 @@ function createModeInstructions(command: HarnessWikiCommand): string {
     return `
 - This is an interactive wiki question turn inside Pi.
 - Answer the user's message directly.
+- Inspect ${WIKI_DIR}/quickstart.md and the most relevant Wiki pages before searching source. Use targeted Wiki grep/read first and consult source only when the Wiki cannot support the answer, appears stale, or the user asks for source verification.
+- If the user explicitly frames the question as "based on the Wiki" or asks what the Wiki says, stay within normal ${WIKI_DIR}/ documentation unless it is insufficient; clearly state when you need to cross that boundary.
+- Do not exhaustively inspect source merely because it is available.
 - Do not create or update Harness Wiki documentation unless the user explicitly asks you to modify documentation.
 - If the user asks to initialize or update the wiki, explain that they can run /harness-wiki-init or /harness-wiki-update, or ask you to make a specific documentation change in chat.
 `.trim();
@@ -223,7 +236,7 @@ function createModeInstructions(command: HarnessWikiCommand): string {
 - Use at most 8 documentation pages on the initial run unless the repository clearly needs more.
 - Do not silently omit a real domain or workflow because of the initial page budget. If it is not documented, record it in the \`## Backlog\` section of ${WIKI_DIR}/quickstart.md with its area name, repository-relative source anchor, and a one-line reason.
 - Do not try to document every source file. Document the main architecture, workflows, domain concepts, data models, integrations, operations, tests, and known extension points at the right level of detail.
-- The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if Harness Wiki content changed.
+- The Pi extension owns complete/interrupted metadata finalization in ${UPDATE_METADATA_PATH} after you finish; do not edit it.
 `.trim();
   }
 
@@ -245,7 +258,7 @@ function createModeInstructions(command: HarnessWikiCommand): string {
 - When recent source changes or the user's explicit instruction affect a backlogged area, document that area and remove its backlog entry. Do not expand update scope merely because page budget remains.
 - Preserve still-valid backlog entries. Remove one only after documenting the area or confirming from repository evidence that the area no longer exists.
 - Updates may be a no-op. If there are no relevant source, workflow, product, existing-doc, or backlog changes since the previous successful run, and the current wiki is already accurate, do not edit files. Say that the wiki is already current.
-- The Pi extension will record successful run metadata in ${UPDATE_METADATA_PATH} after you finish if Harness Wiki content changed.
+- The Pi extension owns complete/interrupted metadata finalization in ${UPDATE_METADATA_PATH} after you finish; do not edit it.
 `.trim();
 }
 

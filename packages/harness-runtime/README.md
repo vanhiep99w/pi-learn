@@ -14,6 +14,7 @@ This package no longer exposes a standalone CLI/bin. The extension imports `src/
 
 ```js
 import {
+  analysisRun,
   sessions,
   scan,
   report,
@@ -43,6 +44,20 @@ Most functions accept the same option shape:
 }
 ```
 
+`analysisRun(options)` freezes `until` before one discovery pass and returns a JSON-safe public run contract. Pass that same object as `analysisRun` to consumers when report and reflection must use exactly the same selected population:
+
+```js
+const run = analysisRun(options);
+const reportOutput = await report({ ...options, analysisRun: run });
+const reflectionOutput = await reflect({ ...options, analysisRun: run });
+```
+
+Legacy calls such as `report(options)` and `reflect(options)` remain supported; each creates a compatibility analysis run internally. The v1 public contract uses `kind: "pi-harness.analysis-run"`, a `run-` ID, `selection.strategy: "latest-n"`, `selection.limit`, a minimal route-only `workspaceTarget`, eligible/selected counts, and deterministic fingerprints. Git projects use `{ kind: "repo-root", route: ".", packageRoute: null, ownerRoute: "." }`; non-Git projects use the same routes with `kind: "standalone"`. No workspace-member topology is inferred.
+
+`maxSessionsPerScan` is normalized once before discovery: non-negative finite values are truncated to an integer, while negative/non-finite values are rejected before context creation. Parseable session header timestamps are canonicalized to ISO; invalid/missing timestamps become `null` and eligibility falls back to file mtime. Authority explicitly denies raw session content and user-home assets and limits normalized lookup to `single-exact-ref`.
+
+Metadata-only private context is stored under `~/.pi/harness/projects/<project-key>/analysis-runs/<run-id>/context.json`. It is immutable after creation and bound to the public run by `contextFingerprint`. Every public API validates a supplied run/context before returning or consuming it, including `analysisRun()` and `sessions()`. Consumers recompute context counts, fingerprints, selected-subset and path bindings before use. Each consumer writes an independent atomic receipt under `analysis-runs/<run-id>/consumers/<consumer>.json`, so concurrent report/reflection calls do not overwrite context or each other.
+
 ## Pi extension commands
 
 ```txt
@@ -58,7 +73,7 @@ Most functions accept the same option shape:
 /harness-wiki-ask <question>
 ```
 
-`/harness [last]` is the single interactive observability command in TUI mode: it combines status and the generated Markdown report in one scrollable dashboard modal. `/harness-proposals` is the single interactive review command in TUI mode: it opens the proposal picker and provides detail, approve, reject, and approve-and-apply actions with confirmation. Proposals with a JSON Patch expose `Approve & Apply`; already approved proposals expose `Apply`. Approve/reject/apply remain runtime operations used internally or by the dedicated apply command. In print and JSON modes, `/harness-proposals` only prints the proposal list.
+`/harness [last]` is the single interactive observability command in TUI mode: it combines the frozen session list and generated Markdown report from one report/analysis-run payload in one scrollable dashboard modal. Automation status is fetched separately because it does not discover sessions. `/harness-proposals` is the single interactive review command in TUI mode: it opens the proposal picker and provides detail, approve, reject, and approve-and-apply actions with confirmation. Proposals with a JSON Patch expose `Approve & Apply`; already approved proposals expose `Apply`. Approve/reject/apply remain runtime operations used internally or by the dedicated apply command. In print and JSON modes, `/harness-proposals` only prints the proposal list.
 
 Harness Wiki is registered from the same public `harness/index.ts` entrypoint. The legacy `/wiki-*` commands and `extensions/wiki/` entrypoint are removed.
 
@@ -78,6 +93,10 @@ Deterministic detectors/defaults remain in `src/analysis/rules.js`. `src/analysi
 ## Safety
 
 - Session discovery reads only the first JSONL line/header for listing.
+- Analysis runs freeze `until`, sort with deterministic tie-breaks, and fingerprint eligible and selected session metadata. If a selected file changes before consumption (including the active session being appended), that session is explicitly skipped and the consumer lane is `partial`; the runtime never silently rediscovers a replacement population.
+- Private analysis-run context contains session identity/stat metadata and warnings, not raw prompt/content. Corrupt/tampered context fails closed with `ANALYSIS_RUN_CONTEXT_INTEGRITY`.
+- Frozen consumers pass the expected header identity/timestamp and final size/mtime into `writeSessionCache()`. A mismatch throws `FROZEN_SESSION_MISMATCH` before canonical cache persistence, preserving any existing cache.
+- Report Markdown and reflection prompts include a bounded run summary: run ID, selected fingerprint, selected/accepted/skipped counts, consumer status, and an explicit partial/observed-empty notice.
 - `inspect` parses a single explicit session file and returns metadata/tree, not full message content unless explicitly requested and redacted.
 - `scan` writes normalized cache files under `~/.pi/harness/projects/<project-key>/sessions/<session-id>/`.
 - Harness runtime logs are written under `~/.pi/harness/logs/` by default.
@@ -94,6 +113,6 @@ Deterministic detectors/defaults remain in `src/analysis/rules.js`. `src/analysi
 - Normal Pi tool turns block write/edit and common shell mutations of `_rules.md` and `.last-update.json`; approved controlled apply writes through runtime code.
 - `rollback` restores uncommitted apply changes for the recorded changed paths, or reverts the recorded commit when `--commit` was used.
 - `eval` runs deterministic regression scenarios and writes JSON/Markdown reports under `~/.pi/harness/projects/<project-key>/evals/`.
-- `automate` is gated by `harness/config.json` and can only scan/report/draft proposals/eval; it never applies, commits, pushes, or reads raw logs beyond the normal normalized scan path.
+- `automate` is gated by `harness/config.json` and can only scan/report/draft proposals/eval; it never applies, commits, pushes, or reads raw logs beyond the normal normalized scan path. Enabled scan/report/propose stages share one frozen analysis run, and automation output records each stage's run ID and selected fingerprint for audit.
 - Creates/checks private harness home at `~/.pi/harness`.
 - Project config is read from `<projectRoot>/harness/config.json` when present.

@@ -34,7 +34,10 @@ The old `/wiki-*` commands are intentionally removed without compatibility alias
 ## Harness Wiki behavior
 
 - Generates and updates normal repository documentation under `wiki/` using the current Pi provider/model/tools.
-- Writes update metadata at `wiki/.last-update.json` only when normal Wiki documentation changes.
+- Answers `/harness-wiki-ask` from `wiki/` first, falling back to source only when the Wiki is insufficient, appears stale, or the user asks for source verification.
+- Optimizes generated docs for coding-agent navigation: stable source paths and symbols, invariants, focused tests, narrow validation commands, compact task routing, and evidence-backed relationships between canonical pages.
+- Validates relative Markdown file links and heading anchors during update no-op checks and after init/update. Broken links are reported with source lines and mark the run interrupted so the next update retries.
+- Records `complete` or `interrupted` status in `wiki/.last-update.json`. An aborted/failed agent run or session shutdown after documentation changes is interrupted; a successful no-change retry clears stale interrupted status.
 - Loads the optional user-owned `wiki/INSTRUCTIONS.md` brief into init/update/ask prompts without treating it as generated documentation.
 - Treats `wiki/**/_rules.md` as reviewed prompt rules, not generated documentation.
 - Creates deterministic empty `_rules.md` scaffolds for root/final sections when missing.
@@ -71,17 +74,18 @@ repository: langchain-ai/openwiki
 commit: 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
 short:  23428de fix: use dash-delimited Anthropic model id for Opus (claude-opus-4-8) (#113)
 date checked locally: 2026-07-06
-latest upstream check: e1a2fea77048f342c6317c457b3dca6efe5ec209 (2026-07-15)
-latest prompt review: e1a2fea77048f342c6317c457b3dca6efe5ec209 (after OpenWiki 0.1.2, 2026-07-15)
-latest prompt behavior ported: 2fb44a876db8cca461ad1c0767931d95495763a3 (documentation coverage backlog)
+latest upstream check: 9a02b3516fe1706d6e8f23557ac42f42a6d0896a (OpenWiki v0.3.0, 2026-08-04)
+latest coding-agent prompt review: 4d2e1a02b53dbee9cb2f13e8df39f397f1a76bb6 (v0.3.0 prompt overhaul)
+selected behavior ports: 2fb44a876db8cca461ad1c0767931d95495763a3 (coverage backlog), c95b6d6bacfa96379993ae424a705578a4882276 (interrupted-run retries), 4d2e1a02b53dbee9cb2f13e8df39f397f1a76bb6 (Wiki-first Q&A and coding-agent navigation), 5f8a8fb5c4943eb0b9474f1a74efb9c0824f6226 (internal-link validation)
 ```
 
 Kept/adapted:
 
 - Wiki init/update/chat concepts.
 - `wiki/` output and `.last-update.json` metadata.
-- Git evidence collection and no-op update behavior.
-- Documentation quality, planning, privacy, update discipline, and deferred-area backlog tracking.
+- Git evidence collection, no-op update behavior, and interrupted-run retry metadata.
+- Documentation quality, planning, privacy, update discipline, deferred-area backlog tracking, and post-run internal-link validation.
+- Wiki-first question answering plus coding-agent-oriented task routing, symbol/test/validation guidance, and evidence-backed page relationships.
 - User-owned persistent Wiki brief adapted from OpenWiki `openwiki/INSTRUCTIONS.md`.
 
 Intentionally different:
@@ -90,6 +94,8 @@ Intentionally different:
 - Pi slash commands and the current Pi model/tools perform the work.
 - Harness owns the Wiki capability; there is no second `extensions/wiki/` entrypoint.
 - Domain-local reviewed rules are Markdown prompts under `wiki/**/_rules.md`.
+- Harness keeps its focused page budget/backlog model and English output contract; it does not adopt OpenWiki's OKF/index/visualizer pipeline, forced Mermaid generation, QA subagent graph, connectors, or personal-wiki features.
+- OpenWiki's `.openwikiignore` backend gate cannot be copied safely onto Pi's shared filesystem tools; Harness continues to use the user-owned Wiki brief for scope exclusions and deterministic protection for reserved/sensitive paths.
 
 ## Upstream upgrade checklist
 

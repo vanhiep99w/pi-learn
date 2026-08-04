@@ -5,6 +5,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
+  formatWikiLinkIssues,
+  validateWikiInternalLinks,
+} from "../../../harness-runtime/src/analysis/wiki-links.js";
+import {
   discoverWikiPromptRules,
   ensureWikiPromptRuleScaffolds,
   isWikiDocumentationPath,
@@ -33,6 +37,7 @@ type UpdateMetadata = {
   command: "init" | "update";
   gitHead?: string;
   model: string;
+  status: "complete" | "interrupted";
 };
 
 type RunContext = {
@@ -45,6 +50,7 @@ type ActiveWikiRun = {
   command: HarnessWikiCommand;
   cwd: string;
   snapshotBefore?: string;
+  agentInterrupted?: boolean;
 };
 
 let activeWikiRun: ActiveWikiRun | null = null;
@@ -113,6 +119,16 @@ export function registerHarnessWikiCommands(pi: ExtensionAPI) {
     }
   });
 
+  pi.on("agent_end", async (event, ctx) => {
+    const run = activeWikiRun;
+    if (!run || run.cwd !== ctx.cwd) return;
+    const finalAssistant = [...event.messages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    run.agentInterrupted = finalAssistant?.role === "assistant"
+      && (finalAssistant.stopReason === "aborted" || finalAssistant.stopReason === "error");
+  });
+
   pi.on("agent_settled", async (_event, ctx) => {
     const run = activeWikiRun;
     if (!run || run.cwd !== ctx.cwd) return;
@@ -128,19 +144,35 @@ export function registerHarnessWikiCommands(pi: ExtensionAPI) {
       const scaffoldResult = ensureWikiPromptRuleScaffolds({ projectRoot: run.cwd });
       const snapshotAfter = await createWikiDocumentationSnapshot(run.cwd);
       const docsChanged = snapshotAfter !== run.snapshotBefore;
-      if (docsChanged) {
-        await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx));
+      const linkReport = validateWikiInternalLinks({ projectRoot: run.cwd });
+      const linksValid = linkReport.issues.length === 0;
+      const agentInterrupted = run.agentInterrupted === true;
+      const previousUpdate = await readLastUpdate(run.cwd);
+      const clearInterruptedStatus = previousUpdate?.status === "interrupted";
+      if (linksValid && !agentInterrupted && (docsChanged || clearInterruptedStatus)) {
+        await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx), "complete");
+      } else if (!linksValid || (agentInterrupted && docsChanged)) {
+        await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx), "interrupted");
       }
 
       const parts = [
-        docsChanged
-          ? `Harness Wiki ${run.command} completed; documentation metadata updated.`
-          : `Harness Wiki ${run.command} completed with no documentation changes.`,
+        agentInterrupted
+          ? docsChanged
+            ? `Harness Wiki ${run.command} was aborted or failed after changing documentation; the run was marked interrupted.`
+            : `Harness Wiki ${run.command} was aborted or failed with no documentation changes; existing metadata was preserved.`
+          : docsChanged
+            ? linksValid
+              ? `Harness Wiki ${run.command} completed; documentation metadata updated.`
+              : `Harness Wiki ${run.command} produced documentation changes and was marked interrupted because internal links are invalid.`
+            : clearInterruptedStatus && linksValid
+              ? `Harness Wiki ${run.command} completed with no documentation changes; interrupted metadata cleared.`
+              : `Harness Wiki ${run.command} completed with no documentation changes.`,
       ];
       if (scaffoldResult.created.length) {
         parts.push(`Created prompt-rule scaffold(s): ${scaffoldResult.created.join(", ")}.`);
       }
-      notifyOrLog(ctx, parts.join(" "), "info");
+      if (!linksValid) parts.push(formatWikiLinkIssues(linkReport));
+      notifyOrLog(ctx, parts.join(" "), linksValid && !agentInterrupted ? "info" : "warning");
     } catch (error) {
       notifyOrLog(ctx, `Harness Wiki finalization failed: ${formatError(error)}`, "error");
     } finally {
@@ -149,8 +181,21 @@ export function registerHarnessWikiCommands(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
+    const run = activeWikiRun;
     activeWikiRun = null;
-    setWikiStatus(ctx, undefined);
+    try {
+      if (run && run.cwd === ctx.cwd && run.command !== "chat") {
+        const snapshotAfter = await createWikiDocumentationSnapshot(run.cwd);
+        if (snapshotAfter !== run.snapshotBefore) {
+          await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx), "interrupted");
+          notifyOrLog(ctx, `Harness Wiki ${run.command} was interrupted after changing documentation; the next update will retry.`, "warning");
+        }
+      }
+    } catch (error) {
+      notifyOrLog(ctx, `Harness Wiki interruption metadata failed: ${formatError(error)}`, "error");
+    } finally {
+      setWikiStatus(ctx, undefined);
+    }
   });
 }
 
@@ -255,9 +300,16 @@ async function getUpdateNoopStatus(cwd: string): Promise<UpdateNoopStatus> {
     return { shouldSkip: false, reason: "prompt-rule scaffolds are missing" };
   }
   if (!promptRules.valid) return { shouldSkip: false, reason: "prompt-rule lint is invalid" };
+  const linkReport = validateWikiInternalLinks({ projectRoot: cwd });
+  if (linkReport.issues.length > 0) {
+    return { shouldSkip: false, reason: "internal Wiki links are invalid" };
+  }
 
   const lastUpdate = await readLastUpdate(cwd);
   if (!lastUpdate?.gitHead) return { shouldSkip: false, reason: "missing previous update git head" };
+  if (lastUpdate.status === "interrupted") {
+    return { shouldSkip: false, reason: "previous update was interrupted" };
+  }
 
   const head = await getGitHead(cwd);
   if (!head) return { shouldSkip: false, reason: "missing current git head" };
@@ -293,6 +345,7 @@ async function readLastUpdate(cwd: string): Promise<UpdateMetadata | null> {
         command: parsed.command === "init" ? "init" : "update",
         gitHead: typeof parsed.gitHead === "string" ? parsed.gitHead : undefined,
         model: parsed.model,
+        status: parsed.status === "interrupted" ? "interrupted" : "complete",
       };
     }
   } catch (error) {
@@ -302,13 +355,19 @@ async function readLastUpdate(cwd: string): Promise<UpdateMetadata | null> {
   return null;
 }
 
-async function writeLastUpdateMetadata(command: "init" | "update", cwd: string, model: string): Promise<void> {
+async function writeLastUpdateMetadata(
+  command: "init" | "update",
+  cwd: string,
+  model: string,
+  status: UpdateMetadata["status"] = "complete",
+): Promise<void> {
   const metadataPath = path.join(cwd, UPDATE_METADATA_PATH);
   const metadata: UpdateMetadata = {
     updatedAt: new Date().toISOString(),
     command,
     gitHead: await getGitHead(cwd),
     model,
+    status,
   };
   await mkdir(path.dirname(metadataPath), { recursive: true });
   await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");

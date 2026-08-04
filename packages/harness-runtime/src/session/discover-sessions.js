@@ -5,18 +5,22 @@ import { resolveProject } from "../project/resolve-project.js";
 export function discoverSessions(config, project, options = {}) {
   const sessionDir = config.sessionDir;
   const maxSessions = options.maxSessions ?? config.maxSessionsPerScan ?? 50;
+  const until = normalizeUntil(options.until);
   const warnings = [];
 
   if (!fs.existsSync(sessionDir)) {
     return {
       sessions: [],
+      eligibleSessions: [],
+      eligibleCount: 0,
       warnings: [warning("session_dir_missing", `Session directory does not exist: ${sessionDir}`)],
       scannedFiles: 0,
+      until: until.iso,
     };
   }
 
   const files = listJsonlFiles(sessionDir, warnings);
-  const sessions = [];
+  const eligibleSessions = [];
 
   for (const file of files) {
     const parsed = readSessionHeader(file);
@@ -27,19 +31,20 @@ export function discoverSessions(config, project, options = {}) {
     if (!session) continue;
 
     if (project && !sessionMatchesProject(session, project)) continue;
-    sessions.push(session);
+    const sessionTime = session.headerTimestampMs ?? session.mtimeMs ?? 0;
+    if (sessionTime > until.ms) continue;
+    eligibleSessions.push(session);
   }
 
-  sessions.sort((a, b) => {
-    const aTime = a.headerTimestampMs ?? a.mtimeMs ?? 0;
-    const bTime = b.headerTimestampMs ?? b.mtimeMs ?? 0;
-    return bTime - aTime;
-  });
+  eligibleSessions.sort(compareSessions);
 
   return {
-    sessions: sessions.slice(0, maxSessions),
+    sessions: eligibleSessions.slice(0, maxSessions),
+    eligibleSessions,
+    eligibleCount: eligibleSessions.length,
     warnings,
     scannedFiles: files.length,
+    until: until.iso,
   };
 }
 
@@ -151,7 +156,8 @@ function sessionInfoFromHeader(sessionFile, header, warnings) {
     warnings.push(warning("resolve_project_failed", `Cannot resolve cwd for ${sessionFile}: ${error.message}`, sessionFile));
   }
 
-  const headerTimestampMs = header.timestamp ? Date.parse(header.timestamp) : undefined;
+  const timestamp = canonicalSessionTimestamp(header.timestamp);
+  const headerTimestampMs = timestamp ? Date.parse(timestamp) : undefined;
 
   return {
     sessionId: header.id,
@@ -161,8 +167,8 @@ function sessionInfoFromHeader(sessionFile, header, warnings) {
     projectRoot: project?.projectRoot ?? cwd,
     projectKey: project?.projectKey,
     piSessionVersion: header.version ?? 1,
-    timestamp: header.timestamp,
-    headerTimestampMs: Number.isFinite(headerTimestampMs) ? headerTimestampMs : undefined,
+    timestamp,
+    headerTimestampMs,
     parentSession: header.parentSession,
     size: stat.size,
     mtimeMs: stat.mtimeMs,
@@ -176,6 +182,36 @@ function sessionMatchesProject(session, project) {
   if (session.gitRoot && project.gitRoot && path.resolve(session.gitRoot) === path.resolve(project.gitRoot)) return true;
   return path.resolve(session.cwd).startsWith(`${path.resolve(project.projectRoot)}${path.sep}`)
     || path.resolve(session.cwd) === path.resolve(project.projectRoot);
+}
+
+export function canonicalSessionTimestamp(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function compareSessions(a, b) {
+  const aTime = a.headerTimestampMs ?? a.mtimeMs ?? 0;
+  const bTime = b.headerTimestampMs ?? b.mtimeMs ?? 0;
+  return bTime - aTime
+    || compareText(a.sessionId, b.sessionId)
+    || compareText(a.sessionFile, b.sessionFile);
+}
+
+function compareText(a, b) {
+  const left = String(a ?? "");
+  const right = String(b ?? "");
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function normalizeUntil(value) {
+  if (value === undefined) {
+    const now = new Date();
+    return { ms: now.getTime(), iso: now.toISOString() };
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error(`Invalid session discovery until value: ${value}`);
+  return { ms: date.getTime(), iso: date.toISOString() };
 }
 
 function warning(code, message, sessionFile) {

@@ -10,10 +10,10 @@ import { isWikiRulePath } from "../analysis/wiki-prompt-rules.js";
 const DEFAULT_MAX_EVENTS = 40;
 const DEFAULT_MAX_EXCERPT_CHARS = 700;
 
-export function buildReflection({ project, sessionResults, generatedAt = new Date(), maxEvents = DEFAULT_MAX_EVENTS, maxExcerptChars = DEFAULT_MAX_EXCERPT_CHARS }) {
+export function buildReflection({ project, sessionResults, analysisRun, generatedAt = new Date(), maxEvents = DEFAULT_MAX_EVENTS, maxExcerptChars = DEFAULT_MAX_EXCERPT_CHARS }) {
   const evidence = selectReflectionEvidence({ sessionResults, maxEvents, maxExcerptChars });
   const metrics = summarizeMetrics(sessionResults);
-  const prompt = renderReflectionPrompt({ project, generatedAt, evidence, metrics, maxExcerptChars });
+  const prompt = renderReflectionPrompt({ project, generatedAt, evidence, metrics, analysisRun, maxExcerptChars });
   return { prompt, evidence, metrics, generatedAt: generatedAt.toISOString() };
 }
 
@@ -95,16 +95,29 @@ export function selectReflectionEvidence({ sessionResults, maxEvents = DEFAULT_M
   return pickBalancedEvidence(deduped, maxEvents);
 }
 
-export function renderReflectionPrompt({ project, generatedAt = new Date(), evidence, metrics, maxExcerptChars = DEFAULT_MAX_EXCERPT_CHARS }) {
+export function renderReflectionPrompt({ project, generatedAt = new Date(), evidence, metrics, analysisRun, maxExcerptChars = DEFAULT_MAX_EXCERPT_CHARS }) {
   const generatedIso = typeof generatedAt === "string" ? generatedAt : generatedAt.toISOString();
   const safeProject = redactValue(project).value;
   const safeEvidence = redactValue(evidence ?? []).value;
   const safeMetrics = redactValue(metrics ?? {}).value;
+  const runScope = boundedRunSummary(analysisRun, safeMetrics.sessions ?? 0);
   const lines = [];
   lines.push(`# Pi Harness LLM Reflection Prompt — ${generatedIso.slice(0, 10)}`);
   lines.push("");
   lines.push("You are reviewing normalized, redacted Pi Harness session evidence. Do not infer from raw logs; raw logs are unavailable by design.");
   lines.push("");
+  if (runScope) {
+    lines.push("## Frozen analysis run scope");
+    lines.push("```json");
+    lines.push(JSON.stringify(runScope, null, 2));
+    lines.push("```");
+    if (runScope.consumerStatus === "partial") {
+      lines.push(`WARNING: PARTIAL frozen scope. ${runScope.skippedCount} selected session(s) were skipped and no replacement population was discovered.`);
+    } else if (runScope.consumerStatus === "observed_empty") {
+      lines.push("OBSERVED EMPTY: the frozen run selected zero eligible sessions; do not infer missing evidence.");
+    }
+    lines.push("");
+  }
   lines.push("## Safety rules");
   lines.push("- Use only the normalized evidence below.");
   lines.push("- Do not request or reconstruct raw Pi JSONL logs.");
@@ -184,6 +197,18 @@ export function renderReflectionPrompt({ project, generatedAt = new Date(), evid
   lines.push("```");
   lines.push("");
   return lines.join("\n");
+}
+
+function boundedRunSummary(analysisRun, acceptedFallback) {
+  if (!analysisRun) return undefined;
+  return {
+    runId: analysisRun.runId,
+    selectedFingerprint: analysisRun.selection?.selectedFingerprint,
+    selectedCount: analysisRun.selection?.selectedCount ?? 0,
+    acceptedCount: analysisRun.consumption?.acceptedCount ?? acceptedFallback,
+    skippedCount: analysisRun.consumption?.skippedCount ?? 0,
+    consumerStatus: analysisRun.consumption?.status ?? analysisRun.laneStatus?.consumer ?? "pending",
+  };
 }
 
 function normalizeReflectionProposal({ proposal, project, index }) {

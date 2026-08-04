@@ -82,6 +82,55 @@ test("writeSessionCache redacts event excerpts", async () => {
   assert.match(eventsText, /<REDACTED_SECRET>/);
 });
 
+test("expected frozen mismatch does not create canonical cache", async () => {
+  const fixture = createFixture();
+  const sessionFile = path.join(fixture.sessionDir, "session.jsonl");
+  writeSession(sessionFile, fixture.project);
+  const project = resolveProject(fixture.project);
+  const config = { harnessHome: fixture.harnessHome, redact: true, logging: { enabled: false } };
+  const stat = fs.statSync(sessionFile);
+  const outDir = path.join(fixture.harnessHome, "projects", project.projectKey, "sessions", "s1");
+
+  await assert.rejects(
+    writeSessionCache({
+      sessionFile,
+      config,
+      project,
+      expectedSnapshot: frozenSnapshot(sessionFile, stat, { size: stat.size + 1 }),
+    }),
+    (error) => error.code === "FROZEN_SESSION_MISMATCH",
+  );
+
+  assert.equal(fs.existsSync(outDir), false);
+});
+
+test("expected frozen mismatch preserves existing canonical cache", async () => {
+  const fixture = createFixture();
+  const sessionFile = path.join(fixture.sessionDir, "session.jsonl");
+  writeSession(sessionFile, fixture.project);
+  const project = resolveProject(fixture.project);
+  const config = { harnessHome: fixture.harnessHome, redact: true, logging: { enabled: false } };
+  const initial = await writeSessionCache({ sessionFile, config, project });
+  const before = Object.fromEntries(Object.entries(initial.paths).map(([name, file]) => [name, fs.readFileSync(file, "utf8")]));
+  const frozen = {
+    sessionFile,
+    sessionId: initial.manifest.sessionId,
+    headerTimestamp: initial.manifest.startedAt,
+    size: initial.manifest.rawSize,
+    mtimeMs: initial.manifest.rawMtimeMs,
+  };
+  fs.appendFileSync(sessionFile, `${JSON.stringify({ type: "message", id: "late", parentId: "m3", timestamp: "2026-06-14T01:01:00.000Z", message: { role: "assistant", content: "late mutation" } })}\n`);
+
+  await assert.rejects(
+    writeSessionCache({ sessionFile, config, project, expectedSnapshot: frozen }),
+    (error) => error.code === "FROZEN_SESSION_MISMATCH",
+  );
+
+  for (const [name, file] of Object.entries(initial.paths)) {
+    assert.equal(fs.readFileSync(file, "utf8"), before[name]);
+  }
+});
+
 function createFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-cache-writer-"));
   const project = path.join(root, "project");
@@ -90,6 +139,17 @@ function createFixture() {
   fs.mkdirSync(path.join(project, ".git"), { recursive: true });
   fs.mkdirSync(sessionDir, { recursive: true });
   return { root, project, sessionDir, harnessHome };
+}
+
+function frozenSnapshot(sessionFile, stat, overrides = {}) {
+  return {
+    sessionFile,
+    sessionId: "s1",
+    headerTimestamp: "2026-06-14T01:00:00.000Z",
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+    ...overrides,
+  };
 }
 
 function writeSession(file, project, userContent = "hi") {

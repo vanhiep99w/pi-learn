@@ -12,6 +12,8 @@
 >
 > Ma trận harness improve từng thành phần theo tín hiệu/evidence: [`improvement-matrix.md`](./improvement-matrix.md).
 >
+> So sánh với Better Harness và kế hoạch nâng cấp evidence/Task Episode/findings/verified repair: [`better-harness-comparison-and-improvement-plan.md`](./better-harness-comparison-and-improvement-plan.md).
+>
 > Roadmap chi tiết + current status: [`roadmap.md`](./roadmap.md).
 >
 > Harness observability/self-improvement logs: [`harness-observability.md`](./harness-observability.md).

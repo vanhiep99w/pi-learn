@@ -73,8 +73,44 @@ test("discoverSessions sorts newest first and respects maxSessions", () => {
     resolveProject(project),
   );
 
+  assert.equal(result.eligibleCount, 2);
   assert.equal(result.sessions.length, 1);
   assert.equal(result.sessions[0].sessionId, "new");
+});
+
+test("discoverSessions applies frozen until and deterministic tie-breaks before selection", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "harness-discover-until-"));
+  const project = path.join(root, "project");
+  const sessionDir = path.join(root, "sessions");
+  fs.mkdirSync(path.join(project, ".git"), { recursive: true });
+  fs.mkdirSync(sessionDir, { recursive: true });
+
+  writeSession(path.join(sessionDir, "first.jsonl"), {
+    id: "z-session",
+    cwd: project,
+    timestamp: "2026-06-14T01:00:00.000Z",
+  });
+  writeSession(path.join(sessionDir, "second.jsonl"), {
+    id: "a-session",
+    cwd: project,
+    timestamp: "2026-06-14T01:00:00.000Z",
+  });
+  writeSession(path.join(sessionDir, "future.jsonl"), {
+    id: "future",
+    cwd: project,
+    timestamp: "2026-06-15T01:00:00.000Z",
+  });
+
+  const result = discoverSessions(
+    { sessionDir, maxSessionsPerScan: 1 },
+    resolveProject(project),
+    { until: "2026-06-14T02:00:00.000Z" },
+  );
+
+  assert.equal(result.until, "2026-06-14T02:00:00.000Z");
+  assert.equal(result.eligibleCount, 2);
+  assert.equal(result.sessions.length, 1);
+  assert.equal(result.sessions[0].sessionId, "a-session");
 });
 
 test("discoverSessions reports missing session directory", () => {

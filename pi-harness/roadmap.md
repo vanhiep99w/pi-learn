@@ -2,6 +2,8 @@
 
 > Bổ sung và thay thế roadmap tổng quát trong [`plan.md`](./plan.md).
 >
+> Kế hoạch nâng cấp rút ra từ so sánh với Better Harness nằm tại [`better-harness-comparison-and-improvement-plan.md`](./better-harness-comparison-and-improvement-plan.md). Tài liệu đó là backlog thiết kế cho frozen evidence, Task Episode, findings, verified repair và longitudinal evaluation; roadmap này vẫn là owner của current implementation status và phase sequencing.
+>
 > Mục tiêu: mô tả **current status**, thứ tự triển khai thực tế, deliverables, Definition of Done, dependencies, và tiêu chí không được nhảy phase.
 
 ---
@@ -42,6 +44,7 @@ pi-harness/
 ├── runtime-and-improvement.md      # runtime tạo cache + memory/rules/parser improve
 ├── config.md                       # config spec
 ├── improvement-matrix.md           # signal → target → improvement mapping
+├── better-harness-comparison-and-improvement-plan.md # evidence/episode/findings upgrade plan
 ├── harness-observability.md        # harness runtime/audit/error logs for self-improvement
 ├── extension-migration-plan.md     # plan chuyển primary UX từ CLI sang Pi extension
 ├── harness-wiki-integration-plan.md # Harness Wiki + domain-local prompt-rule design

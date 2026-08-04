@@ -69,13 +69,12 @@ export default function harnessExtension(pi: ExtensionAPI) {
     description: "Open the Harness status and Markdown report dashboard. Usage: /harness [last]",
     handler: async (args, ctx) => withHarnessErrors(ctx, async () => {
       const last = firstArg(args) ?? DEFAULT_LAST;
-      const [sessionsRun, reportRun, automationRun] = await Promise.all([
-        runHarness(ctx, ["sessions", "--project", ctx.cwd, "--last", last, "--json"]),
+      const [reportRun, automationRun] = await Promise.all([
         runHarness(ctx, ["report", "--project", ctx.cwd, "--last", last, "--json"]),
         runHarness(ctx, ["automation-status", "--project", ctx.cwd, "--json"]),
       ]);
-      const sessionsOutput = parseJson(sessionsRun.stdout);
       const reportOutput = parseJson(reportRun.stdout);
+      const sessionsOutput = reportOutput;
       const automationOutput = parseJson(automationRun.stdout);
       const reportPath = reportOutput?.report?.latestPath;
       if (!reportPath) return notifyOrLog(ctx, "Harness report did not return latestPath.", "warning");
@@ -96,7 +95,7 @@ export default function harnessExtension(pi: ExtensionAPI) {
           markdown: dashboardMarkdown,
           projectName: sessionsOutput?.project?.projectKey ?? "current project",
           sessionCount: sessionsOutput?.sessions?.length ?? 0,
-          warningCount: countHarnessWarnings(reportOutput?.results ?? []),
+          warningCount: countHarnessWarnings(reportOutput?.results ?? [], reportOutput?.warnings ?? []),
           automationAllowed: Boolean(automationOutput?.status?.allowed),
         });
       } else if (ctx.hasUI && ctx.ui?.editor) {
@@ -224,8 +223,9 @@ export default function harnessExtension(pi: ExtensionAPI) {
   });
 }
 
-function countHarnessWarnings(results: any[]) {
-  return results.reduce((sum: number, result: any) => sum + (result.warningsCount ?? result.warnings?.length ?? 0), 0);
+function countHarnessWarnings(results: any[], topLevelWarnings: any[] = []) {
+  return topLevelWarnings.length
+    + results.reduce((sum: number, result: any) => sum + (result.warningsCount ?? result.warnings?.length ?? 0), 0);
 }
 
 function formatHarnessDashboard({
@@ -245,15 +245,22 @@ function formatHarnessDashboard({
 }) {
   const sessions = sessionsOutput?.sessions ?? [];
   const results = reportOutput?.results ?? [];
-  const warningCount = countHarnessWarnings(results);
+  const topLevelWarnings = reportOutput?.warnings ?? [];
+  const warningCount = countHarnessWarnings(results, topLevelWarnings);
   const automation = automationOutput?.status;
-  const recentWarnings = results
-    .flatMap((result: any) => (result.warnings ?? []).slice(0, 3).map((warning: any) => ({
+  const analysisRun = reportOutput?.analysisRun;
+  const recentWarnings = [
+    ...topLevelWarnings.map((warning: any) => ({
+      sessionId: warning.sessionId,
+      code: warning.code,
+      message: warning.message,
+    })),
+    ...results.flatMap((result: any) => (result.warnings ?? []).slice(0, 3).map((warning: any) => ({
       sessionId: result.sessionId,
       code: warning.code,
       message: warning.message,
-    })))
-    .slice(0, 10);
+    }))),
+  ].slice(0, 10);
   const renderedReport = reportMarkdown.trim().replace(/^#\s+/, "## ");
 
   return [
@@ -261,6 +268,7 @@ function formatHarnessDashboard({
     `- **Project:** ${markdownCode(sessionsOutput?.project?.projectRoot ?? "(unknown)")}`,
     `- **Session source:** ${markdownCode(sessionsOutput?.sessionDir ?? "(unknown)")}`,
     `- **Session gần đây:** **${sessions.length}/${last}**`,
+    `- **Analysis run:** **${markdownInline(analysisRun?.laneStatus?.consumer ?? "unknown")}** — ${markdownCode(analysisRun?.runId ?? "unknown")} · ${markdownCode(analysisRun?.selection?.selectedFingerprint ?? "unknown")}`,
     `- **Warnings:** **${warningCount}**`,
     `- **Automation:** **${automation?.allowed ? "allowed" : "disabled/skipped"}** — ${markdownInline(automation?.reason ?? "unknown")}`,
     `- **Report:** ${markdownCode(reportPath)}`,

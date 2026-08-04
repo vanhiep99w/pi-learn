@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import { loadConfig } from "./config/load-config.js";
 import { checkWritableDirectory, ensureHarnessHome, projectCacheDir } from "./storage/harness-home.js";
-import { writeSessionCache } from "./storage/cache-writer.js";
-import { discoverSessions } from "./session/discover-sessions.js";
+import { createAnalysisRun as freezeAnalysisRun, consumeAnalysisRun, readAnalysisRunContext } from "./analysis/analysis-run.js";
 import { createLogger } from "./logging/logger.js";
 import { parseSessionFile, summarizeEntry } from "./session/parse-session.js";
 import { buildSessionTree, summarizeTree } from "./session/tree.js";
@@ -81,12 +80,26 @@ export function projectResolve(options = {}) {
   return project;
 }
 
+export function analysisRun(options = {}) {
+  const { config, project, logger } = createHarnessContext("analysis-run", options);
+  ensureHarnessHome(config);
+  try {
+    const run = resolveAnalysisRun({ options, config, project, logger });
+    end(logger, project, { runId: run.runId, selectedCount: run.selection.selectedCount });
+    return run;
+  } catch (error) {
+    fail(logger, project, error);
+    throw error;
+  }
+}
+
 export function sessions(options = {}) {
   const { config, project, sources, logger } = createHarnessContext("sessions", options);
+  ensureHarnessHome(config);
   try {
-    const result = runSessionDiscovery({ config, project, logger });
-    end(logger, project, { sessions: result.sessions.length, warnings: result.warnings.length });
-    return { project, sessionDir: config.sessionDir, scannedFiles: result.scannedFiles ?? 0, count: result.sessions.length, sessions: result.sessions, warnings: result.warnings, sources };
+    const run = resolveAnalysisRun({ options, config, project, logger });
+    end(logger, project, { sessions: run.sessions.length, warnings: run.warnings.length, runId: run.runId });
+    return runPopulationOutput({ project, config, sources, run });
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -97,11 +110,15 @@ export async function scan(options = {}) {
   const { config, project, sources, logger } = createHarnessContext("scan", options);
   ensureHarnessHome(config);
   try {
-    const discovery = runSessionDiscovery({ config, project, logger });
-    const results = [];
-    for (const session of discovery.sessions) results.push(await writeSessionCache({ sessionFile: session.sessionFile, config, project, logger }));
-    end(logger, project, { sessionsCached: results.length });
-    return { project, sessionDir: config.sessionDir, scannedFiles: discovery.scannedFiles ?? 0, count: results.length, results: results.map(publicScanResult), warnings: discovery.warnings, sources };
+    const run = resolveAnalysisRun({ options, config, project, logger });
+    const consumed = await consumeAnalysisRun({ analysisRun: run, config, project, logger, consumer: "scan" });
+    end(logger, project, { sessionsCached: consumed.results.length, runId: run.runId });
+    return {
+      ...runPopulationOutput({ project, config, sources, run: consumed.analysisRun }),
+      count: consumed.results.length,
+      results: consumed.results.map(publicScanResult),
+      warnings: [...run.warnings, ...consumed.warnings],
+    };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -112,15 +129,20 @@ export async function report(options = {}) {
   const { config, project, sources, logger } = createHarnessContext("report", options);
   ensureHarnessHome(config);
   try {
-    const discovery = runSessionDiscovery({ config, project, logger });
-    const results = [];
-    for (const session of discovery.sessions) results.push(await writeSessionCache({ sessionFile: session.sessionFile, config, project, logger }));
+    const run = resolveAnalysisRun({ options, config, project, logger });
+    const consumed = await consumeAnalysisRun({ analysisRun: run, config, project, logger, consumer: "report" });
     const now = new Date();
-    const markdown = generateProjectReport({ project, results, generatedAt: now });
+    const markdown = generateProjectReport({ project, results: consumed.results, analysisRun: consumed.analysisRun, generatedAt: now });
     const reportPaths = writeProjectReport({ config, project, markdown, now });
-    logger.info("report_generated", "Markdown report generated", { component: "report", projectKey: project.projectKey, data: { latestPath: reportPaths.latestPath, datedPath: reportPaths.datedPath, sessions: results.length } });
-    end(logger, project, { sessionsReported: results.length, reportPath: reportPaths.latestPath });
-    return { project, sessionDir: config.sessionDir, scannedFiles: discovery.scannedFiles ?? 0, count: results.length, report: reportPaths, results: results.map(publicScanResult), warnings: discovery.warnings, sources };
+    logger.info("report_generated", "Markdown report generated", { component: "report", projectKey: project.projectKey, data: { latestPath: reportPaths.latestPath, datedPath: reportPaths.datedPath, sessions: consumed.results.length, runId: run.runId } });
+    end(logger, project, { sessionsReported: consumed.results.length, reportPath: reportPaths.latestPath, runId: run.runId });
+    return {
+      ...runPopulationOutput({ project, config, sources, run: consumed.analysisRun }),
+      count: consumed.results.length,
+      report: reportPaths,
+      results: consumed.results.map(publicScanResult),
+      warnings: [...run.warnings, ...consumed.warnings],
+    };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -131,15 +153,27 @@ export async function reflect(options = {}) {
   const { config, project, sources, logger } = createHarnessContext(options.proposeMode ? "propose --llm" : "reflect", options);
   ensureHarnessHome(config);
   try {
-    const discovery = runSessionDiscovery({ config, project, logger });
-    const results = [];
-    for (const session of discovery.sessions) results.push(await writeSessionCache({ sessionFile: session.sessionFile, config, project, logger }));
+    const run = resolveAnalysisRun({ options, config, project, logger });
+    const consumed = await consumeAnalysisRun({ analysisRun: run, config, project, logger, consumer: "reflect" });
     const now = new Date();
-    const reflection = buildReflection({ project, sessionResults: results, generatedAt: now, maxEvents: options.maxEvents, maxExcerptChars: options.maxExcerptChars });
+    const reflection = buildReflection({ project, sessionResults: consumed.results, analysisRun: consumed.analysisRun, generatedAt: now, maxEvents: options.maxEvents, maxExcerptChars: options.maxExcerptChars });
     const reflectionPaths = writeReflectionPrompt({ config, project, prompt: reflection.prompt, now });
-    logger.info("reflection_prompt_written", "LLM reflection prompt written", { component: "reflection", projectKey: project.projectKey, data: { latestPath: reflectionPaths.latestPath, evidenceCount: reflection.evidence.length } });
-    end(logger, project, { sessionsReflected: results.length, evidenceCount: reflection.evidence.length });
-    return { project, sessionDir: config.sessionDir, scannedFiles: discovery.scannedFiles ?? 0, sessionsScanned: results.length, mode: options.proposeMode ? "llm_reflection_prompt" : "reflect", reflection: reflectionPaths, evidenceCount: reflection.evidence.length, metrics: reflection.metrics, warnings: discovery.warnings, sources };
+    logger.info("reflection_prompt_written", "LLM reflection prompt written", { component: "reflection", projectKey: project.projectKey, data: { latestPath: reflectionPaths.latestPath, evidenceCount: reflection.evidence.length, runId: run.runId } });
+    end(logger, project, { sessionsReflected: consumed.results.length, evidenceCount: reflection.evidence.length, runId: run.runId });
+    return {
+      project,
+      sessionDir: config.sessionDir,
+      scannedFiles: run.selection.scannedFiles,
+      sessions: run.sessions,
+      sessionsScanned: consumed.results.length,
+      mode: options.proposeMode ? "llm_reflection_prompt" : "reflect",
+      reflection: reflectionPaths,
+      evidenceCount: reflection.evidence.length,
+      metrics: reflection.metrics,
+      warnings: [...run.warnings, ...consumed.warnings],
+      analysisRun: consumed.analysisRun,
+      sources,
+    };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -174,21 +208,20 @@ export async function propose(options = {}) {
   const { config, project, sources, logger } = createHarnessContext("propose", options);
   ensureHarnessHome(config);
   try {
-    const discovery = runSessionDiscovery({ config, project, logger });
-    const results = [];
-    for (const session of discovery.sessions) results.push(await writeSessionCache({ sessionFile: session.sessionFile, config, project, logger }));
+    const run = resolveAnalysisRun({ options, config, project, logger });
+    const consumed = await consumeAnalysisRun({ analysisRun: run, config, project, logger, consumer: "propose" });
     let proposals;
     let memoryWriteResult = { written: [] };
     if (options.target) {
-      const improvement = generateTargetedImprovements({ project, sessionResults: results, target: options.target });
+      const improvement = generateTargetedImprovements({ project, sessionResults: consumed.results, target: options.target });
       proposals = improvement.proposals;
       if (improvement.memoryItems?.length) memoryWriteResult = writeMemoryDrafts({ config, project, items: improvement.memoryItems });
     } else {
-      proposals = runRuleEngine({ project, sessionResults: results });
+      proposals = runRuleEngine({ project, sessionResults: consumed.results });
     }
     const writeResult = writeDraftProposals({ config, project, proposals });
-    end(logger, project, { candidates: proposals.length, written: writeResult.written.length, skipped: writeResult.skipped.length, memoryDrafts: memoryWriteResult.written.length });
-    return { project, sessionDir: config.sessionDir, scannedFiles: discovery.scannedFiles ?? 0, sessionsScanned: results.length, mode: options.target ? `target:${options.target}` : "rules", candidates: proposals.length, draftDir: writeResult.draftDir, memory: memoryWriteResult.draftPath ? { draftPath: memoryWriteResult.draftPath, written: memoryWriteResult.written } : undefined, written: writeResult.written.map(publicProposalSummary), skipped: writeResult.skipped.map(publicProposalSummary), warnings: discovery.warnings, sources };
+    end(logger, project, { candidates: proposals.length, written: writeResult.written.length, skipped: writeResult.skipped.length, memoryDrafts: memoryWriteResult.written.length, runId: run.runId });
+    return { project, sessionDir: config.sessionDir, scannedFiles: run.selection.scannedFiles, sessionsScanned: consumed.results.length, mode: options.target ? `target:${options.target}` : "rules", candidates: proposals.length, draftDir: writeResult.draftDir, memory: memoryWriteResult.draftPath ? { draftPath: memoryWriteResult.draftPath, written: memoryWriteResult.written } : undefined, written: writeResult.written.map(publicProposalSummary), skipped: writeResult.skipped.map(publicProposalSummary), warnings: [...run.warnings, ...consumed.warnings], analysisRun: consumed.analysisRun, sources };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -266,27 +299,40 @@ export async function automate(options = {}) {
     project: options.project ?? project.cwd,
     maxSessionsPerScan: Number(config.automation?.maxSessions ?? options.maxSessionsPerScan ?? 5),
   };
+  const supportedTargets = status.automation.proposeTargets.filter((target) => ["memory", "rules", "parser", "redaction"].includes(target));
+  const hasSessionStages = status.automation.scan
+    || status.automation.report
+    || status.automation.proposeRules
+    || supportedTargets.length > 0;
+  const sharedRun = hasSessionStages
+    ? freezeAnalysisRun({
+      config: { ...config, maxSessionsPerScan: automationOptions.maxSessionsPerScan },
+      project,
+      logger,
+    })
+    : undefined;
+  const stageOptions = sharedRun ? { ...automationOptions, analysisRun: sharedRun } : automationOptions;
 
   let reportResult;
   if (status.automation.scan) {
-    const scanResult = await scan(automationOptions);
-    actions.push({ name: "scan", status: "done", sessions: scanResult.count });
+    const scanResult = await scan(stageOptions);
+    actions.push({ name: "scan", status: "done", sessions: scanResult.count, analysisRun: automationRunBinding(scanResult.analysisRun) });
   }
   if (status.automation.report) {
-    reportResult = await report(automationOptions);
-    actions.push({ name: "report", status: "done", path: reportResult.report.latestPath });
+    reportResult = await report(stageOptions);
+    actions.push({ name: "report", status: "done", path: reportResult.report.latestPath, analysisRun: automationRunBinding(reportResult.analysisRun) });
   }
   if (status.automation.proposeRules) {
-    const result = await propose({ ...automationOptions, rules: true });
-    actions.push({ name: "propose:rules", status: "done", written: result.written.length, skipped: result.skipped.length });
+    const result = await propose({ ...stageOptions, rules: true });
+    actions.push({ name: "propose:rules", status: "done", written: result.written.length, skipped: result.skipped.length, analysisRun: automationRunBinding(result.analysisRun) });
   }
   for (const target of status.automation.proposeTargets) {
     if (!["memory", "rules", "parser", "redaction"].includes(target)) {
       actions.push({ name: `propose:${target}`, status: "skipped", reason: "unsupported_target" });
       continue;
     }
-    const result = await propose({ ...automationOptions, target });
-    actions.push({ name: `propose:${target}`, status: "done", written: result.written.length, skipped: result.skipped.length, memoryDrafts: result.memory?.written?.length ?? 0 });
+    const result = await propose({ ...stageOptions, target });
+    actions.push({ name: `propose:${target}`, status: "done", written: result.written.length, skipped: result.skipped.length, memoryDrafts: result.memory?.written?.length ?? 0, analysisRun: automationRunBinding(result.analysisRun) });
   }
 
   let evalResult;
@@ -300,9 +346,10 @@ export async function automate(options = {}) {
     actions.push({ name: "draft:eval-fixture", status: "done", written: writeResult.written.length, skipped: writeResult.skipped.length });
   }
 
-  logger.audit("automation_completed", "Gated automation completed", { component: "automation", projectKey: project.projectKey, data: { actions } });
-  end(logger, project, { actions: actions.length });
-  return { project, status: "done", automation: status, actions };
+  const runBinding = automationRunBinding(sharedRun);
+  logger.audit("automation_completed", "Gated automation completed", { component: "automation", projectKey: project.projectKey, data: { actions, analysisRun: runBinding } });
+  end(logger, project, { actions: actions.length, runId: runBinding?.runId });
+  return { project, status: "done", automation: status, analysisRun: runBinding, actions };
 }
 
 export async function evalHarness(options = {}) {
@@ -353,11 +400,42 @@ function lifecycle(operation, options, action) {
   }
 }
 
-function runSessionDiscovery({ config, project, logger }) {
+function resolveAnalysisRun({ options, config, project, logger }) {
+  if (options.analysisRun) {
+    readAnalysisRunContext({ analysisRun: options.analysisRun, config, project });
+    return options.analysisRun;
+  }
   logger.info("session_discovery_start", "Session discovery started", { component: "session_discovery", projectKey: project.projectKey, data: { sessionDir: config.sessionDir, maxSessionsPerScan: config.maxSessionsPerScan } });
-  const result = discoverSessions(config, project, { maxSessions: config.maxSessionsPerScan });
-  logger.info("session_discovery_end", "Session discovery finished", { component: "session_discovery", projectKey: project.projectKey, data: { scannedFiles: result.scannedFiles ?? 0, matched: result.sessions.length, warnings: result.warnings.length } });
-  return result;
+  const run = freezeAnalysisRun({ config, project, logger, now: options.now, runId: options.runId });
+  logger.info("session_discovery_end", "Session discovery finished", { component: "session_discovery", projectKey: project.projectKey, data: { scannedFiles: run.selection.scannedFiles, eligible: run.selection.eligibleCount, selected: run.selection.selectedCount, warnings: run.warnings.length, runId: run.runId } });
+  return run;
+}
+
+function runPopulationOutput({ project, config, sources, run }) {
+  return {
+    project,
+    sessionDir: config.sessionDir,
+    scannedFiles: run.selection.scannedFiles,
+    eligibleCount: run.selection.eligibleCount,
+    selectedCount: run.selection.selectedCount,
+    count: run.sessions.length,
+    sessions: run.sessions,
+    warnings: run.warnings,
+    analysisRun: run,
+    sources,
+  };
+}
+
+function automationRunBinding(run) {
+  if (!run) return undefined;
+  return {
+    runId: run.runId,
+    selectedFingerprint: run.selection?.selectedFingerprint,
+    selectedCount: run.selection?.selectedCount ?? 0,
+    consumerStatus: run.consumption?.status ?? run.laneStatus?.consumer ?? "pending",
+    acceptedCount: run.consumption?.acceptedCount,
+    skippedCount: run.consumption?.skippedCount,
+  };
 }
 
 function inspectEntry(parsed, entryId, { full = false } = {}) {
@@ -381,7 +459,7 @@ function publicConfigSummary(config) {
 }
 
 function safeOptionSummary(options) {
-  return { project: options.project, sessionDir: options.sessionDir, harnessHome: options.harnessHome, maxSessionsPerScan: options.maxSessionsPerScan, rules: Boolean(options.rules), target: options.target, llm: Boolean(options.llm), scenario: options.scenario, entry: options.entry, full: Boolean(options.full) };
+  return { project: options.project, sessionDir: options.sessionDir, harnessHome: options.harnessHome, maxSessionsPerScan: options.maxSessionsPerScan, analysisRunId: options.analysisRun?.runId, rules: Boolean(options.rules), target: options.target, llm: Boolean(options.llm), scenario: options.scenario, entry: options.entry, full: Boolean(options.full) };
 }
 
 function end(logger, project, data) {

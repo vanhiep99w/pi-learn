@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   VERSION,
+  analysisRun,
   projectResolve,
   sessions,
   scan,
@@ -23,6 +24,7 @@ import {
   automate,
   inspect,
 } from "../src/api.js";
+import { analysisRunConsumerReceiptPath, analysisRunContextPath } from "../src/analysis/analysis-run.js";
 
 const packageCwd = path.resolve(new URL("..", import.meta.url).pathname);
 
@@ -50,6 +52,28 @@ test("api sessions lists project sessions", () => {
   assert.equal(output.sessions[0].sessionId, "s1");
 });
 
+test("api sessions and analysisRun reject forged or stale supplied runs", () => {
+  const fixture = createFixture();
+  const options = baseOptions(fixture);
+  writeSession(path.join(fixture.sessionDir, "session.jsonl"), { id: "s1", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const run = analysisRun(options);
+  const forged = { ...run, sessions: [] };
+
+  assert.throws(
+    () => sessions({ ...options, analysisRun: forged }),
+    (error) => error.code === "ANALYSIS_RUN_CONTEXT_INTEGRITY"
+      && error.reason === "public_session_count",
+  );
+
+  const project = projectResolve(options);
+  fs.unlinkSync(analysisRunContextPath({ config: options, project, runId: run.runId }));
+  assert.throws(
+    () => analysisRun({ ...options, analysisRun: run }),
+    (error) => error.code === "ANALYSIS_RUN_CONTEXT_INTEGRITY"
+      && error.reason === "context_unreadable",
+  );
+});
+
 test("api scan writes cache files", async () => {
   const fixture = createFixture();
   writeSession(path.join(fixture.sessionDir, "session.jsonl"), { id: "s1", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
@@ -69,7 +93,68 @@ test("api report writes latest Markdown report", async () => {
 
   assert.equal(output.count, 1);
   assert.equal(fs.existsSync(output.report.latestPath), true);
-  assert.match(fs.readFileSync(output.report.latestPath, "utf8"), /# Pi Harness Report/);
+  const markdown = fs.readFileSync(output.report.latestPath, "utf8");
+  assert.match(markdown, /# Pi Harness Report/);
+  assert.match(markdown, new RegExp(output.analysisRun.runId));
+  assert.match(markdown, new RegExp(output.analysisRun.selection.selectedFingerprint));
+  assert.match(markdown, /Frozen scope: selected 1, accepted 1, skipped 0/);
+  assert.equal(output.sessions[0].sessionId, "s1");
+  assert.equal(output.analysisRun.selection.selectedFingerprint.length, 64);
+  assert.doesNotThrow(() => JSON.stringify(output));
+});
+
+test("api report and reflect consume the same supplied frozen run", async () => {
+  const fixture = createFixture();
+  writeErrorSession(path.join(fixture.sessionDir, "shared.jsonl"), { id: "s-shared", cwd: fixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const options = baseOptions(fixture);
+  const run = analysisRun(options);
+  const project = projectResolve(options);
+  const contextPath = analysisRunContextPath({ config: options, project, runId: run.runId });
+  const contextBefore = fs.readFileSync(contextPath, "utf8");
+
+  const [reportOutput, reflectOutput] = await Promise.all([
+    report({ ...options, analysisRun: run }),
+    reflect({ ...options, analysisRun: run }),
+  ]);
+
+  assert.equal(reportOutput.analysisRun.runId, run.runId);
+  assert.equal(reflectOutput.analysisRun.runId, run.runId);
+  assert.equal(reportOutput.analysisRun.selection.selectedFingerprint, run.selection.selectedFingerprint);
+  assert.equal(reflectOutput.analysisRun.selection.selectedFingerprint, run.selection.selectedFingerprint);
+  assert.equal(reportOutput.analysisRun.laneStatus.consumer, "complete");
+  assert.equal(reflectOutput.analysisRun.laneStatus.consumer, "complete");
+  assert.equal(fs.readFileSync(contextPath, "utf8"), contextBefore);
+  const reportReceiptPath = analysisRunConsumerReceiptPath({ config: options, project, runId: run.runId, consumer: "report" });
+  const reflectReceiptPath = analysisRunConsumerReceiptPath({ config: options, project, runId: run.runId, consumer: "reflect" });
+  assert.equal(fs.existsSync(reportReceiptPath), true);
+  assert.equal(fs.existsSync(reflectReceiptPath), true);
+  assert.equal(JSON.parse(fs.readFileSync(reportReceiptPath, "utf8")).selectedFingerprint, run.selection.selectedFingerprint);
+  assert.equal(JSON.parse(fs.readFileSync(reflectReceiptPath, "utf8")).selectedFingerprint, run.selection.selectedFingerprint);
+  assert.doesNotThrow(() => JSON.stringify({ reportOutput, reflectOutput }));
+});
+
+test("partial and observed-empty scope are explicit in report and reflection artifacts", async () => {
+  const partialFixture = createFixture();
+  const partialOptions = baseOptions(partialFixture);
+  const sessionFile = path.join(partialFixture.sessionDir, "active.jsonl");
+  writeSession(sessionFile, { id: "active", cwd: partialFixture.project, timestamp: "2026-06-14T01:00:00.000Z" });
+  const partialRun = analysisRun(partialOptions);
+  fs.appendFileSync(sessionFile, `${JSON.stringify({ type: "message", id: "late", parentId: "m1", timestamp: "2026-06-14T01:01:00.000Z", message: { role: "assistant", content: "late" } })}\n`);
+
+  const partialReport = await report({ ...partialOptions, analysisRun: partialRun });
+  const partialReflection = await reflect({ ...partialOptions, analysisRun: partialRun });
+  assert.match(fs.readFileSync(partialReport.report.latestPath, "utf8"), /Scope warning: PARTIAL/);
+  assert.match(fs.readFileSync(partialReflection.reflection.latestPath, "utf8"), /WARNING: PARTIAL frozen scope/);
+  assert.match(fs.readFileSync(partialReflection.reflection.latestPath, "utf8"), /"selectedCount": 1/);
+  assert.match(fs.readFileSync(partialReflection.reflection.latestPath, "utf8"), /"acceptedCount": 0/);
+
+  const emptyFixture = createFixture();
+  const emptyOptions = baseOptions(emptyFixture);
+  const emptyRun = analysisRun(emptyOptions);
+  const emptyReport = await report({ ...emptyOptions, analysisRun: emptyRun });
+  const emptyReflection = await reflect({ ...emptyOptions, analysisRun: emptyRun });
+  assert.match(fs.readFileSync(emptyReport.report.latestPath, "utf8"), /Scope observation: OBSERVED EMPTY/);
+  assert.match(fs.readFileSync(emptyReflection.reflection.latestPath, "utf8"), /OBSERVED EMPTY: the frozen run selected zero eligible sessions/);
 });
 
 test("api reflect writes redacted LLM reflection prompt", async () => {
@@ -172,7 +257,7 @@ test("api automate runs only gated draft actions when enabled", async () => {
       maxSessions: 1,
       scan: true,
       report: true,
-      proposeRules: false,
+      proposeRules: true,
       proposeTargets: [],
       eval: false,
       createEvalFixtureDraft: true,
@@ -182,8 +267,15 @@ test("api automate runs only gated draft actions when enabled", async () => {
   const output = await automate(baseOptions(fixture));
 
   assert.equal(output.status, "done");
-  assert.deepEqual(output.actions.map((action) => action.name), ["scan", "report", "draft:eval-fixture"]);
+  assert.deepEqual(output.actions.map((action) => action.name), ["scan", "report", "propose:rules", "draft:eval-fixture"]);
+  const sessionActions = output.actions.filter((action) => action.analysisRun);
+  assert.equal(sessionActions.length, 3);
+  assert.equal(new Set(sessionActions.map((action) => action.analysisRun.runId)).size, 1);
+  assert.equal(new Set(sessionActions.map((action) => action.analysisRun.selectedFingerprint)).size, 1);
+  assert.equal(sessionActions[0].analysisRun.runId, output.analysisRun.runId);
+  assert.equal(sessionActions[0].analysisRun.selectedFingerprint, output.analysisRun.selectedFingerprint);
   assert.equal(output.actions.some((action) => action.name === "apply"), false);
+  assert.doesNotThrow(() => JSON.stringify(output));
 });
 
 test("api eval runs deterministic scenarios and writes report", async () => {

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { parseSessionFile } from "../session/parse-session.js";
+import { canonicalSessionTimestamp } from "../session/discover-sessions.js";
 import { buildSessionTree } from "../session/tree.js";
 import { normalizeSessionEvents } from "../normalize/events.js";
 import { computeSessionMetrics } from "../metrics/session-metrics.js";
@@ -7,7 +8,7 @@ import { collectNormalizeWarnings, enrichWarnings } from "../session/warnings.js
 import { atomicWriteJson, atomicWriteJsonl, ensureDir } from "./atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "./harness-home.js";
 
-export async function writeSessionCache({ sessionFile, config, project, logger }) {
+export async function writeSessionCache({ sessionFile, config, project, logger, expectedSnapshot }) {
   logger?.info("parse_start", "Parsing session JSONL", {
     component: "parser",
     projectKey: project.projectKey,
@@ -15,6 +16,7 @@ export async function writeSessionCache({ sessionFile, config, project, logger }
   });
 
   const parsed = await parseSessionFile(sessionFile);
+  validateExpectedSnapshot(parsed, expectedSnapshot);
   const tree = buildSessionTree(parsed.entries, sessionFile);
   const warnings = enrichWarnings([
     ...parsed.warnings,
@@ -108,6 +110,21 @@ export async function writeSessionCache({ sessionFile, config, project, logger }
   };
 }
 
+function validateExpectedSnapshot(parsed, expectedSnapshot) {
+  if (!expectedSnapshot) return;
+  const matches = path.resolve(parsed.sessionFile) === path.resolve(expectedSnapshot.sessionFile)
+    && (parsed.header?.id ?? null) === (expectedSnapshot.sessionId ?? null)
+    && canonicalSessionTimestamp(parsed.header?.timestamp) === expectedSnapshot.headerTimestamp
+    && parsed.stats.size === expectedSnapshot.size
+    && parsed.stats.mtimeMs === expectedSnapshot.mtimeMs;
+  if (matches) return;
+
+  const error = new Error("Frozen session snapshot mismatch during cache build");
+  error.name = "FrozenSessionMismatchError";
+  error.code = "FROZEN_SESSION_MISMATCH";
+  throw error;
+}
+
 function createManifest({ parsed, tree, warnings, config, project }) {
   return {
     schemaVersion: 1,
@@ -118,7 +135,7 @@ function createManifest({ parsed, tree, warnings, config, project }) {
     gitRoot: project.gitRoot,
     piSessionVersion: parsed.header?.version ?? 1,
     parsedAt: new Date().toISOString(),
-    startedAt: parsed.header?.timestamp,
+    startedAt: canonicalSessionTimestamp(parsed.header?.timestamp),
     lastEntryAt: parsed.entries.at(-1)?.timestamp,
     rawSize: parsed.stats.size,
     rawMtimeMs: parsed.stats.mtimeMs,

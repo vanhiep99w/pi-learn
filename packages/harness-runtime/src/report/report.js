@@ -3,7 +3,7 @@ import path from "node:path";
 import { atomicWriteFile, ensureDir } from "../storage/atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "../storage/harness-home.js";
 
-export function generateProjectReport({ project, results, generatedAt = new Date() }) {
+export function generateProjectReport({ project, results, analysisRun, generatedAt = new Date() }) {
   const totals = createEmptyTotals();
   const toolFailures = new Map();
   const bashFailures = [];
@@ -55,6 +55,7 @@ export function generateProjectReport({ project, results, generatedAt = new Date
   }
 
   const generatedIso = generatedAt.toISOString();
+  const runScope = boundedRunSummary(analysisRun, results.length);
   const lines = [];
   lines.push(`# Pi Harness Report — ${generatedIso.slice(0, 10)}`);
   lines.push("");
@@ -62,6 +63,17 @@ export function generateProjectReport({ project, results, generatedAt = new Date
   lines.push(`- Project: \`${project.projectKey}\``);
   lines.push(`- Project root: \`${project.projectRoot}\``);
   lines.push(`- Generated at: ${generatedIso}`);
+  if (runScope) {
+    lines.push(`- Analysis run: \`${runScope.runId}\``);
+    lines.push(`- Selected fingerprint: \`${runScope.selectedFingerprint}\``);
+    lines.push(`- Consumer status: ${runScope.consumerStatus}`);
+    lines.push(`- Frozen scope: selected ${runScope.selectedCount}, accepted ${runScope.acceptedCount}, skipped ${runScope.skippedCount}`);
+    if (runScope.consumerStatus === "partial") {
+      lines.push(`- Scope warning: PARTIAL — ${runScope.skippedCount} frozen selected session(s) were skipped; no replacement population was discovered.`);
+    } else if (runScope.consumerStatus === "observed_empty") {
+      lines.push("- Scope observation: OBSERVED EMPTY — the frozen run selected zero eligible sessions.");
+    }
+  }
   lines.push(`- Sessions scanned: ${results.length}`);
   lines.push(`- User turns: ${totals.turns}`);
   lines.push(`- Assistant messages: ${totals.assistantMessages}`);
@@ -161,6 +173,18 @@ export function writeProjectReport({ config, project, markdown, now = new Date()
   atomicWriteFile(datedPath, markdown.endsWith("\n") ? markdown : `${markdown}\n`);
 
   return { reportsDir, latestPath, datedPath };
+}
+
+function boundedRunSummary(analysisRun, acceptedFallback) {
+  if (!analysisRun) return undefined;
+  return {
+    runId: analysisRun.runId,
+    selectedFingerprint: analysisRun.selection?.selectedFingerprint,
+    selectedCount: analysisRun.selection?.selectedCount ?? 0,
+    acceptedCount: analysisRun.consumption?.acceptedCount ?? acceptedFallback,
+    skippedCount: analysisRun.consumption?.skippedCount ?? 0,
+    consumerStatus: analysisRun.consumption?.status ?? analysisRun.laneStatus?.consumer ?? "pending",
+  };
 }
 
 function readJsonlSafe(filePath) {
