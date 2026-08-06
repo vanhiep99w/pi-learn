@@ -72,7 +72,7 @@ Enable the included theme by setting `theme` to `midnight-aurora` in Pi settings
 | Web tools | Adds `web_search`, `web_fetch`, and `tool_search` tools for current web/docs lookups. | [Extensions catalog](extensions/catalog.md#web-tools) |
 | ChatGPT usage | Shows ChatGPT Plus/Pro usage when the active provider is `openai-codex` or `chatgpt`. | [Extensions catalog](extensions/catalog.md#chatgpt-usage-status) |
 | Prompt templates | Creates slash commands from Markdown prompts with optional model/thinking frontmatter. | [Extensions catalog](extensions/catalog.md#prompt-with-model) |
-| Aurora UI/theme | Custom TUI editor/footer/status behavior plus the `midnight-aurora` theme. | [Extensions catalog](extensions/catalog.md#aurora-ui-and-fixed-input-layout) |
+| Aurora UI/theme | Custom TUI editor/footer/status behavior plus the `midnight-aurora` theme. | [Extensions catalog](extensions/catalog.md#aurora-ui) |
 | Harness Wiki | Pi-native `/harness-wiki-*` commands that generate/update `wiki/` documentation and use reviewed domain-local prompt rules. | [Harness Wiki capability](extensions/wiki-extension.md) |
 | Harness | Mines normalized Pi session logs to create reports, reflection proposals, controlled prompt-rule updates, evals, and gated automation. | [Harness runtime](architecture/harness-runtime.md) |
 | Vietnamese Pi docs | Learning/reference material for Pi itself. | `docs/README.md` |

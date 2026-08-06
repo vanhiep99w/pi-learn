@@ -61,7 +61,6 @@ extensions/
 ├── web-tools/                  # web_search, web_fetch, tool_search
 ├── harness/                    # observability, proposals, eval, Harness Wiki
 ├── chatgpt-usage-status/       # ChatGPT Plus/Pro usage status
-├── fixed-input-layout/         # helper cho aurora-ui
 ├── prompt-with-model.ts        # prompt templates có model/thinking riêng
 └── aurora-ui.ts                # custom TUI/editor/footer/status
 
@@ -215,12 +214,12 @@ Sau khi thêm/sửa prompt, chạy:
 
 ---
 
-## 5. Aurora UI + fixed input layout
+## 5. Aurora UI
 
 Extension `aurora-ui.ts` custom TUI:
 
 - Startup banner.
-- Editor border/fixed input cluster.
+- Bordered editor (rounded border + badges).
 - Footer tối giản.
 - Working messages tiếng Việt.
 - Hiển thị cwd/git branch/git stats.
@@ -288,9 +287,8 @@ extensions/
 ├── web-tools/
 ├── chatgpt-usage-status/
 ├── harness/             # Pi Harness + Harness Wiki commands
-├── fixed-input-layout/  # vendored compositor helpers for aurora-ui
 ├── prompt-with-model.ts # model-aware prompt template commands
-└── aurora-ui.ts         # fixed input cluster + bordered editor
+└── aurora-ui.ts         # bordered editor + custom footer
 
 themes/
 └── midnight-aurora.json

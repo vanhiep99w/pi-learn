@@ -1,8 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { copyToClipboard, CustomEditor } from "@earendil-works/pi-coding-agent";
+import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { renderFixedEditorCluster } from "./fixed-input-layout/cluster.ts";
-import { TerminalSplitCompositor } from "./fixed-input-layout/terminal-split.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Aurora UI Extension — Bordered Input + Custom Footer
@@ -53,67 +51,11 @@ export default function (pi: ExtensionAPI) {
     let gitStatsTimer: ReturnType<typeof setInterval> | undefined;
     let bannerTimer: ReturnType<typeof setTimeout> | undefined;
     let currentEditor: BorderedEditor | null = null;
-    let tuiRef: any = null;
-    let footerDataRef: any = null;
-    let fixedInputCompositor: TerminalSplitCompositor | null = null;
-    let fixedEditorContainer: any = null;
-
-    const scheduleFixedInputInstall = () => {
-      queueMicrotask(installFixedInputLayout);
-      setTimeout(installFixedInputLayout, 0);
-      setTimeout(installFixedInputLayout, 50);
-    };
-
-    const teardownFixedInputLayout = (resetExtendedKeyboardModes = false) => {
-      fixedInputCompositor?.dispose({ resetExtendedKeyboardModes });
-      fixedInputCompositor = null;
-      fixedEditorContainer = null;
-    };
-
-    const installFixedInputLayout = () => {
-      if (disposed || fixedInputCompositor || !tuiRef || !currentEditor) return;
-      if (!tuiRef.terminal || typeof tuiRef.terminal.write !== "function") return;
-
-      const match = findContainerWithChild(tuiRef, currentEditor);
-      if (!match) return;
-
-      fixedEditorContainer = match.container;
-      let compositor: TerminalSplitCompositor;
-      compositor = new TerminalSplitCompositor({
-        tui: tuiRef,
-        terminal: tuiRef.terminal,
-        scrollBar: true,
-        onCopySelection: (text) => void copyToClipboard(text),
-        accentColor: (text: string) => getSafeTheme(ctx).fg("accent", text),
-        getShowHardwareCursor: () =>
-          typeof tuiRef.getShowHardwareCursor === "function" && tuiRef.getShowHardwareCursor(),
-        renderCluster: (width, terminalRows) => {
-          const statuses: string[] = [];
-          try {
-            const parts = [...(footerDataRef?.getExtensionStatuses?.() ?? new Map()).values()];
-            if (parts.length > 0) statuses.push(parts.join("  "));
-          } catch { /* footer data can be transient during session switch */ }
-
-          return renderFixedEditorCluster({
-            width,
-            terminalRows,
-            statusLines: statuses,
-            editorLines: fixedEditorContainer ? compositor.renderHidden(fixedEditorContainer, width) : [],
-          });
-        },
-      });
-
-      fixedInputCompositor = compositor;
-      compositor.hideRenderable(fixedEditorContainer);
-      compositor.install();
-      tuiRef.requestRender(true);
-    };
 
     const unregisterCleanup = addSessionCleanup(() => {
       disposed = true;
       if (bannerTimer) clearTimeout(bannerTimer);
       if (gitStatsTimer) clearInterval(gitStatsTimer);
-      teardownFixedInputLayout(true);
     });
 
     // ── Startup Banner ──────────────────────────────────────────
@@ -126,9 +68,7 @@ export default function (pi: ExtensionAPI) {
     // ── Bordered Editor ─────────────────────────────────────────
     // CustomEditor constructor: (tui, theme, keybindings, options?)
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-      tuiRef = tui;
       currentEditor = new BorderedEditor(tui, theme, keybindings, pi, ctx, cwd, () => gitBranch, () => gitStats);
-      scheduleFixedInputInstall();
       return currentEditor;
     });
 
@@ -149,13 +89,9 @@ export default function (pi: ExtensionAPI) {
 
     // ── Minimal Footer (chỉ extension statuses) ────────────────
     ctx.ui.setFooter((tui, _theme, footerData) => {
-      tuiRef = tui;
-      footerDataRef = footerData;
       requestRender = () => {
-        if (!fixedInputCompositor) scheduleFixedInputInstall();
-        fixedInputCompositor?.requestRepaint() ?? tui.requestRender();
+        tui.requestRender();
       };
-      scheduleFixedInputInstall();
 
       const branchDispose = footerData.onBranchChange(() => {
         gitBranch = footerData.getGitBranch();
@@ -169,13 +105,15 @@ export default function (pi: ExtensionAPI) {
           if (bannerTimer) clearTimeout(bannerTimer);
           if (gitStatsTimer) clearInterval(gitStatsTimer);
           branchDispose();
-          teardownFixedInputLayout(true);
           unregisterCleanup();
         },
         invalidate() {},
         render(_w: number): string[] {
           gitBranch = footerData.getGitBranch();
-          // Fixed input layout renders extension statuses inside the bottom cluster.
+          try {
+            const parts = [...(footerData.getExtensionStatuses?.() ?? new Map()).values()];
+            if (parts.length > 0) return [parts.join("  ")];
+          } catch { /* footer data can be transient during session switch */ }
           return [];
         },
       };
@@ -467,20 +405,6 @@ class BorderedEditor extends CustomEditor {
       t.fg(bc, " " + "─".repeat(fill) + "╯")
     );
   }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Fixed input layout helpers
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function findContainerWithChild(tui: any, child: any): { container: any; index: number } | null {
-  const children = Array.isArray(tui?.children) ? tui.children : [];
-  const index = children.findIndex((candidate: any) =>
-    candidate && Array.isArray(candidate.children) && candidate.children.includes(child),
-  );
-
-  if (index === -1) return null;
-  return { container: children[index], index };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

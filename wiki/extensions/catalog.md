@@ -120,19 +120,16 @@ Change guidance:
 - Be careful with model registry/auth checks; the extension supports both exact `provider/id` and model-id-only specs.
 - Avoid using Pi's core `prompts/` folder for this extension; it intentionally uses `model-prompts/`.
 
-## Aurora UI and fixed input layout
+## Aurora UI
 
 Sources:
 
 - `packages/pi-learn-extensions/extensions/aurora-ui.ts`
-- `packages/pi-learn-extensions/extensions/fixed-input-layout/cluster.ts`
-- `packages/pi-learn-extensions/extensions/fixed-input-layout/terminal-split.ts`
 
 Aurora customizes the interactive Pi TUI:
 
 - startup banner
 - bordered custom editor
-- fixed input cluster through the fixed input layout helpers
 - minimal footer showing extension statuses
 - Vietnamese working messages for agent/tool activity
 - cwd, git branch, and git working-tree stats in the editor border

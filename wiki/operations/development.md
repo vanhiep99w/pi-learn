@@ -100,7 +100,7 @@ Where to change common features:
 | Web search/fetch/tool discovery | `packages/pi-learn-extensions/extensions/web-tools/**` |
 | ChatGPT usage UI and account commands | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts` |
 | Prompt commands/model switching | `packages/pi-learn-extensions/extensions/prompt-with-model.ts` |
-| Aurora TUI/editor/footer | `packages/pi-learn-extensions/extensions/aurora-ui.ts`, `fixed-input-layout/**` |
+| Aurora TUI/editor/footer | `packages/pi-learn-extensions/extensions/aurora-ui.ts` |
 | Harness command surface | `packages/pi-learn-extensions/extensions/harness/index.ts` |
 | Harness Wiki commands/task prompt | `packages/pi-learn-extensions/extensions/harness/wiki-commands.ts`, `wiki-prompt.ts` |
 | Reviewed domain prompt rules | `wiki/_rules.md`, `wiki/<section>/_rules.md` |
