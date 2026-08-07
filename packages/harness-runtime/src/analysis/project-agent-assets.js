@@ -91,6 +91,57 @@ export function publicAgentAssetInventory(lane) {
   };
 }
 
+export function inspectProjectAsset({ projectRoot, route, type = "project-asset", limits = {}, aggregateBytes = 0, verificationHooks } = {}) {
+  const normalizedRoute = normalizeProjectRoute(route);
+  const base = {
+    route: safeRoute(route),
+    type,
+    state: normalizedRoute ? "unavailable" : "outside-authority",
+    size: undefined,
+    digest: undefined,
+    blocks: [],
+  };
+  if (!normalizedRoute) return base;
+
+  const configuredRoot = path.resolve(String(projectRoot ?? ""));
+  let root;
+  try {
+    const rootStat = fs.lstatSync(configuredRoot);
+    if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) return { ...base, state: "invalid-project-root" };
+    root = fs.realpathSync(configuredRoot);
+  } catch {
+    return { ...base, state: "unreadable-project-root" };
+  }
+
+  return inspectAsset({
+    root,
+    route: normalizedRoute,
+    type,
+    maxFileBytes: normalizeLimit(limits.maxFileBytes, MAX_AGENT_ASSET_FILE_BYTES),
+    maxAggregateBytes: normalizeLimit(limits.maxAggregateBytes, MAX_AGENT_ASSET_AGGREGATE_BYTES),
+    aggregateBytes,
+    verificationHooks,
+    includeText: true,
+    parseMarkdown: false,
+  });
+}
+
+export function inspectProjectPath(projectRoot, route) {
+  const normalizedRoute = normalizeProjectRoute(route);
+  if (!normalizedRoute) return "outside-authority";
+
+  const configuredRoot = path.resolve(String(projectRoot ?? ""));
+  let root;
+  try {
+    const rootStat = fs.lstatSync(configuredRoot);
+    if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) return "invalid-project-root";
+    root = fs.realpathSync(configuredRoot);
+  } catch {
+    return "unreadable-project-root";
+  }
+  return inspectPathWithoutSymlinks(root, normalizedRoute);
+}
+
 export function applicableAssetRoutes(ownerRoute) {
   const normalized = normalizeProjectRoute(ownerRoute);
   if (!normalized) return [];
@@ -131,8 +182,7 @@ export function extractH2Blocks(markdown, { includePreamble = false } = {}) {
   return blocks;
 }
 
-function inspectAsset({ root, route, maxFileBytes, maxAggregateBytes, aggregateBytes, verificationHooks }) {
-  const type = route.endsWith("AGENTS.md") ? "agents" : "wiki-rules";
+function inspectAsset({ root, route, maxFileBytes, maxAggregateBytes, aggregateBytes, verificationHooks, type = route.endsWith("AGENTS.md") ? "agents" : "wiki-rules", includeText = false, parseMarkdown = type === "agents" || type === "wiki-rules" }) {
   const absolutePath = path.join(root, ...route.split("/"));
   const base = { route, type, state: "absent", size: undefined, digest: undefined, blocks: [] };
   const pathState = inspectPathWithoutSymlinks(root, route);
@@ -203,7 +253,8 @@ function inspectAsset({ root, route, maxFileBytes, maxAggregateBytes, aggregateB
       state: "opened",
       size: buffer.length,
       digest: sha256(buffer),
-      blocks: extractH2Blocks(markdown, { includePreamble: type === "agents" }),
+      blocks: parseMarkdown ? extractH2Blocks(markdown, { includePreamble: type === "agents" }) : [],
+      ...(includeText ? { text: markdown } : {}),
     };
   } finally {
     try {
@@ -274,7 +325,7 @@ function inspectPathWithoutSymlinks(root, route) {
     }
     if (stat.isSymbolicLink()) return index === segments.length - 1 ? "symlink-file" : "symlink-directory";
     if (index < segments.length - 1 && !stat.isDirectory()) return "not-regular-file";
-    if (index === segments.length - 1) return stat.isFile() ? "regular-file" : "not-regular-file";
+    if (index === segments.length - 1) return stat.isDirectory() ? "directory" : stat.isFile() ? "regular-file" : "not-regular-file";
   }
   return "absent";
 }
@@ -307,7 +358,7 @@ function ancestorDirectories(directory) {
   return ["", ...parts.map((_, index) => parts.slice(0, index + 1).join("/"))];
 }
 
-function normalizeProjectRoute(value) {
+export function normalizeProjectRoute(value) {
   const raw = String(value ?? "").trim().replace(/\\/g, "/").replace(/^\.\//, "");
   if (!raw || raw.startsWith("/") || raw.includes("\0")) return undefined;
   const normalized = path.posix.normalize(raw);

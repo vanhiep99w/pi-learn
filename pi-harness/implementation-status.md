@@ -2,7 +2,7 @@
 
 > **Canonical completed/remaining tracker.** Use this page for the current Better Harness slice status, publication state, evidence, risks, and next decision. The design contracts remain in the linked source-of-truth documents below.
 
-**Snapshot:** The reviewed candidate is based on `6baa3fcbabd880bb1b854d5440332312615d4a4c`. Slice 3 was already published in `35cf1c1976a75467583ad4557ba0287325981441`. The Project Harness Evidence Lane is a local candidate and has not been pushed.
+**Snapshot:** Slice 3 was published in `35cf1c1976a75467583ad4557ba0287325981441`. The bounded Project Harness Evidence Lane was published at `a8e7701289819395875be693d37105971d7c6f29`. The Agent Asset Evidence Lane is the current uncommitted working-tree candidate based on that published revision.
 
 ## Status at a glance
 
@@ -12,9 +12,9 @@
 | Slice 2 — Existing Coverage Before Proposal | **Completed — published** | `96167736f86aafe662d0ecc876fc7d337a581daa` | The narrow project Rules/AGENTS coverage gate, protected-path checks, and duplicate-prevention behavior were verified at publication. | This is not full project evidence, full workspace topology, or full Agent Asset evidence. | Keep the coverage-before-proposal gate and its `GLOBAL-EDIT-001` behavior. |
 | Slice 2 baseline — project Rules/AGENTS coverage | **Done — narrow baseline** | Published as part of `9616773...` | Applicable project `AGENTS.md` and `wiki/**/_rules.md` ancestor inventory/content coverage is used before deterministic proposal promotion. | Do not expand this row into a claim of full workspace or asset coverage. | Keep it as the existing instruction-coverage baseline. |
 | Slice 3 — Task Episode candidate lane | **Completed — published** | `35cf1c1976a75467583ad4557ba0287325981441` | Active-path, session-bounded candidate segmentation, conservative change/validation linkage, explicit marks, reader-safe artifacts, and partial-coverage handling were published. | Candidates are not semantic one-goal episodes; session-end delivery remains unobserved. Findings, report/TUI projection, automation, and extension UI are not wired to this lane. | Treat Slice 3 as the published session-evidence foundation. |
-| Project Harness Evidence Lane | **Implemented — local candidate** | Based on `6baa3fcbabd880bb1b854d5440332312615d4a4c`; local only, no push | `projectEvidence(options)` and bounded fixtures cover manifests/npm workspaces, scoped instructions, filesystem-only Git name/status metadata, CI names, release/recovery leads, ownership leads, and explicit partial/unavailable diagnostics. | Static presence is not execution, pass, acceptance, agent use, or finding evidence. Gitfile/external metadata and unsupported/unsafe paths remain partial; Git status is bounded metadata-based. | Review and publish this bounded lane, then make the next topology/Agent Asset versus P1 sequencing decision. |
+| Project Harness Evidence Lane | **Implemented — published** | `a8e7701289819395875be693d37105971d7c6f29` | `projectEvidence(options)` and bounded fixtures cover manifests/npm workspaces, scoped instructions, filesystem-only Git name/status metadata, CI names, release/recovery leads, ownership leads, and explicit partial/unavailable diagnostics. | Static presence is not execution, pass, acceptance, agent use, or finding evidence. Gitfile/external metadata and unsupported/unsafe paths remain partial; Git status is bounded metadata-based. | Preserve this independent published lane while the next asset/topology decision is reviewed. |
 | Full workspace/owner topology | **Incomplete** | Existing `analysisRun()` target remains route-only | Project Evidence can identify an npm workspace member for evidence scoping, but no complete owner graph, apply binding, or sibling-owner rejection exists. | Do not claim full topology from the member hint. | Scope separately only if evidence justifies it. |
-| Full Agent Asset Evidence Lane | **Incomplete** | Existing safe project-agent-assets inventory is reused where applicable | The current inventory safely reads bounded applicable project assets for instruction coverage; it is not the full rules/skills/prompts/extensions/tools/hooks lane. | No user-home asset reads; no full asset topology or use/outcome claim. | Keep separate from Project Evidence and sequence conservatively. |
+| Agent Asset Evidence Lane | **Implemented — current candidate** | Based on `a8e7701289819395875be693d37105971d7c6f29`; local uncommitted working tree, no push | `agentAssets(options)` returns a reader-safe `pi-harness.agent-assets` projection for applicable instructions, project model prompts, and explicitly declared project-local skills/extensions/config. Focused fixtures cover discovery, ancestry, scope separation, malformed/oversized/symlinked assets, bounded declarations, and empty surfaces. | Presence/configuration only; no user-home/MCP/external package roots, raw/private evidence, content projection, or selection/use/exercise/outcome claim. Full workspace/owner topology and broader asset types remain out of scope. | Review this bounded candidate, then explicitly publish or sequence the next topology/P1 decision. |
 
 ## What is implemented in the Project Harness Evidence Lane
 
@@ -31,15 +31,26 @@ The lane is an additive, synchronous runtime API. It returns `kind: "pi-harness.
 
 The collector reads no user-home configuration, raw/private session evidence, or external CI. It does not create findings, proposals, reports, automation actions, or extension UI. Routes are project-relative and bounded; traversal, symlink escapes, sensitive paths, arbitrary manifest fields, command output, and unsafe script bodies are omitted or downgraded to diagnostics.
 
+## What is implemented in the Agent Asset Evidence candidate
+
+The candidate is an additive, synchronous `agentAssets(options)` API. It returns `kind: "pi-harness.agent-assets"` with:
+
+- the existing descriptor-bound applicable `AGENTS.md`/`wiki/**/_rules.md` instruction inventory, including opaque section IDs and ancestor applicability;
+- project-only `.pi/agent/model-prompts/*.md` presence;
+- explicitly declared project-local `skills` and `extensions` from the root `package.json` Pi manifest or `.pi/settings.json`;
+- safe project configuration presence, per-surface `complete`/`partial`/`failed` status, bounded counts, and project-relative diagnostics;
+- authority `{ project: true, userHome: false }` plus an explicit presence/configuration-only boundary.
+
+The candidate never reads user-home assets, undocumented MCP or external package roots, raw sessions, auth, payload logs, `.env`, or private Harness evidence. It does not expose asset content or absolute paths and is not wired to findings, reports, proposals, automation, or Pi UI.
+
 ## Remaining work, in roadmap order
 
 ### Next implementation decision
 
-Review and publish the bounded Project Harness Evidence Lane first. After that review, choose one narrowly scoped follow-up:
+Review and publish the bounded Agent Asset Evidence candidate next. After that review, choose one narrowly scoped follow-up:
 
 1. strengthen workspace/owner topology and apply binding; or
-2. complete the separate Agent Asset Evidence baseline; or
-3. proceed to P1 evidence states and Findings only after confirming the required topology/asset boundaries are sufficient.
+2. proceed to P1 evidence states and Findings only after confirming the required topology/asset boundaries are sufficient.
 
 This decision must not be made by treating static Project Evidence presence as a defect, execution result, acceptance result, or finding.
 
@@ -78,12 +89,12 @@ Implement, in the roadmap order:
 - **Slice 2:** `96167736f86aafe662d0ecc876fc7d337a581daa` published the existing-coverage gate and narrow project Rules/AGENTS baseline.
 - **Slice 3:** `35cf1c1976a75467583ad4557ba0287325981441` published the Task Episode candidate lane. No unsupported historical test total is asserted here.
 
-### Current Project Evidence candidate
+### Current Agent Asset Evidence candidate
 
 The candidate verification record includes:
 
 ```txt
-node --test packages/harness-runtime/tests/project-evidence.test.js
+node --test packages/harness-runtime/tests/agent-assets.test.js
 npm --prefix packages/harness-runtime test
 node --check on changed JavaScript
 git diff --check
@@ -91,7 +102,7 @@ git status --short
 git diff HEAD -- 'wiki/**/_rules.md'  → empty
 ```
 
-The candidate contains only runtime/tests/docs needed for this lane. No private/raw session evidence, user-home assets, findings ledger, automation wiring, Pi TUI/extension UI, or protected prompt-rule changes are part of it.
+The candidate contains only runtime/tests/docs needed for this lane. No private/raw session evidence, user-home assets, MCP wiring, findings ledger, automation wiring, Pi TUI/extension UI, or protected prompt-rule changes are part of it.
 
 ## Scope boundaries and non-goals
 
@@ -99,7 +110,7 @@ The candidate contains only runtime/tests/docs needed for this lane. No private/
 - No `wiki/**/_rules.md` file is edited by this tracker task.
 - No automatic commit, push, merge, force-push, deploy, or apply is implied.
 - Project Evidence is static mechanism inventory, not a test runner, CI client, acceptance checker, findings ledger, or defect/age/hotspot classifier.
-- No full workspace topology, full Agent Asset lane, LLM semantic grouping, or semantic one-goal Task Episode claim is made.
+- No full workspace topology, broader undocumented asset lane, LLM semantic grouping, or semantic one-goal Task Episode claim is made.
 - Static script/CI/documentation/ownership presence does not prove agent read/use, exercise, pass, acceptance, repair verification, or later improvement.
 
 ## Source-of-truth documents

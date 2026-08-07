@@ -16,6 +16,7 @@ import { runRuleEngine } from "./analysis/rules.js";
 import { publicCandidateReview, reviewCandidateSignals } from "./analysis/candidate-review.js";
 import { buildTaskEpisodeArtifacts } from "./analysis/task-episodes.js";
 import { collectProjectEvidence } from "./analysis/project-evidence.js";
+import { collectAgentAssetEvidence } from "./analysis/agent-assets.js";
 import { generateTargetedImprovements } from "./improve/target-proposals.js";
 import { writeMemoryDrafts } from "./memory/memory-drafts.js";
 import { beginCandidateReviewAttempt, finalizeCandidateReviewAttempt } from "./storage/candidate-review-writer.js";
@@ -91,6 +92,15 @@ export function projectEvidence(options = {}) {
   return collectProjectEvidence({
     project,
     limits: options.projectEvidenceLimits ?? options.limits,
+  });
+}
+
+export function agentAssets(options = {}) {
+  const project = resolveProject(options.project ?? process.cwd());
+  return collectAgentAssetEvidence({
+    project,
+    ownerRoutes: options.ownerRoutes,
+    limits: options.agentAssetLimits ?? options.limits,
   });
 }
 
