@@ -108,13 +108,23 @@ export default function (pi: ExtensionAPI) {
           unregisterCleanup();
         },
         invalidate() {},
-        render(_w: number): string[] {
+        render(w: number): string[] {
           gitBranch = footerData.getGitBranch();
+          let statusLine: string | undefined;
           try {
             const parts = [...(footerData.getExtensionStatuses?.() ?? new Map()).values()];
-            if (parts.length > 0) return [parts.join("  ")];
+            if (parts.length > 0) statusLine = parts.join("  ");
           } catch { /* footer data can be transient during session switch */ }
-          return [];
+
+          // Pi 0.84's fullscreen layout reserves one row for the footer even
+          // when a custom footer renders no text. Reuse that row for Aurora's
+          // bottom border instead of leaving a blank line under the editor.
+          if (isFullscreenTui(tui) && currentEditor) {
+            const border = currentEditor.renderFooterBorder(w);
+            return statusLine ? [border, statusLine] : [border];
+          }
+
+          return statusLine ? [statusLine] : [];
         },
       };
     });
@@ -273,14 +283,22 @@ class BorderedEditor extends CustomEditor {
     }
 
     // ── Bottom border with cwd ──
-    result.push(this.bottomBorder(width, t));
+    // Fullscreen Pi reserves a footer row; Aurora renders this border there
+    // so the reserved row is useful instead of appearing as bottom padding.
+    if (!isFullscreenTui(this.tui)) {
+      result.push(this.bottomBorder(width, t));
+    }
 
-    // ── Autocomplete dropdown (rendered after bottom border) ──
+    // ── Autocomplete dropdown ──
     for (const line of autocompleteLines) {
       result.push(line);
     }
 
     return result;
+  }
+
+  renderFooterBorder(width: number): string {
+    return this.bottomBorder(width, getSafeTheme(this.ctxRef));
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -410,6 +428,14 @@ class BorderedEditor extends CustomEditor {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
+
+function isFullscreenTui(tui: any): boolean {
+  try {
+    return tui?.mode === "fullscreen";
+  } catch {
+    return false;
+  }
+}
 
 async function readGitWorkingTreeStats(pi: ExtensionAPI, cwd: string): Promise<GitWorkingTreeStats | null> {
   let result: Awaited<ReturnType<ExtensionAPI["exec"]>>;
