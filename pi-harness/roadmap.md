@@ -1044,15 +1044,16 @@ The canonical status, evidence, risks, and ordered backlog are tracked in [`impl
 
 ```txt
 Published: Slice 1 (Frozen Analysis Run), Slice 2 (Existing Coverage Before Proposal), Slice 3 (Task Episode candidate lane), and the bounded Project Harness Evidence Lane are published. Project Evidence was published at commit `a8e7701289819395875be693d37105971d7c6f29`; Slice 3 was published in commit `35cf1c1976a75467583ad4557ba0287325981441`.
-Current candidate: the bounded project-only Agent Asset Evidence Lane is implemented in the runtime worktree and remains uncommitted; no push is implied.
-Immediate: review the Agent Asset candidate and its protected-path/privacy boundaries; publication is not automatic.
-Next decision: after this bounded lane, choose conservatively between workspace/owner topology and the P1 evidence-state/Findings sequence.
-Constraint: do not claim full workspace topology, broader undocumented asset support, findings, or semantic one-goal Task Episodes from these bounded capabilities.
+The Agent Asset Evidence Lane was published at `f67cea8` and remains an independent project-only inventory boundary.
+Current candidate: the first bounded P1 Evidence State + Findings slice is implemented in the runtime worktree and remains uncommitted; no push is implied.
+Immediate: review the exact seven-state model, caller-supplied schema-1 ledger, private latest/history persistence, and reader-safe projection.
+Next decision: keep proposal linkage, findings-backed report/TUI, validation receipts, and verified repair as separate P1 slices; do not infer findings from Project/Agent Asset presence or session counts.
+Constraint: do not claim full workspace topology, broader undocumented asset support, automatic finding generation, or semantic one-goal Task Episodes from these bounded capabilities.
 ```
 
 The published Project Harness Evidence slice is a deterministic, synchronous, read-only runtime API (`projectEvidence(options)`) at `a8e7701289819395875be693d37105971d7c6f29`. It reports bounded package/runtime manifest metadata, npm workspace/member hints, script and reviewed validation-route leads, scoped applicable instruction inventory, filesystem-only Git/index name-status metadata, CI workflow presence/names, release/recovery documentation leads, and source/test ownership paths. It returns explicit `available`, `partial`, and `unavailable` statuses and diagnostics, including missing Git and missing package manifest. It executes no project commands, opens no external CI, reads no user-home/session evidence, exposes no unsafe script body, creates no finding, and does not infer exercise/pass/acceptance from presence.
 
-The evidence lane's `workspaceTarget` can identify an npm workspace member for evidence scoping, but this is not the full workspace topology/apply-binding capability. It does not reject sibling owners, freeze a complete owner graph, or widen the existing analysis-run contract. The current additive `agentAssets(options)` candidate reuses the existing safe project Agent Asset inventory for applicable instructions and adds project model-prompts plus explicitly declared local skills/extensions/config presence. It does not inspect user-home assets, undocumented MCP/external package roots, raw/private evidence, or agent use/outcome.
+The evidence lane's `workspaceTarget` can identify an npm workspace member for evidence scoping, but this is not the full workspace topology/apply-binding capability. It does not reject sibling owners, freeze a complete owner graph, or widen the existing analysis-run contract. The published additive `agentAssets(options)` lane reuses the existing safe project Agent Asset inventory for applicable instructions and adds project model-prompts plus explicitly declared local skills/extensions/config presence. It does not inspect user-home assets, undocumented MCP/external package roots, raw/private evidence, or agent use/outcome.
 
 Current implementation choice:
 
@@ -1131,9 +1132,9 @@ MVP must guarantee:
 Updated roadmap:
 
 ```txt
-Current: Slices 1, 2, and 3 plus the bounded Project Harness Evidence Lane are published; the project-only Agent Asset Evidence Lane is the current local candidate.
-Next: review and explicitly publish the Agent Asset candidate, then decide whether evidence supports workspace/owner topology or the P1 Findings sequencing decision.
-Then: evidence states, Findings ledger, proposal linkage, findings-backed projections, validation receipts, applied-vs-verified state, stale revision protection, and post-fix review.
+Current: Slices 1, 2, and 3, Project Evidence, and the project-only Agent Asset Evidence Lane are published; the first P1 Evidence State + caller-supplied Findings slice is the current local candidate.
+Next: review and explicitly publish this P1 candidate, then sequence proposal linkage, findings-backed projections, validation receipts, applied-vs-verified state, stale revision protection, and post-fix review separately.
+Then: complete the remaining P1 linkage, projection, receipt, and verified-repair slices.
 Later: P2 longitudinal outcomes, followed by optional P3 capabilities only when evidence justifies them.
 Finally: no automatic commit/push, silent auto-apply, or raw/private evidence in the repository.
 ```

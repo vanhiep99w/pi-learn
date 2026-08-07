@@ -25,6 +25,8 @@ import { findDraftProposal, readDraftProposals, writeDraftProposals } from "./pr
 import { approveProposal, applyProposal, readProposalHistory, rejectProposal, rollbackProposal } from "./proposals/lifecycle.js";
 import { resolveProject } from "./project/resolve-project.js";
 import { pathExists, resolvePath } from "./utils/path.js";
+import { readFindingsLedger, writeFindingsLedger } from "./findings/ledger.js";
+import { EVIDENCE_STATES, EvidenceState, isEvidenceState, normalizeEvidenceState } from "./findings/evidence-states.js";
 
 const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 export const VERSION = packageJson.version;
@@ -103,6 +105,27 @@ export function agentAssets(options = {}) {
     limits: options.agentAssetLimits ?? options.limits,
   });
 }
+
+export function writeFindings(options = {}) {
+  const { config, project } = loadConfig(options);
+  return writeFindingsLedger({
+    config,
+    project,
+    findings: options.findings,
+    now: options.now,
+  });
+}
+
+export function readFindings(options = {}) {
+  const { config, project } = loadConfig(options);
+  return readFindingsLedger({ config, project });
+}
+
+export function findings(options = {}) {
+  return readFindings(options);
+}
+
+export { EVIDENCE_STATES, EvidenceState, isEvidenceState, normalizeEvidenceState };
 
 export function analysisRun(options = {}) {
   const { config, project, logger } = createHarnessContext("analysis-run", options);

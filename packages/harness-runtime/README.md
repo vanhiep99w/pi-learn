@@ -1,6 +1,6 @@
 # Harness Runtime
 
-Runtime API for Pi session observability, reports, proposals, reflection, controlled apply, and evals.
+Runtime API for Pi session observability, bounded project evidence, caller-supplied findings, reports, proposals, reflection, controlled apply, and evals.
 
 Primary UX is the Pi extension in:
 
@@ -17,6 +17,10 @@ import {
   analysisRun,
   projectEvidence,
   agentAssets,
+  EVIDENCE_STATES,
+  normalizeEvidenceState,
+  writeFindings,
+  readFindings,
   sessions,
   scan,
   taskEpisodes,
@@ -62,6 +66,8 @@ Legacy calls such as `report(options)` and `reflect(options)` remain supported; 
 Each surface reports `available`, `partial`, or `unavailable`; missing Git and a missing root `package.json` remain explicit diagnostics rather than exceptions. Scripts never expose their shell bodies. Only a reviewed safe argv identity is projected, and unsafe scripts remain name-only leads. Git collection reads metadata/index files and never runs `git`, npm, tests, or any other project command. CI is presence-only and is never opened externally. The boundary is explicit: a script, CI file, release/recovery document, or route lead being present does not prove exercise, pass, acceptance, or agent use.
 
 `agentAssets(options)` is an additive, synchronous, project-only Agent Asset Evidence Lane. It returns `kind: "pi-harness.agent-assets"` and inventories root/nested applicable instruction chains through the existing secure inventory, project `.pi/agent/model-prompts/*.md`, and explicitly declared project-local `skills`/`extensions` from the root `package.json` Pi manifest or `.pi/settings.json`. It reports only project-relative presence/configuration, per-surface `complete`/`partial`/`failed` status, bounded counts, and safe diagnostics. It does not inspect user-home assets, MCP or external package roots, raw sessions, auth, payload logs, `.env`, or private Harness evidence. Presence/configuration does not claim selection, reading, invocation, exercise, or outcome, and the lane is not wired into findings, reports, proposals, automation, or extension UI.
+
+The additive P1 `writeFindings(options)`/`readFindings(options)` APIs are a caller-supplied, synchronous Findings ledger. `EVIDENCE_STATES` and `normalizeEvidenceState()` expose exactly `Present`, `Wired`, `Exercised`, `Outcome-supported`, `Missing`, `Unobserved`, and `Not-applicable`; the runtime never derives a state from inventory or session counts. A supplied finding uses schema version `1`, stable `F-####` identity, explicit lifecycle/status, target and acceptance fields, bounded evidence references, and optional multiple `P-####` proposal references. Findings are stored privately under the configured Harness project key at `findings/latest.json` and append-only `findings/history.jsonl` with owner-only modes and fail-closed validation. The reader projection contains no absolute paths, private locators, prompts, commands, or raw evidence. A proposal reference never changes a finding's state, and no proposal, detector, report, TUI, validation receipt, or automation integration is included in this slice.
 
 The Project Evidence workspace-member hint is not the full workspace/owner-topology capability: `analysisRun()` keeps its compatible route-only target, and apply binding, sibling-owner rejection, and complete topology remain future work. `projectEvidence()` and `agentAssets()` are independent read-only lanes and create no findings.
 
