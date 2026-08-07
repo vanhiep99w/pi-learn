@@ -252,11 +252,22 @@ function preparePrivateDirectories(paths) {
 }
 
 function existingPrivateDirectory(paths) {
-  for (const directory of [paths.harnessHome, path.join(paths.harnessHome, "projects"), paths.projectDir, paths.dir]) {
+  const parentDirectories = [paths.harnessHome, path.join(paths.harnessHome, "projects"), paths.projectDir];
+  const findingsState = lstatOrMissing(paths.dir);
+  if (findingsState === undefined) {
+    for (const directory of parentDirectories) {
+      const state = lstatOrMissing(directory);
+      if (state === undefined) return false;
+      assertPrivateDirectory(directory, state, { requireMode: false });
+    }
+    return false;
+  }
+  for (const directory of parentDirectories) {
     const state = lstatOrMissing(directory);
     if (state === undefined) return false;
     assertPrivateDirectory(directory, state);
   }
+  assertPrivateDirectory(paths.dir, findingsState);
   return true;
 }
 
@@ -270,11 +281,11 @@ function createPrivateDirectory(directory) {
   assertPrivateDirectory(directory, finalState, { repairMode: true });
 }
 
-function assertPrivateDirectory(directory, stat, { repairMode = false } = {}) {
+function assertPrivateDirectory(directory, stat, { repairMode = false, requireMode = true } = {}) {
   if (stat.isSymbolicLink() || !stat.isDirectory() || !ownedByCurrentUser(stat)) {
     throw ledgerError("FINDINGS_STORAGE_UNSAFE", "Findings storage directory is unsafe");
   }
-  if ((stat.mode & 0o777) !== 0o700) {
+  if (requireMode && (stat.mode & 0o777) !== 0o700) {
     if (!repairMode) throw ledgerError("FINDINGS_STORAGE_MODE", "Findings storage directory is not owner-only");
     fs.chmodSync(directory, 0o700);
     const repaired = fs.lstatSync(directory);

@@ -288,7 +288,8 @@ test("api propose writes deterministic draft proposals and dedupes", async () =>
   const list = proposals(baseOptions(fixture));
   assert.equal(list.count >= 1, true);
   const shown = showProposal({ ...baseOptions(fixture), id: list.proposals[0].id });
-  assert.match(fs.readFileSync(shown.filePath, "utf8"), /## Evidence/);
+  assert.equal(shown.id, list.proposals[0].id);
+  assert.equal(Object.hasOwn(shown, "filePath"), false);
 });
 
 test("rules:true and target:rules share R1/R2 candidates and decisions", async () => {
@@ -433,7 +434,9 @@ test("api propose target memory writes memory draft and proposal", async () => {
 
   assert.equal(output.mode, "target:memory");
   assert.equal(output.memory.written.length >= 1, true);
-  assert.equal(fs.existsSync(output.memory.draftPath), true);
+  assert.equal(output.memory.stored, true);
+  assert.equal(Object.hasOwn(output.memory, "draftPath"), false);
+  assert.equal(JSON.stringify(output).includes(fixture.root), false);
 });
 
 test("api automation status is disabled by default", () => {

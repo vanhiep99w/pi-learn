@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { atomicWriteFile, ensureDir } from "../storage/atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "../storage/harness-home.js";
+import { normalizeProposalFindingBinding } from "./finding-binding.js";
 
 export function writeDraftProposals({ config, project, proposals }) {
   const draftDir = proposalsDraftDir(config, project.projectKey);
@@ -14,6 +15,7 @@ export function writeDraftProposals({ config, project, proposals }) {
   let nextNumber = nextProposalNumber(existing);
 
   for (const proposal of proposals ?? []) {
+    const binding = normalizeProposalFindingBinding(proposal);
     const duplicate = proposal.fingerprint ? existingByFingerprint.get(proposal.fingerprint) : undefined;
     if (duplicate) {
       skipped.push({ ...proposal, id: duplicate.id, status: duplicate.status, filePath: duplicate.filePath, reason: "duplicate_fingerprint" });
@@ -21,7 +23,7 @@ export function writeDraftProposals({ config, project, proposals }) {
     }
 
     const id = proposal.id ?? `P-${String(nextNumber++).padStart(4, "0")}`;
-    const finalProposal = { ...proposal, id, status: proposal.status ?? "draft" };
+    const finalProposal = { ...proposal, id, status: proposal.status ?? "draft", ...binding };
     const filePath = path.join(draftDir, `${id}-${slugify(proposal.title)}.md`);
     atomicWriteFile(filePath, renderProposalMarkdown(finalProposal));
     if (proposal.fingerprint) existingByFingerprint.set(proposal.fingerprint, { ...finalProposal, filePath });
@@ -42,8 +44,10 @@ export function readDraftProposals({ config, project }) {
       const filePath = path.join(draftDir, name);
       const markdown = fs.readFileSync(filePath, "utf8");
       const frontmatter = parseFrontmatter(markdown);
+      const binding = normalizeProposalFindingBinding(frontmatter);
       return {
         ...frontmatter,
+        ...binding,
         id: frontmatter.id ?? name.match(/^(P-\d+)/)?.[1],
         title: extractTitle(markdown) ?? frontmatter.title,
         filePath,
@@ -57,6 +61,7 @@ export function findDraftProposal({ config, project, id }) {
 
 export function renderProposalMarkdown(proposal) {
   const evidence = proposal.evidence ?? [];
+  const binding = normalizeProposalFindingBinding(proposal);
   const lines = [];
   lines.push("---");
   lines.push(`id: ${proposal.id}`);
@@ -70,6 +75,10 @@ export function renderProposalMarkdown(proposal) {
   lines.push(`fingerprint: ${proposal.fingerprint}`);
   lines.push(`created: ${proposal.createdAt ?? new Date().toISOString()}`);
   lines.push(`evidence_count: ${evidence.length}`);
+  if (binding.findingId) {
+    lines.push(`finding_id: ${binding.findingId}`);
+    lines.push(`expected_finding_revision: ${binding.expectedFindingRevision}`);
+  }
   lines.push("---");
   lines.push("");
   lines.push(`# ${proposal.id} — ${proposal.title}`);

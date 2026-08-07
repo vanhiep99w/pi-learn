@@ -7,7 +7,7 @@ import { parseSessionFile, summarizeEntry } from "./session/parse-session.js";
 import { buildSessionTree, summarizeTree } from "./session/tree.js";
 import { collectNormalizeWarnings, enrichWarnings } from "./session/warnings.js";
 import { contentToText, makeExcerpt } from "./normalize/content.js";
-import { redactValue } from "./safety/redaction.js";
+import { redactString, redactValue } from "./safety/redaction.js";
 import { generateProjectReport, writeProjectReport } from "./report/report.js";
 import { buildReflection, reflectionResponseToProposals, writeReflectionPrompt } from "./reflection/reflection.js";
 import { runEvalHarness } from "./eval/eval-harness.js";
@@ -278,7 +278,13 @@ export function importReflectionResponse(options = {}) {
     const writeResult = writeDraftProposals({ config, project, proposals });
     logger.audit("reflection_imported", "LLM reflection response imported as draft proposals", { component: "reflection", projectKey: project.projectKey, data: { importPath, candidates: proposals.length, written: writeResult.written.length, skipped: writeResult.skipped.length } });
     end(logger, project, { imported: importPath, candidates: proposals.length, written: writeResult.written.length, skipped: writeResult.skipped.length });
-    return { project, mode: "reflect_import", importPath, candidates: proposals.length, draftDir: writeResult.draftDir, written: writeResult.written.map(publicProposalSummary), skipped: writeResult.skipped.map(publicProposalSummary), sources };
+    return {
+      project: publicProjectSummary(project),
+      mode: "reflect_import",
+      candidates: proposals.length,
+      written: writeResult.written.map(publicProposalSummary),
+      skipped: writeResult.skipped.map(publicProposalSummary),
+    };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -302,7 +308,20 @@ export async function propose(options = {}) {
         : { written: [] };
       const writeResult = writeDraftProposals({ config, project, proposals: improvement.proposals });
       end(logger, project, { candidates: improvement.proposals.length, written: writeResult.written.length, skipped: writeResult.skipped.length, memoryDrafts: memoryWriteResult.written.length, runId: run.runId });
-      return { project, sessionDir: config.sessionDir, scannedFiles: run.selection.scannedFiles, sessionsScanned: consumed.results.length, mode, candidates: improvement.proposals.length, draftDir: writeResult.draftDir, memory: memoryWriteResult.draftPath ? { draftPath: memoryWriteResult.draftPath, written: memoryWriteResult.written } : undefined, written: writeResult.written.map(publicProposalSummary), skipped: writeResult.skipped.map(publicProposalSummary), warnings: [...run.warnings, ...consumed.warnings], analysisRun: consumed.analysisRun, sources };
+      return {
+        project: publicProjectSummary(project),
+        scannedFiles: run.selection.scannedFiles,
+        sessionsScanned: consumed.results.length,
+        mode,
+        candidates: improvement.proposals.length,
+        memory: memoryWriteResult.draftPath
+          ? { stored: true, written: memoryWriteResult.written.map(publicMemorySummary) }
+          : undefined,
+        written: writeResult.written.map(publicProposalSummary),
+        skipped: writeResult.skipped.map(publicProposalSummary),
+        warnings: publicProposalWarnings([...run.warnings, ...consumed.warnings]),
+        analysisRun: publicProposalAnalysisRun(consumed.analysisRun),
+      };
     }
 
     const detected = runRuleEngine({ project, sessionResults: consumed.results });
@@ -314,19 +333,16 @@ export async function propose(options = {}) {
     const projection = publicCandidateReview(review);
     end(logger, project, { candidates: projection.candidates, promoted: projection.promoted, deferred: projection.deferred, rejected: projection.rejected, written: writeResult.written.length, skipped: writeResult.skipped.length, runId: run.runId });
     return {
-      project,
-      sessionDir: config.sessionDir,
+      project: publicProjectSummary(project),
       scannedFiles: run.selection.scannedFiles,
       sessionsScanned: consumed.results.length,
       mode,
       ...projection,
-      draftDir: writeResult.draftDir,
       reviewReceipt: { stored: true, mode, attemptId: attempt.attemptId },
       written: writeResult.written.map(publicProposalSummary),
       skipped: writeResult.skipped.map(publicProposalSummary),
-      warnings: [...run.warnings, ...consumed.warnings],
-      analysisRun: consumed.analysisRun,
-      sources,
+      warnings: publicProposalWarnings([...run.warnings, ...consumed.warnings]),
+      analysisRun: publicProposalAnalysisRun(consumed.analysisRun),
     };
   } catch (error) {
     fail(logger, project, error);
@@ -339,7 +355,7 @@ export function proposals(options = {}) {
   try {
     const items = readDraftProposals({ config, project });
     end(logger, project, { proposals: items.length });
-    return { project, count: items.length, proposals: items.map(publicProposalSummary) };
+    return { project: publicProjectSummary(project), count: items.length, proposals: items.map(publicProposalSummary) };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -352,7 +368,7 @@ export function showProposal(options = {}) {
     const proposal = findDraftProposal({ config, project, id: options.id });
     if (!proposal) throw cliLikeError(`Proposal not found: ${options.id}`);
     end(logger, project, { shown: true });
-    return proposal;
+    return publicProposalSummary(proposal);
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -377,7 +393,7 @@ export function history(options = {}) {
   try {
     const items = readProposalHistory({ config, project, id: options.id });
     end(logger, project, { historyEvents: items.length });
-    return { project, proposalId: options.id, count: items.length, history: items };
+    return { project: publicProjectSummary(project), proposalId: options.id, count: items.length, history: items.map(publicProposalHistoryEvent) };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -499,7 +515,13 @@ function lifecycle(operation, options, action) {
   try {
     const result = action({ config, project, logger });
     end(logger, project, { status: result.proposal?.status, event: result.historyEvent?.event });
-    return { project, ...result, proposal: publicProposalSummary(result.proposal) };
+    const { diff: _diff, ...safeResult } = result;
+    return {
+      project: publicProjectSummary(project),
+      ...safeResult,
+      proposal: publicProposalSummary(result.proposal),
+      ...(result.historyEvent ? { historyEvent: publicProposalHistoryEvent(result.historyEvent) } : {}),
+    };
   } catch (error) {
     fail(logger, project, error);
     throw error;
@@ -557,7 +579,109 @@ function publicScanResult(result) {
 }
 
 function publicProposalSummary(proposal = {}) {
-  return { id: proposal.id, title: proposal.title, status: proposal.status, target: proposal.target, risk: proposal.risk, ruleId: proposal.ruleId, candidateId: proposal.candidateId, detectorId: proposal.detectorId, reviewFingerprint: proposal.reviewFingerprint, fingerprint: proposal.fingerprint, evidenceCount: proposal.evidenceCount ?? proposal.evidence?.length, filePath: proposal.filePath, reason: proposal.reason };
+  return {
+    id: proposal.id,
+    title: publicProposalText(proposal.title),
+    status: proposal.status,
+    target: publicProposalText(proposal.target),
+    risk: publicProposalText(proposal.risk),
+    ruleId: publicProposalText(proposal.ruleId),
+    candidateId: publicProposalText(proposal.candidateId),
+    detectorId: publicProposalText(proposal.detectorId),
+    reviewFingerprint: publicProposalText(proposal.reviewFingerprint),
+    fingerprint: publicProposalText(proposal.fingerprint),
+    evidenceCount: proposal.evidenceCount ?? proposal.evidence?.length,
+    findingId: proposal.findingId,
+    expectedFindingRevision: proposal.expectedFindingRevision,
+    reason: publicProposalText(proposal.reason),
+  };
+}
+
+function publicProposalHistoryEvent(event = {}) {
+  return {
+    schemaVersion: event.schemaVersion,
+    timestamp: event.timestamp,
+    proposalId: event.proposalId,
+    event: event.event,
+    status: event.status,
+    target: publicProposalText(event.target),
+    risk: publicProposalText(event.risk),
+    findingId: event.findingId,
+    expectedFindingRevision: event.expectedFindingRevision,
+    data: publicProposalHistoryData(event.data),
+  };
+}
+
+function publicProposalHistoryData(data = {}) {
+  const result = {};
+  if (typeof data.branchName === "string" && /^harness\/P-\d{4}$/.test(data.branchName)) result.branchName = data.branchName;
+  if (Array.isArray(data.changedPaths)) result.changedPaths = data.changedPaths.filter(isSafeProjectRoute);
+  if (typeof data.committed === "boolean") result.committed = data.committed;
+  if (typeof data.commitHash === "string" && /^[a-f0-9]{7,64}$/.test(data.commitHash)) result.commitHash = data.commitHash;
+  if (typeof data.rolledBackCommit === "string" && /^[a-f0-9]{7,64}$/.test(data.rolledBackCommit)) result.rolledBackCommit = data.rolledBackCommit;
+  if (typeof data.previousStatus === "string") result.previousStatus = data.previousStatus;
+  return result;
+}
+
+function publicMemorySummary(item = {}) {
+  return {
+    id: item.id,
+    status: item.status,
+  };
+}
+
+function publicProposalWarnings(warnings = []) {
+  return warnings.map((warning) => ({
+    schemaVersion: warning.schemaVersion,
+    code: warning.code,
+    timestamp: warning.timestamp,
+  }));
+}
+
+function publicProposalAnalysisRun(run = {}) {
+  return {
+    schemaVersion: run.schemaVersion,
+    kind: run.kind,
+    runId: run.runId,
+    createdAt: run.createdAt,
+    provider: run.provider,
+    window: run.window,
+    selection: {
+      scannedFiles: run.selection?.scannedFiles,
+      eligibleCount: run.selection?.eligibleCount,
+      selectedCount: run.selection?.selectedCount,
+      eligibleFingerprint: run.selection?.eligibleFingerprint,
+      selectedFingerprint: run.selection?.selectedFingerprint,
+    },
+    authority: {
+      population: run.authority?.population,
+      discoveryPasses: run.authority?.discoveryPasses,
+      mutationPolicy: run.authority?.mutationPolicy,
+      activeSessionPolicy: run.authority?.activeSessionPolicy,
+      rawSessionContent: run.authority?.rawSessionContent,
+      userHomeAssets: run.authority?.userHomeAssets,
+    },
+    laneStatus: {
+      discovery: run.laneStatus?.discovery,
+      consumer: run.laneStatus?.consumer,
+    },
+    contextFingerprint: run.contextFingerprint,
+  };
+}
+
+function publicProjectSummary(project = {}) {
+  return { name: publicProposalText(project.name), kind: project.gitRoot ? "git-project" : "project" };
+}
+
+function publicProposalText(value) {
+  if (value === undefined || value === null) return value;
+  return redactString(String(value))
+    .value.replace(/~\/\.pi(?:\/[A-Za-z0-9._-]+)*/g, "<private-path>")
+    .replace(/(?:^|[\s([{"'`=])\/(?:[^\s)\]}>,;'"`]+)/g, (match) => `${match.slice(0, 1)}<absolute-path>`);
+}
+
+function isSafeProjectRoute(value) {
+  return typeof value === "string" && value.length <= 512 && !value.includes("\0") && !value.includes("\\") && !value.startsWith("/") && !value.startsWith("~") && !value.includes("://") && !value.split("/").includes("..");
 }
 
 function selectCandidateSignals(candidates, target) {

@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { atomicWriteFile, ensureDir } from "../storage/atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "../storage/harness-home.js";
 import { findDraftProposal } from "./proposal-writer.js";
+import { normalizeProposalFindingBinding, validateProposalFindingBinding } from "./finding-binding.js";
 import { discoverWikiPromptRules, isWikiRulePath } from "../analysis/wiki-prompt-rules.js";
 
 const VALID_STATUS = new Set(["draft", "approved", "rejected", "applied", "rolled_back"]);
@@ -55,6 +56,7 @@ export function applyProposal({ config, project, id, allowDirty = false, commit 
   if (proposal.status !== "approved") {
     throw cliLikeError(`Proposal must be approved before apply: ${id} (status: ${proposal.status ?? "unknown"})`);
   }
+  validateProposalFindingBinding({ config, project, proposal });
 
   const markdown = fs.readFileSync(proposal.filePath, "utf8");
   const targetFiles = parseTargetFiles(markdown);
@@ -68,6 +70,7 @@ export function applyProposal({ config, project, id, allowDirty = false, commit 
   const branchName = `harness/${id}`;
   checkoutBranch(git, branchName);
 
+  validateProposalFindingBinding({ config, project, proposal });
   const appliedPatch = applyTextPatches({ projectRoot: project.projectRoot, targetFiles, patches });
   const { changedPaths } = appliedPatch;
   try {
@@ -140,6 +143,7 @@ function transitionProposal({ config, project, id, status, event, logger }) {
   if (!VALID_STATUS.has(status)) throw cliLikeError(`Invalid proposal status: ${status}`);
   const proposal = requireProposal({ config, project, id });
   if (proposal.status === "applied" && status !== "rolled_back") throw cliLikeError(`Applied proposal cannot transition to ${status}: ${id}`);
+  if (status === "approved") validateProposalFindingBinding({ config, project, proposal });
   const updated = updateProposalStatusFile(proposal.filePath, status);
   const historyEvent = appendProposalHistory({ config, project, proposal: updated, event, data: { previousStatus: proposal.status ?? "draft", status } });
   logLifecycle(logger, project, historyEvent);
@@ -156,10 +160,13 @@ function updateProposalStatusFile(filePath, status) {
   const markdown = fs.readFileSync(filePath, "utf8");
   const updatedAt = new Date().toISOString();
   const updated = replaceFrontmatterValue(replaceFrontmatterValue(markdown, "status", status), "updated", updatedAt);
+  const parsed = parseBasicFrontmatter(updated);
+  const binding = normalizeProposalFindingBinding(parsed);
   atomicWriteFile(filePath, updated);
   return {
-    ...parseBasicFrontmatter(updated),
-    id: parseBasicFrontmatter(updated).id ?? path.basename(filePath).match(/^(P-\d+)/)?.[1],
+    ...parsed,
+    ...binding,
+    id: parsed.id ?? path.basename(filePath).match(/^(P-\d+)/)?.[1],
     title: extractTitle(updated),
     filePath,
   };
@@ -168,6 +175,7 @@ function updateProposalStatusFile(filePath, status) {
 function appendProposalHistory({ config, project, proposal, event, data = {} }) {
   const historyPath = proposalsHistoryPath(config, project.projectKey);
   ensureDir(path.dirname(historyPath));
+  const binding = normalizeProposalFindingBinding(proposal);
   const entry = {
     schemaVersion: 1,
     timestamp: new Date().toISOString(),
@@ -177,7 +185,7 @@ function appendProposalHistory({ config, project, proposal, event, data = {} }) 
     status: proposal.status,
     target: proposal.target,
     risk: proposal.risk,
-    filePath: proposal.filePath,
+    ...binding,
     data,
   };
   fs.appendFileSync(historyPath, `${JSON.stringify(entry)}\n`);
@@ -319,7 +327,8 @@ function parseBasicFrontmatter(markdown) {
     const index = line.indexOf(":");
     if (index < 0) continue;
     const key = line.slice(0, index).trim().replace(/_([a-z])/g, (_, char) => char.toUpperCase());
-    result[key] = line.slice(index + 1).trim();
+    const value = line.slice(index + 1).trim();
+    result[key] = key === "expectedFindingRevision" && /^\d+$/.test(value) ? Number(value) : value;
   }
   return result;
 }

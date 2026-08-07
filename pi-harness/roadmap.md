@@ -1043,11 +1043,11 @@ Do not enter next phase unless gate passes.
 The canonical status, evidence, risks, and ordered backlog are tracked in [`implementation-status.md`](./implementation-status.md).
 
 ```txt
-Published: Slice 1 (Frozen Analysis Run), Slice 2 (Existing Coverage Before Proposal), Slice 3 (Task Episode candidate lane), and the bounded Project Harness Evidence Lane are published. Project Evidence was published at commit `a8e7701289819395875be693d37105971d7c6f29`; Slice 3 was published in commit `35cf1c1976a75467583ad4557ba0287325981441`.
+Published: Slice 1 (Frozen Analysis Run), Slice 2 (Existing Coverage Before Proposal), Slice 3 (Task Episode candidate lane), the bounded Project Harness Evidence Lane, and the P1 Evidence State + Findings ledger are published. Project Evidence was published at commit `a8e7701289819395875be693d37105971d7c6f29`; Slice 3 was published in commit `35cf1c1976a75467583ad4557ba0287325981441`; Evidence State + Findings was published at `4dd6026`.
 The Agent Asset Evidence Lane was published at `f67cea8` and remains an independent project-only inventory boundary.
-Current candidate: the first bounded P1 Evidence State + Findings slice is implemented in the runtime worktree and remains uncommitted; no push is implied.
-Immediate: review the exact seven-state model, caller-supplied schema-1 ledger, private latest/history persistence, and reader-safe projection.
-Next decision: keep proposal linkage, findings-backed report/TUI, validation receipts, and verified repair as separate P1 slices; do not infer findings from Project/Agent Asset presence or session counts.
+Current candidate: the bounded P1 proposal-to-finding linkage slice is implemented in the runtime worktree and remains uncommitted; no push is implied.
+Immediate: review optional proposal finding ID/revision frontmatter, legacy compatibility, approval/pre-apply stale-revision checks, stable error codes, and safe proposal outputs/history.
+Next decision: keep findings-backed report/TUI, validation receipts, applied-vs-verified state, and verified repair as separate P1 slices; do not infer findings or bindings from Project/Agent Asset presence or session counts.
 Constraint: do not claim full workspace topology, broader undocumented asset support, automatic finding generation, or semantic one-goal Task Episodes from these bounded capabilities.
 ```
 
@@ -1132,9 +1132,9 @@ MVP must guarantee:
 Updated roadmap:
 
 ```txt
-Current: Slices 1, 2, and 3, Project Evidence, and the project-only Agent Asset Evidence Lane are published; the first P1 Evidence State + caller-supplied Findings slice is the current local candidate.
-Next: review and explicitly publish this P1 candidate, then sequence proposal linkage, findings-backed projections, validation receipts, applied-vs-verified state, stale revision protection, and post-fix review separately.
-Then: complete the remaining P1 linkage, projection, receipt, and verified-repair slices.
+Current: Slices 1, 2, and 3, Project Evidence, the project-only Agent Asset Evidence Lane, and the P1 Evidence State + caller-supplied Findings slice are published; proposal-to-finding linkage is the current local candidate.
+Next: review and explicitly publish this linkage candidate, then sequence findings-backed projections, validation receipts, applied-vs-verified state, stale workspace protection, and post-fix review separately.
+Then: complete the remaining P1 projection, receipt, and verified-repair slices.
 Later: P2 longitudinal outcomes, followed by optional P3 capabilities only when evidence justifies them.
 Finally: no automatic commit/push, silent auto-apply, or raw/private evidence in the repository.
 ```
