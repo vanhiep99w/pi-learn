@@ -15,12 +15,14 @@ import { createEvalFixtureDraftProposal, getAutomationStatus } from "./automatio
 import { runRuleEngine } from "./analysis/rules.js";
 import { publicCandidateReview, reviewCandidateSignals } from "./analysis/candidate-review.js";
 import { buildTaskEpisodeArtifacts } from "./analysis/task-episodes.js";
+import { collectProjectEvidence } from "./analysis/project-evidence.js";
 import { generateTargetedImprovements } from "./improve/target-proposals.js";
 import { writeMemoryDrafts } from "./memory/memory-drafts.js";
 import { beginCandidateReviewAttempt, finalizeCandidateReviewAttempt } from "./storage/candidate-review-writer.js";
 import { writeTaskEpisodeArtifacts } from "./storage/task-episodes-writer.js";
 import { findDraftProposal, readDraftProposals, writeDraftProposals } from "./proposals/proposal-writer.js";
 import { approveProposal, applyProposal, readProposalHistory, rejectProposal, rollbackProposal } from "./proposals/lifecycle.js";
+import { resolveProject } from "./project/resolve-project.js";
 import { pathExists, resolvePath } from "./utils/path.js";
 
 const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -82,6 +84,14 @@ export function projectResolve(options = {}) {
   const { project, logger } = createHarnessContext("project resolve", options);
   end(logger, project, { resolved: true });
   return project;
+}
+
+export function projectEvidence(options = {}) {
+  const project = resolveProject(options.project ?? process.cwd());
+  return collectProjectEvidence({
+    project,
+    limits: options.projectEvidenceLimits ?? options.limits,
+  });
 }
 
 export function analysisRun(options = {}) {

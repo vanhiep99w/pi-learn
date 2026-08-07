@@ -2,53 +2,46 @@
 
 > **Canonical completed/remaining tracker.** Use this page for the current Better Harness slice status, publication state, evidence, risks, and next decision. The design contracts remain in the linked source-of-truth documents below.
 
-**Snapshot:** `HEAD` and `origin/main` are `96167736f86aafe662d0ecc876fc7d337a581daa`. The working tree intentionally retains the unpublished Slice 3 implementation. This documentation-only update does not commit, push, stage, reset, or discard those changes.
+**Snapshot:** The reviewed candidate is based on `6baa3fcbabd880bb1b854d5440332312615d4a4c`. Slice 3 was already published in `35cf1c1976a75467583ad4557ba0287325981441`. The Project Harness Evidence Lane is a local candidate and has not been pushed.
 
 ## Status at a glance
 
 | Slice / capability | Status | Commit / working tree | Evidence | Risks / limits | Next action |
 |---|---|---|---|---|---|
-| Slice 1 — Frozen Analysis Run | **Completed — published** | `cb40fa4616ab6a3bd0f3a5760d99a74fb08c0ce4` | Frozen analysis-run contract, shared population, fingerprints, and report/reflection binding were verified at publication. The focused/full runtime evidence is recorded in the publication history; no unsupported historical test count is repeated here. | Population freezing changes orchestration and must remain revision-bound. | Treat as the published foundation; preserve compatibility paths while later lanes build on it. |
-| Slice 2 — Existing Coverage Before Proposal | **Completed — published** | `96167736f86aafe662d0ecc876fc7d337a581daa` | `138/138` runtime tests before Slice 3, plus protected-path and diff checks, as recorded by the verified pre-Slice-3 handoff. | This is a narrow project Rules/AGENTS coverage baseline, not full project evidence or full agent-asset evidence. | Keep the coverage-before-proposal gate and its `GLOBAL-EDIT-001` duplicate-prevention behavior. |
-| Slice 2 baseline — project Rules/AGENTS coverage | **Done — narrow baseline** | Published as part of `9616773...` | Applicable project `AGENTS.md` and `wiki/**/_rules.md` inventory/content coverage is used before deterministic proposal promotion. | Full Project Harness Evidence Lane and full Agent Asset Evidence Lane remain distinct and incomplete. | Do not expand this row into a claim of full workspace topology or full asset coverage. |
-| Slice 3 — Task Episode candidate lane | **Implemented — unpublished** | Working tree only; **no commit and no push**. The direct path audit classifies **12 pre-tracker dirty runtime/test/doc files**: runtime README, API, normalization, warnings, Task Episode builder, Task Episode writer, five tests, and the architecture wiki page. With the two tracker docs, the current total is 14 dirty paths. All existing Slice 3 changes must remain untouched. | Direct runtime suite: `184 passed, 0 failed`. Relevant JavaScript syntax checks, `git diff --check`, and the protected `_rules.md` audit were verified by the supervisor. | Candidates are user-turn candidates, **not semantic one-goal episodes**. Coverage remains session-bounded and conservative; lexical topology/scope correlation is residual. Private-first `private.json`/`reader.json` publication is recoverable but is not an atomic two-file transaction; a distinct residual same-user parent-directory swap race exists around pathname-based hard-link publication because portable Node lacks fully descriptor-relative link publication. Findings, report/TUI projection, automation, and extension UI are not wired to this lane. | Review the dirty implementation, then explicitly commit and push Slice 3 when approved; publication is not automatic. |
+| Slice 1 — Frozen Analysis Run | **Completed — published** | `cb40fa4616ab6a3bd0f3a5760d99a74fb08c0ce4` | Frozen analysis-run contract, shared population, fingerprints, and report/reflection binding were verified at publication. | Population freezing changes orchestration and must remain revision-bound. | Preserve compatibility paths while later lanes build on it. |
+| Slice 2 — Existing Coverage Before Proposal | **Completed — published** | `96167736f86aafe662d0ecc876fc7d337a581daa` | The narrow project Rules/AGENTS coverage gate, protected-path checks, and duplicate-prevention behavior were verified at publication. | This is not full project evidence, full workspace topology, or full Agent Asset evidence. | Keep the coverage-before-proposal gate and its `GLOBAL-EDIT-001` behavior. |
+| Slice 2 baseline — project Rules/AGENTS coverage | **Done — narrow baseline** | Published as part of `9616773...` | Applicable project `AGENTS.md` and `wiki/**/_rules.md` ancestor inventory/content coverage is used before deterministic proposal promotion. | Do not expand this row into a claim of full workspace or asset coverage. | Keep it as the existing instruction-coverage baseline. |
+| Slice 3 — Task Episode candidate lane | **Completed — published** | `35cf1c1976a75467583ad4557ba0287325981441` | Active-path, session-bounded candidate segmentation, conservative change/validation linkage, explicit marks, reader-safe artifacts, and partial-coverage handling were published. | Candidates are not semantic one-goal episodes; session-end delivery remains unobserved. Findings, report/TUI projection, automation, and extension UI are not wired to this lane. | Treat Slice 3 as the published session-evidence foundation. |
+| Project Harness Evidence Lane | **Implemented — local candidate** | Based on `6baa3fcbabd880bb1b854d5440332312615d4a4c`; local only, no push | `projectEvidence(options)` and bounded fixtures cover manifests/npm workspaces, scoped instructions, filesystem-only Git name/status metadata, CI names, release/recovery leads, ownership leads, and explicit partial/unavailable diagnostics. | Static presence is not execution, pass, acceptance, agent use, or finding evidence. Gitfile/external metadata and unsupported/unsafe paths remain partial; Git status is bounded metadata-based. | Review and publish this bounded lane, then make the next topology/Agent Asset versus P1 sequencing decision. |
+| Full workspace/owner topology | **Incomplete** | Existing `analysisRun()` target remains route-only | Project Evidence can identify an npm workspace member for evidence scoping, but no complete owner graph, apply binding, or sibling-owner rejection exists. | Do not claim full topology from the member hint. | Scope separately only if evidence justifies it. |
+| Full Agent Asset Evidence Lane | **Incomplete** | Existing safe project-agent-assets inventory is reused where applicable | The current inventory safely reads bounded applicable project assets for instruction coverage; it is not the full rules/skills/prompts/extensions/tools/hooks lane. | No user-home asset reads; no full asset topology or use/outcome claim. | Keep separate from Project Evidence and sequence conservatively. |
 
-## What is actually implemented in Slice 3
+## What is implemented in the Project Harness Evidence Lane
 
-The unpublished lane adds an opt-in `taskEpisodes()` API and private run artifacts for bounded Task Episode **candidates**. It includes:
+The lane is an additive, synchronous runtime API. It returns `kind: "pi-harness.project-evidence"` and a reader-safe projection with:
 
-- active-path, session-bounded user-turn candidates that never merge;
-- conservative change linkage for matched successful `edit`/`write` activity;
-- conservative validation linkage for allowlisted observed checks;
-- explicit `harness-mark` success/failure closure candidates;
-- `unobserved` session-end/delivery semantics rather than inferred success;
-- separate private and reader-safe artifacts with deterministic aliases and reconciliation checks;
-- warning/partial-coverage handling for malformed or ambiguous normalized evidence.
+- bounded root/member `package.json` metadata, runtime manifest/pin presence, npm workspace patterns, and member routes;
+- manifest script leads plus reviewed argv-safe identities for simple validation/delivery routes; unsafe shell bodies remain opaque;
+- scoped applicable `AGENTS.md`/`wiki/**/_rules.md` surfaces through the existing project-only safe asset inventory;
+- filesystem-only Git/index name-status metadata scoped to the selected workspace target;
+- CI workflow presence/names without opening CI externally;
+- release/recovery documentation leads and source/test ownership paths;
+- overall and per-surface `available`, `partial`, or `unavailable` states, including missing Git and missing package manifest;
+- an explicit static boundary stating that no project commands/scripts/network/CI were executed or opened and that presence does not prove exercise, pass, or acceptance.
 
-The current runtime README and architecture page document the exact privacy and integrity boundaries, including two separate publication limitations:
-
-- Private-first `private.json`/`reader.json` publication is recoverable by exact replay after a private-only interruption, but it is not an atomic two-file transaction.
-- A residual same-user parent-directory swap race exists around pathname-based hard-link publication because portable Node lacks fully descriptor-relative link publication.
-
-Those limitations are tracked here rather than hidden behind a stronger semantic claim.
+The collector reads no user-home configuration, raw/private session evidence, or external CI. It does not create findings, proposals, reports, automation actions, or extension UI. Routes are project-relative and bounded; traversal, symlink escapes, sensitive paths, arbitrary manifest fields, command output, and unsafe script bodies are omitted or downgraded to diagnostics.
 
 ## Remaining work, in roadmap order
 
-### Immediate — publish the current slice
-
-1. Review the unpublished Slice 3 diff and its changed paths.
-2. Run/confirm the required checks against the intended revision.
-3. Commit Slice 3 only after review and explicit approval.
-4. Push only after explicit approval. Neither commit nor push is automatic.
-
 ### Next implementation decision
 
-Choose and sequence the next bounded capability before starting P1 Findings work:
+Review and publish the bounded Project Harness Evidence Lane first. After that review, choose one narrowly scoped follow-up:
 
-- implement the bounded **Project Harness Evidence Lane** first (static, read-only project instructions, manifests/scripts, scoped change metadata, validation/delivery leads); and/or
-- make an explicit sequencing decision about whether to proceed directly toward P1 Findings after Slice 3 publication.
+1. strengthen workspace/owner topology and apply binding; or
+2. complete the separate Agent Asset Evidence baseline; or
+3. proceed to P1 evidence states and Findings only after confirming the required topology/asset boundaries are sufficient.
 
-Do **not** describe full workspace topology, a full Project Evidence Lane, or a full Agent Asset Evidence Lane as implemented. Slice 2's narrow project Rules/AGENTS coverage baseline is complete; those broader lanes are not.
+This decision must not be made by treating static Project Evidence presence as a defect, execution result, acceptance result, or finding.
 
 ### P1 — Findings and verified repair
 
@@ -81,41 +74,40 @@ Implement, in the roadmap order:
 
 ### Published slices
 
-- **Slice 1:** `cb40fa4616ab6a3bd0f3a5760d99a74fb08c0ce4` published the frozen analysis-run foundation, followed by the documented docs refresh at `547d041`. Exact historical focused/full test totals are intentionally not restated without a safe repository source.
-- **Slice 2:** `96167736f86aafe662d0ecc876fc7d337a581daa` is published and was verified at `138/138` runtime tests before Slice 3, with protected-path and diff checks.
+- **Slice 1:** `cb40fa4616ab6a3bd0f3a5760d99a74fb08c0ce4` published the frozen analysis-run foundation, followed by the documented docs refresh at `547d041`.
+- **Slice 2:** `96167736f86aafe662d0ecc876fc7d337a581daa` published the existing-coverage gate and narrow project Rules/AGENTS baseline.
+- **Slice 3:** `35cf1c1976a75467583ad4557ba0287325981441` published the Task Episode candidate lane. No unsupported historical test total is asserted here.
 
-### Current unpublished slice
+### Current Project Evidence candidate
 
-Supervisor-reported direct verification for the Slice 3 working tree:
+The candidate verification record includes:
 
 ```txt
-npm --prefix packages/harness-runtime test  → 184 passed, 0 failed
-node --check relevant JavaScript             → passed
-git diff --check                            → passed
-wiki/**/_rules.md diff                      → empty
-extension/manifest/lockfile/plan changes    → none
+node --test packages/harness-runtime/tests/project-evidence.test.js
+npm --prefix packages/harness-runtime test
+node --check on changed JavaScript
+git diff --check
+git status --short
+git diff HEAD -- 'wiki/**/_rules.md'  → empty
 ```
 
-This is evidence for the implementation and its focused tests, not evidence that Slice 3 has been published. The required publication decision remains open.
+The candidate contains only runtime/tests/docs needed for this lane. No private/raw session evidence, user-home assets, findings ledger, automation wiring, Pi TUI/extension UI, or protected prompt-rule changes are part of it.
 
 ## Scope boundaries and non-goals
 
-The tracker and current Slice 3 preserve these constraints:
-
-- No raw sessions or private Harness evidence are stored in the repository.
+- No raw sessions, normalized private evidence, auth data, `.env`, payload logs, or private Harness artifacts are stored in the repository.
 - No `wiki/**/_rules.md` file is edited by this tracker task.
-- No automatic commit or push.
-- No Findings ledger, full workspace topology, or LLM semantic grouping in Slice 3.
-- No claim that a user turn is a semantic one-goal Task Episode.
-- No claim that project/agent-asset inventory proves use, outcome, or repair verification.
-- No automatic inference that apply, a self-mark, or a passing check proves delivery acceptance or later improvement.
+- No automatic commit, push, merge, force-push, deploy, or apply is implied.
+- Project Evidence is static mechanism inventory, not a test runner, CI client, acceptance checker, findings ledger, or defect/age/hotspot classifier.
+- No full workspace topology, full Agent Asset lane, LLM semantic grouping, or semantic one-goal Task Episode claim is made.
+- Static script/CI/documentation/ownership presence does not prove agent read/use, exercise, pass, acceptance, repair verification, or later improvement.
 
 ## Source-of-truth documents
 
 - [Better Harness comparison and improvement plan](./better-harness-comparison-and-improvement-plan.md) — evidence lanes, slice definitions, P0–P3 backlog, and design contracts.
 - [Roadmap](./roadmap.md) — phase sequencing and current-status pointer.
 - [Plan](./plan.md) — overall Harness direction and safety model.
-- [Harness runtime README](../packages/harness-runtime/README.md) — implemented API, private artifacts, and Slice 3 limitations.
+- [Harness runtime README](../packages/harness-runtime/README.md) — implemented API and privacy boundaries.
 - [Harness runtime architecture wiki](../wiki/architecture/harness-runtime.md) — package ownership, storage, privacy, and verification boundaries.
 
 ## How to update this tracker
@@ -123,7 +115,7 @@ The tracker and current Slice 3 preserve these constraints:
 After each slice, update this page with:
 
 1. status and publication state;
-2. commit (or explicit working-tree/unpublished state);
+2. commit (or explicit local candidate state);
 3. tests and other verification actually observed;
 4. changed paths and protected-path audit;
 5. risks, known semantic limits, and the next decision/action.

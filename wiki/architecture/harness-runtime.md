@@ -27,10 +27,11 @@ The main flow through `src/api.js` is:
 4. **Parse session JSONL** — `parseSessionFile()` reads each unchanged selected JSONL file line by line, extracts the session header, keeps entries, and emits parser warnings for malformed/missing/duplicate structure.
 5. **Guard and normalize** — before canonical persistence, `writeSessionCache()` verifies parsed header identity/timestamp and final size/mtime against the frozen snapshot. A mismatch cannot create or overwrite canonical cache. Matching parses proceed to tree building, normalization, metrics, and enriched warnings.
 6. **Write private cache and receipt** — normalized session artifacts and independent atomic consumer receipts are written under the harness home, not into the source repo by default.
-7. **Optionally build Task Episode candidates** — the explicit `taskEpisodes()` API consumes the frozen run through its own consumer, validates normalized event file order, uses active-path evidence only, creates one non-merged session-bounded candidate per user turn, links observed change/validation sets conservatively, and publishes canonical private plus derived reader artifacts. It is not invoked by reports, findings, proposals, automation, or extension UI.
-8. **Review deterministic candidates before proposal** — R-0001 through R-0004 emit proposal-free `CandidateSignal` objects whose private evidence refs include the frozen session `sourceFingerprint` and normalized event ID when available. One reviewer filters by API mode, inventories bounded applicable project `AGENTS.md`/`wiki/**/_rules.md` ancestry, evaluates executable per-block coverage signatures and eligibility, then retains promoted/deferred/rejected decisions.
-9. **Begin, write, and finalize one proposal attempt** — before proposal files are touched, the runtime exclusively persists a pending attempt receipt. It then writes/skips promoted proposals and atomically finalizes that same receipt. Begin failure prevents proposal writing; finalize failure leaves the pending receipt intact.
-10. **Generate outputs** — report, reflection, reviewed proposal, eval, or automation functions consume normalized session results.
+7. **Collect project evidence independently** — `projectEvidence()` performs a bounded filesystem-only pass over manifests, npm workspace/member routes, applicable project instructions, Git/index name-status metadata, CI workflow names, release/recovery documentation leads, and source/test ownership paths. It does not load user-home/session evidence, execute project commands, or open external CI, and writes no project artifact.
+8. **Optionally build Task Episode candidates** — the explicit `taskEpisodes()` API consumes the frozen run through its own consumer, validates normalized event file order, uses active-path evidence only, creates one non-merged session-bounded candidate per user turn, links observed change/validation sets conservatively, and publishes canonical private plus derived reader artifacts. It is not invoked by reports, findings, proposals, automation, or extension UI.
+9. **Review deterministic candidates before proposal** — R-0001 through R-0004 emit proposal-free `CandidateSignal` objects whose private evidence refs include the frozen session `sourceFingerprint` and normalized event ID when available. One reviewer filters by API mode, inventories bounded applicable project `AGENTS.md`/`wiki/**/_rules.md` ancestry, evaluates executable per-block coverage signatures and eligibility, then retains promoted/deferred/rejected decisions.
+10. **Begin, write, and finalize one proposal attempt** — before proposal files are touched, the runtime exclusively persists a pending attempt receipt. It then writes/skips promoted proposals and atomically finalizes that same receipt. Begin failure prevents proposal writing; finalize failure leaves the pending receipt intact.
+11. **Generate outputs** — report, reflection, reviewed proposal, eval, or automation functions consume normalized session results.
 
 Representative source files:
 
@@ -49,6 +50,7 @@ Representative source files:
 - `src/eval/eval-harness.js` — deterministic eval scenarios
 - `src/analysis/rules.js` — built-in deterministic detectors that emit CandidateSignals
 - `src/analysis/project-agent-assets.js` — project-only applicability, bounded secure asset reads, H2 extraction, and privacy-safe inventory projection
+- `src/analysis/project-evidence.js` — bounded static Project Harness Evidence Lane, npm workspace hints, Git/index metadata, delivery leads, and reader-safe projection
 - `src/analysis/candidate-review.js` — detector-owned coverage signatures, eligibility decisions, and promoted proposal templates
 - `src/storage/candidate-review-writer.js` — atomic run-bound candidate review receipts
 - `src/analysis/wiki-prompt-rules.js` — `_rules.md` discovery, classification, scaffolding, and lint; it does not configure detectors or coverage signatures
@@ -109,6 +111,8 @@ Harness is designed to avoid raw-log exposure in normal workflows:
 - Public candidate/review projections exclude asset contents, evidence excerpts, raw/session/cache absolute paths, user-home paths and source heading words. Project-relative asset routes and explicit/opaque section IDs are the only content locators exposed by this lane.
 - Frozen session fingerprints cover provider, session id/private stable ref, header timestamp, file size/mtime, and project/workspace identity. The active session follows the same explicit-partial mutation policy as every selected session.
 - Public authority records `rawSessionContent: false`, `userHomeAssets: false`, and `normalizedLookup: single-exact-ref`. The route-only `workspaceTarget` is `{ kind: "repo-root" | "standalone", route: ".", packageRoute: null, ownerRoute: "." }`; it contains no absolute paths and does not implement workspace-member topology.
+- `projectEvidence()` is a separate project-only lane. It returns project-relative routes and bounded metadata for manifests, npm workspace/member detection, applicable instruction inventory, Git/index name-status data, CI presence/names, release/recovery leads, and source/test ownership leads. Its surface statuses distinguish `available`, `partial`, and `unavailable`; missing Git/manifest is not silently normalized away. It never executes project commands, opens external CI, reads user-home/session evidence, exposes unsafe script bodies, or treats presence as exercise/pass/acceptance.
+- The Project Evidence lane's `workspace-member` target is an evidence-scope hint only. It does not replace the route-only analysis-run target or implement full workspace topology, owner binding, sibling rejection, or the full Agent Asset Evidence Lane.
 - `src/safety/redaction.js` redacts common API keys/tokens, bearer headers, sensitive assignments, long opaque tokens, sensitive object keys, and sensitive paths such as `.env`, Pi auth stores, Pi sessions, and `.pi/logs/llm-payloads/`.
 - `writeSessionCache()` records redaction-enabled metadata and writes normalized artifacts to harness home.
 - The Pi extension tells `/harness-improve` to use only normalized evidence and to call `harness_import_llm_reflection` with JSON proposals instead of responding in prose.
@@ -120,6 +124,7 @@ Future changes should preserve these boundaries. Do not read raw session logs, a
 Important API functions in `src/api.js`:
 
 - `analysisRun()` creates the public frozen-run contract. `report()`, `reflect()`, and `taskEpisodes()` accept that object through `options.analysisRun`; legacy calls create a compatibility run internally.
+- `projectEvidence()` is an additive synchronous API for the independent static Project Evidence lane. It has no findings, report, proposal, automation, or extension-UI wiring and does not write a private or repository artifact.
 - `taskEpisodes()` is itself the opt-in switch: it consumes with independent consumer name `task-episodes`, persists the two run artifacts, and returns only the reader projection with bounded run/count binding. It has no config feature-gate semantics and is not wired into current report/proposal/automation/extension behavior.
 - `report()` consumes unchanged sessions from the frozen selection, writes cache, creates a Markdown project report, and writes `reports/latest.md`. Its JSON payload also includes the same frozen session list used by `/harness`, so the dashboard does not make a second session-discovery call.
 - `reflect()` consumes unchanged sessions from the frozen selection and writes a redacted reflection prompt with evidence references.
@@ -171,7 +176,7 @@ Automation is gated by config and disabled by default. Runtime and README eviden
 
 - For general Harness command wording or UI behavior, edit `packages/pi-learn-extensions/extensions/harness/index.ts`.
 - For Harness Wiki behavior/prompt, edit `harness/wiki-commands.ts` and `harness/wiki-prompt.ts`; preserve lazy rule loading and reserved-file protection.
-- For parsing, caching, reports, reflection, proposals, eval, or automation behavior, edit `packages/harness-runtime/src/**` and add/update tests in `packages/harness-runtime/tests/**`.
+- For parsing, caching, project evidence, reports, reflection, proposals, eval, or automation behavior, edit `packages/harness-runtime/src/**` and add/update tests in `packages/harness-runtime/tests/**`.
 - Run harness runtime tests from `packages/harness-runtime/` with `npm test`.
 - For security-sensitive changes, add/adjust tests around redaction, file protection, and proposal lifecycle.
 - Review `pi-harness/` design docs when making larger architecture changes; they capture roadmap and session-format intent beyond the code.

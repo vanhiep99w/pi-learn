@@ -1043,12 +1043,16 @@ Do not enter next phase unless gate passes.
 The canonical status, evidence, risks, and ordered backlog are tracked in [`implementation-status.md`](./implementation-status.md).
 
 ```txt
-Published: Slice 1 (Frozen Analysis Run) and Slice 2 (Existing Coverage Before Proposal).
-Working tree: Slice 3 Task Episode candidate lane is implemented but unpublished.
-Immediate: review, commit, and push Slice 3; publication is not automatic.
-Next decision: implement the bounded Project Harness Evidence Lane and/or decide its sequencing before P1 Findings work.
-Constraint: do not claim full workspace topology, findings, or semantic one-goal Task Episodes yet.
+Published: Slice 1 (Frozen Analysis Run), Slice 2 (Existing Coverage Before Proposal), and Slice 3 (Task Episode candidate lane) are published. Slice 3 was published in commit `35cf1c1976a75467583ad4557ba0287325981441`.
+Current candidate: the bounded Project Harness Evidence Lane is implemented in the runtime worktree and remains local until its candidate commit is reviewed; no push is implied.
+Immediate: review the Project Evidence candidate and its protected-path/privacy boundaries; publication is not automatic.
+Next decision: after this bounded lane, choose conservatively between the still-incomplete full workspace/owner-topology and Agent Asset lanes or the P1 evidence-state/Findings sequence.
+Constraint: do not claim full workspace topology, the full Agent Asset lane, findings, or semantic one-goal Task Episodes from these bounded capabilities.
 ```
+
+The current Project Harness Evidence slice is a deterministic, synchronous, read-only runtime API (`projectEvidence(options)`). It reports bounded package/runtime manifest metadata, npm workspace/member hints, script and reviewed validation-route leads, scoped applicable instruction inventory, filesystem-only Git/index name-status metadata, CI workflow presence/names, release/recovery documentation leads, and source/test ownership paths. It returns explicit `available`, `partial`, and `unavailable` statuses and diagnostics, including missing Git and missing package manifest. It executes no project commands, opens no external CI, reads no user-home/session evidence, exposes no unsafe script body, creates no finding, and does not infer exercise/pass/acceptance from presence.
+
+The evidence lane's `workspaceTarget` can identify an npm workspace member for evidence scoping, but this is not the full workspace topology/apply-binding capability. It does not reject sibling owners, freeze a complete owner graph, or widen the existing analysis-run contract. It reuses the existing safe project Agent Asset inventory for applicable instructions; the full Agent Asset Evidence Lane remains a separate incomplete roadmap item.
 
 Current implementation choice:
 
@@ -1127,8 +1131,8 @@ MVP must guarantee:
 Updated roadmap:
 
 ```txt
-Current: Slices 1 and 2 are published; Slice 3 is implemented in the dirty working tree but is not committed or pushed.
-Next: review and explicitly publish Slice 3, then choose/implement the bounded Project Harness Evidence Lane before or alongside the P1 Findings sequencing decision.
+Current: Slices 1, 2, and 3 are published; the bounded Project Harness Evidence Lane is the current local candidate based on the reviewed base revision.
+Next: review and explicitly publish the Project Evidence candidate, then decide whether evidence supports full workspace/Agent Asset lanes or the P1 Findings sequencing decision.
 Then: evidence states, Findings ledger, proposal linkage, findings-backed projections, validation receipts, applied-vs-verified state, stale revision protection, and post-fix review.
 Later: P2 longitudinal outcomes, followed by optional P3 capabilities only when evidence justifies them.
 Finally: no automatic commit/push, silent auto-apply, or raw/private evidence in the repository.
