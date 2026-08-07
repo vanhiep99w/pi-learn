@@ -68,8 +68,6 @@ for pkg in \
   git:github.com/edxeth/pi-gpt-config \
   npm:pi-tool-display \
   npm:pi-mcp-adapter \
-  npm:pi-markdown-preview \
-  npm:pi-mermaid \
   npm:pi-image-preview
 do
   pi install "$pkg"
@@ -85,8 +83,6 @@ for pkg in \
   git:github.com/edxeth/pi-gpt-config \
   npm:pi-tool-display \
   npm:pi-mcp-adapter \
-  npm:pi-markdown-preview \
-  npm:pi-mermaid \
   npm:pi-image-preview
 do
   pi install -l "$pkg"
