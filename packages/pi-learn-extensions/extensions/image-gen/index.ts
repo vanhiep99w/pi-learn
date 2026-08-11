@@ -16,6 +16,7 @@ export default function imageGenExtension(pi: ExtensionAPI) {
       "Use image_gen when the user asks to create or edit an image asset.",
       "Before calling image_gen for a project asset, inspect the workspace for an existing suitable image directory (for example public/images, assets/images, or src/assets) and pass a project-relative outputPath that follows the project's convention.",
       "If image_gen has no suitable project image directory and the user did not choose one, omit outputPath; image_gen then saves in the current workspace root.",
+      "Use size=auto for image_gen unless the user or target layout requires explicit dimensions; the experimental subscription backend can return a different valid size and such mismatches are saved with a warning.",
       "For image_gen edits, assign every input image an explicit role and use edit_target only for the image to modify.",
     ],
     parameters: imageGenSchema,

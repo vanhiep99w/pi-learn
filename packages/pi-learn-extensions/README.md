@@ -80,7 +80,7 @@ Tool `image_gen` hiện hỗ trợ bước triển khai ban đầu:
 - `count` nhỏ có bounded concurrency
 - agent chọn `outputPath` theo folder/convention phù hợp trong project; nếu bỏ trống thì lưu tại workspace root (`ctx.cwd`)
 - non-overwrite mặc định
-- validate PNG/JPEG/WebP, dimensions/alpha semantics và ghi metadata sidecar
+- validate PNG/JPEG/WebP và alpha; dimension mismatch từ private subscription backend được lưu với warning thay vì làm mất ảnh hợp lệ
 - trả ảnh inline để model kiểm tra ở turn tiếp theo
 
 Command:
@@ -94,6 +94,8 @@ Command:
 Tool result hiển thị ảnh inline khi `terminal.showImages` được bật. `/image-gen generate` hiển thị preview phía trên editor; dùng `/image-gen hide` để đóng. Terminal cần hỗ trợ inline image, ví dụ Kitty, Ghostty, WezTerm hoặc Warp; terminal không hỗ trợ sẽ hiện placeholder/path.
 
 `/image-gen generate` chạy trực tiếp nên nếu không có `outputPath` thì lưu ở folder hiện tại. Khi gọi qua hội thoại, agent được hướng dẫn inspect project và chọn folder ảnh phù hợp như `public/images`, `assets/images` hoặc convention đã tồn tại.
+
+Private subscription backend đôi khi bỏ qua `size` đã request, ví dụ yêu cầu `1024x1024` nhưng trả `1536x1024`. Extension vẫn lưu ảnh đúng MIME/hợp lệ theo kích thước thực tế, đánh dấu `validation.dimensions=false` và trả warning. Agent mặc định dùng `size=auto` nếu người dùng không yêu cầu kích thước cụ thể.
 
 Các capability chưa có trong build này: public OpenAI Images API fallback, mask, transparency/chroma-key và batch JSONL. Request các capability này sẽ fail trước khi generate; không có paid fallback âm thầm.
 

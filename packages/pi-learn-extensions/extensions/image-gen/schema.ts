@@ -40,7 +40,10 @@ export const imageGenSchema = Type.Object(
       ),
     ),
     maskPath: Type.Optional(Type.String({ minLength: 1 })),
-    size: Type.Optional(Type.String({ pattern: "^(auto|[1-9][0-9]{2,4}x[1-9][0-9]{2,4})$" })),
+    size: Type.Optional(Type.String({
+      pattern: "^(auto|[1-9][0-9]{2,4}x[1-9][0-9]{2,4})$",
+      description: "Requested size. Experimental subscription responses may return a different valid size; mismatches are saved with a warning.",
+    })),
     quality: Type.Optional(StringEnum(["auto", "low", "medium", "high"] as const)),
     background: Type.Optional(StringEnum(["auto", "opaque", "transparent"] as const)),
     outputFormat: Type.Optional(StringEnum(["png", "webp", "jpeg"] as const)),

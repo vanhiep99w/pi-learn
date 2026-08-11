@@ -32,6 +32,7 @@ export type ImageMetadata = {
   savedPath: string;
   referencePaths: string[];
   validation: ImageValidationMetadata;
+  warnings?: string[];
   fallbackUsed: boolean;
 };
 

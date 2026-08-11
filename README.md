@@ -37,6 +37,8 @@ Implementation ban đầu đăng ký tool `image_gen` và command:
 
 Hiện đã có subscription generate, local references, reference-conditioned edit, variants nhỏ, output validation, non-overwrite và metadata sidecar. Tool result hiển thị ảnh inline; `/image-gen generate` mở preview phía trên editor và `/image-gen hide` đóng preview. Cần terminal hỗ trợ inline image (Kitty/Ghostty/WezTerm/Warp) và `terminal.showImages` bật cho tool result. Cần login bằng `/login` → ChatGPT Plus/Pro (Codex). Public API fallback, mask và transparency chưa được triển khai; extension fail rõ ràng và **không phát sinh paid API call** cho các capability này.
 
+`size` trên private subscription backend là best-effort: backend đôi khi trả kích thước khác yêu cầu. Extension vẫn lưu ảnh hợp lệ theo kích thước thực tế, ghi `validation.dimensions=false` và trả warning; agent được hướng dẫn dùng `size=auto` khi người dùng không yêu cầu kích thước cụ thể.
+
 Agent nên xem cấu trúc project và truyền `outputPath` theo convention sẵn có, ví dụ `public/images/hero.png` hoặc `assets/images/hero.png`. Nếu không truyền `outputPath`, ảnh được lưu ngay tại workspace root hiện tại (`ctx.cwd`).
 
 ## Cài đặt

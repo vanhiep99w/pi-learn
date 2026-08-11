@@ -13,8 +13,9 @@ import {
   redactSensitiveText,
 } from "./errors.ts";
 import { decodeImageBase64, inspectImage } from "./image/inspect.ts";
+import { validateGeneratedImage } from "./image/validate.ts";
 import { compilePrompt } from "./prompt-compiler.ts";
-import type { ImageGenInput, ImageOutputFormat } from "./schema.ts";
+import type { ImageGenInput } from "./schema.ts";
 import { saveImageWithMetadata, type ImageMetadata, type ImageValidationMetadata } from "./storage/metadata.ts";
 import { inferOutputFormat, resolveOutputPaths, stripLeadingAt } from "./storage/paths.ts";
 
@@ -34,6 +35,7 @@ export type ImageGenDetails = {
   batchId: string;
   fallbackUsed: boolean;
   strategy: string[];
+  warnings: string[];
   experimental: boolean;
 };
 
@@ -100,16 +102,25 @@ export async function runImageGen(
   const validations: ImageValidationMetadata[] = [];
   const metadataPaths: string[] = [];
   const inlineImages: Array<{ type: "image"; data: string; mimeType: string }> = [];
+  const warnings: string[] = [];
 
   for (let index = 0; index < generated.length; index++) {
     signal?.throwIfAborted();
     const result = generated[index];
     const bytes = decodeImageBase64(result.base64);
     const inspected = inspectImage(bytes);
-    validateGeneratedImage(inspected, outputFormat, size, background);
+    const generatedValidation = validateGeneratedImage(
+      inspected,
+      outputFormat,
+      size,
+      background,
+      backend.id === "api",
+    );
+    const imageWarnings = generatedValidation.warnings.map((warning) => `Image ${index + 1}: ${warning}`);
+    warnings.push(...imageWarnings);
     const validation: ImageValidationMetadata = {
       mime: true,
-      dimensions: true,
+      dimensions: generatedValidation.dimensionsMatch,
       alpha: background === "transparent" ? (inspected.hasAlpha ? "present" : "missing") : "not-requested",
       width: inspected.width,
       height: inspected.height,
@@ -137,6 +148,7 @@ export async function runImageGen(
       savedPath: outputPaths[index],
       referencePaths: images.map((image) => image.path),
       validation,
+      warnings: imageWarnings,
       fallbackUsed,
     };
     metadataPaths.push(await saveImageWithMetadata(outputPaths[index], bytes, metadata, input.overwrite === true));
@@ -144,9 +156,10 @@ export async function runImageGen(
   }
 
   const savedText = outputPaths.map((path) => `- ${path}`).join("\n");
+  const warningText = warnings.length > 0 ? `\nWarnings:\n${warnings.map((warning) => `- ${warning}`).join("\n")}` : "";
   return {
     content: [
-      { type: "text", text: `Generated ${outputPaths.length} image(s) with the experimental ${backend.id} backend.\nSaved to:\n${savedText}` },
+      { type: "text", text: `Generated ${outputPaths.length} image(s) with the experimental ${backend.id} backend.\nSaved to:\n${savedText}${warningText}` },
       ...inlineImages,
     ],
     details: {
@@ -162,6 +175,7 @@ export async function runImageGen(
       batchId,
       fallbackUsed,
       strategy: generated.map((result) => result.strategy),
+      warnings,
       experimental: true,
     },
   };
@@ -261,27 +275,6 @@ function validateCapabilities(
   }
   if (request.background === "transparent" && !capabilities.transparentOutput) {
     throw new ImageGenCapabilityError(`Transparent output is not implemented for the ${backend.id} backend yet; no image was generated.`, backend.id);
-  }
-}
-
-function validateGeneratedImage(
-  inspected: ReturnType<typeof inspectImage>,
-  outputFormat: ImageOutputFormat,
-  size: string,
-  background: "auto" | "opaque" | "transparent",
-): void {
-  const expectedMime = outputFormat === "jpeg" ? "image/jpeg" : `image/${outputFormat}`;
-  if (inspected.mimeType !== expectedMime) {
-    throw new ImageGenValidationError(`Backend returned ${inspected.mimeType}, expected ${expectedMime}.`);
-  }
-  if (size !== "auto") {
-    const [width, height] = size.split("x").map(Number);
-    if (inspected.width !== width || inspected.height !== height) {
-      throw new ImageGenValidationError(`Backend returned ${inspected.width}x${inspected.height}, expected ${size}.`);
-    }
-  }
-  if (background === "transparent" && !inspected.hasAlpha) {
-    throw new ImageGenValidationError("Transparent output was requested, but the generated image has no alpha channel.");
   }
 }
 

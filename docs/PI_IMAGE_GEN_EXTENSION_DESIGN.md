@@ -12,7 +12,7 @@
 
 ### Tiến độ implementation hiện tại
 
-Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, metadata sidecar, inline tool-result image, direct-command preview widget, `/image-gen doctor`, unit tests và mocked subscription tests.
+Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, dimension-mismatch warning/preservation, metadata sidecar, inline tool-result image, direct-command preview widget, `/image-gen doctor`, unit tests và mocked subscription tests.
 
 Chưa có: live smoke validation, public API fallback, mask, chroma-key/native transparency, JSONL batch manifest, skill resource và A/B quality suite. Runtime hiện fail sớm cho capability chưa hỗ trợ; không thể phát sinh paid API fallback.
 
@@ -436,6 +436,8 @@ Payload lõi:
 }
 ```
 
+Quan sát runtime: private subscription endpoint đôi khi bỏ qua `size` trong image tool và trả một kích thước hợp lệ khác, ví dụ request `1024x1024` nhưng nhận `1536x1024`. Vì ảnh đã được tạo và hợp lệ, subscription path không discard asset: lưu theo kích thước thực tế, đặt `validation.dimensions=false`, ghi warning trong sidecar/tool result. MIME và alpha validation vẫn strict. Agent dùng `size=auto` khi người dùng/layout không bắt buộc kích thước cụ thể. Public API backend sau này vẫn có thể giữ strict dimension validation.
+
 Dispatcher model selection:
 
 1. Nếu active model thuộc `openai-codex` và capability phù hợp, dùng active model.
@@ -655,9 +657,10 @@ Mỗi ảnh có sidecar:
   "referencePaths": ["..."],
   "validation": {
     "mime": true,
-    "dimensions": true,
+    "dimensions": false,
     "alpha": "not-requested"
-  }
+  },
+  "warnings": ["Image 1: Backend returned 1536x1024, requested 1024x1024; saved using actual dimensions."]
 }
 ```
 
