@@ -78,7 +78,8 @@ Tool `image_gen` hiện hỗ trợ bước triển khai ban đầu:
 - generate bằng OAuth `openai-codex`, không cần `OPENAI_API_KEY`
 - local reference images với role rõ ràng; edit dùng strategy reference-conditioned
 - `count` nhỏ có bounded concurrency
-- output project-relative hoặc preview global, non-overwrite mặc định
+- agent chọn `outputPath` theo folder/convention phù hợp trong project; nếu bỏ trống thì lưu tại workspace root (`ctx.cwd`)
+- non-overwrite mặc định
 - validate PNG/JPEG/WebP, dimensions/alpha semantics và ghi metadata sidecar
 - trả ảnh inline để model kiểm tra ở turn tiếp theo
 
@@ -88,6 +89,8 @@ Command:
 /image-gen doctor
 /image-gen generate <prompt>
 ```
+
+`/image-gen generate` chạy trực tiếp nên nếu không có `outputPath` thì lưu ở folder hiện tại. Khi gọi qua hội thoại, agent được hướng dẫn inspect project và chọn folder ảnh phù hợp như `public/images`, `assets/images` hoặc convention đã tồn tại.
 
 Các capability chưa có trong build này: public OpenAI Images API fallback, mask, transparency/chroma-key và batch JSONL. Request các capability này sẽ fail trước khi generate; không có paid fallback âm thầm.
 

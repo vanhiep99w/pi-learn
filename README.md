@@ -36,7 +36,7 @@ Implementation ban đầu đăng ký tool `image_gen` và command:
 
 Hiện đã có subscription generate, local references, reference-conditioned edit, variants nhỏ, output validation, non-overwrite và metadata sidecar. Cần login bằng `/login` → ChatGPT Plus/Pro (Codex). Public API fallback, mask và transparency chưa được triển khai; extension fail rõ ràng và **không phát sinh paid API call** cho các capability này.
 
-Khi ảnh sẽ được source code sử dụng, truyền `outputPath` tương đối theo workspace, ví dụ `assets/hero.png`.
+Agent nên xem cấu trúc project và truyền `outputPath` theo convention sẵn có, ví dụ `public/images/hero.png` hoặc `assets/images/hero.png`. Nếu không truyền `outputPath`, ảnh được lưu ngay tại workspace root hiện tại (`ctx.cwd`).
 
 ## Cài đặt
 

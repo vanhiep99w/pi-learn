@@ -22,8 +22,7 @@ export async function resolveOutputPaths(options: OutputPathOptions): Promise<st
   const semanticName = `${slugify(options.prompt)}-${timestamp}-${id}`;
 
   if (!options.outputPath) {
-    const directory = join(homedir(), ".pi", "agent", "generated-images");
-    return variants(directory, semanticName, extension, options.count);
+    return variants(resolve(options.cwd), semanticName, extension, options.count);
   }
 
   const cleaned = stripLeadingAt(options.outputPath.trim());

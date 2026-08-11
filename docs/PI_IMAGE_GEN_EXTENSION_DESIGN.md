@@ -12,7 +12,7 @@
 
 ### Tiến độ implementation hiện tại
 
-Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite project/global paths, metadata sidecar, inline image result, `/image-gen doctor`, unit tests và mocked subscription tests.
+Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, metadata sidecar, inline image result, `/image-gen doctor`, unit tests và mocked subscription tests.
 
 Chưa có: live smoke validation, public API fallback, mask, chroma-key/native transparency, JSONL batch manifest, skill resource và A/B quality suite. Runtime hiện fail sớm cho capability chưa hỗ trợ; không thể phát sinh paid API fallback.
 
@@ -609,15 +609,19 @@ Vì đây có thể chuyển sang paid API fallback và model khác, cần opt-i
 
 ## 14. Output policy
 
-### 14.1 Preview-only
+### 14.1 Mặc định theo workspace
 
-Mặc định global preview path:
+Nếu không truyền `outputPath`, ảnh được lưu ngay tại workspace root hiện tại:
 
 ```txt
-~/.pi/agent/generated-images/<timestamp>-<image-id>.<ext>
+<ctx.cwd>/<semantic-name>-<timestamp>-<image-id>.<ext>
 ```
 
-### 14.2 Project-bound
+Agent phải inspect cấu trúc project trước khi gọi tool. Nếu tìm thấy convention/folder ảnh phù hợp như `public/images`, `assets/images`, `src/assets` hoặc folder tương đương, agent nên truyền `outputPath` project-relative theo convention đó. Nếu không có folder phù hợp và người dùng không chỉ định, fallback là `ctx.cwd`.
+
+Command `/image-gen generate` chạy trực tiếp, không có agent chọn folder, nên cũng fallback về `ctx.cwd`.
+
+### 14.2 Output path được chỉ định
 
 Nếu `outputPath` được cung cấp:
 
@@ -626,8 +630,6 @@ Nếu `outputPath` được cung cấp:
 - Không overwrite nếu `overwrite !== true`.
 - Nếu path là directory, tạo semantic/versioned filename.
 - Dùng `withFileMutationQueue()` cho toàn bộ mutation window.
-
-Skill phải hướng agent luôn truyền project path khi ảnh sẽ được source code tham chiếu.
 
 ### 14.3 Metadata
 
@@ -740,7 +742,7 @@ Ví dụ:
   "defaultFormat": "png",
   "subscriptionConcurrency": 2,
   "apiConcurrency": 3,
-  "previewDirectory": "~/.pi/agent/generated-images",
+  "defaultOutputDirectory": ".",
   "dispatcherModel": "auto"
 }
 ```

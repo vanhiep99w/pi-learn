@@ -7,6 +7,23 @@ import { inferOutputFormat, resolveOutputPaths } from "../../extensions/image-ge
 
 const fixedDate = new Date("2026-06-01T01:02:03.000Z");
 
+test("defaults to the current workspace root", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-image-paths-"));
+  try {
+    const [path] = await resolveOutputPaths({
+      cwd,
+      outputFormat: "png",
+      prompt: "Product hero",
+      count: 1,
+      now: fixedDate,
+      id: "fixed",
+    });
+    assert.equal(path, join(cwd, "product-hero-2026-06-01T01-02-03-000Z-fixed.png"));
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("resolves @-prefixed project files and variant suffixes", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-image-paths-"));
   try {

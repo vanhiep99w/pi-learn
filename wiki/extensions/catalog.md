@@ -15,7 +15,7 @@ Implemented command surface:
 /image-gen generate <prompt>
 ```
 
-Current scope includes subscription generate, explicit reference roles, reference-conditioned edit, and small variant batches with bounded concurrency. Public API billing fallback, masks, transparency/chroma-key processing, and JSONL batch commands are deliberately unavailable; capability checks fail before generation and no paid fallback can occur in this build.
+Current scope includes subscription generate, explicit reference roles, reference-conditioned edit, and small variant batches with bounded concurrency. The agent is instructed to inspect existing project image conventions and pass a suitable project-relative `outputPath`; without one, output falls back to the current workspace root (`ctx.cwd`). Public API billing fallback, masks, transparency/chroma-key processing, and JSONL batch commands are deliberately unavailable; capability checks fail before generation and no paid fallback can occur in this build.
 
 Change guidance:
 
