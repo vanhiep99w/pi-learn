@@ -2,6 +2,28 @@
 
 Public Pi extension and theme source lives under `packages/pi-learn-extensions/`. The root package and package-level manifest both expose this directory to Pi. This page summarizes what each extension does, where to change it, and what to verify.
 
+## Image Gen (experimental)
+
+Source: `packages/pi-learn-extensions/extensions/image-gen/`; tests: `packages/pi-learn-extensions/tests/image-gen/`
+
+The initial implementation registers tool `image_gen` and command namespace `/image-gen`. It resolves OAuth only through `ctx.modelRegistry.getProviderAuth("openai-codex")`, calls the experimental ChatGPT Codex Responses image tool, validates PNG/JPEG/WebP output, saves images non-destructively through Pi's file mutation queue, writes redacted metadata sidecars, and returns generated images inline.
+
+Implemented command surface:
+
+```txt
+/image-gen doctor
+/image-gen generate <prompt>
+```
+
+Current scope includes subscription generate, explicit reference roles, reference-conditioned edit, and small variant batches with bounded concurrency. Public API billing fallback, masks, transparency/chroma-key processing, and JSONL batch commands are deliberately unavailable; capability checks fail before generation and no paid fallback can occur in this build.
+
+Change guidance:
+
+- Preserve provider credential resolution through Pi; do not read auth files or log requests containing data URLs.
+- Keep credential-bearing fetches pinned to `https://chatgpt.com` with redirects disabled.
+- Keep non-overwrite behavior, sidecar redaction, input/output size limits, and backend capability checks deterministic.
+- Run `npm --prefix packages/pi-learn-extensions run test:image-gen`, load the entrypoint, then use `/reload` for interactive verification.
+
 ## Web tools
 
 Source: `packages/pi-learn-extensions/extensions/web-tools/`

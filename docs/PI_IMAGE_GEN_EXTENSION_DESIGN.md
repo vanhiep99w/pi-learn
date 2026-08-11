@@ -1,10 +1,20 @@
 # Thiết kế Pi Image Gen Extension — Codex parity core
 
-> Trạng thái: **Design proposal** — chưa triển khai runtime  
-> Vị trí dự kiến: `packages/pi-learn-extensions/extensions/image-gen/`  
-> Tool công khai: `image_gen`  
-> Backend mặc định: ChatGPT/Codex subscription OAuth  
-> Fallback tùy chọn: public OpenAI Images API
+> Trạng thái: **Đang triển khai** — Phase 0 và phần lõi Phase 1/2 đã có runtime experimental
+>
+> Vị trí: `packages/pi-learn-extensions/extensions/image-gen/`
+>
+> Tool công khai: `image_gen`
+>
+> Backend hiện có: ChatGPT/Codex subscription OAuth
+>
+> Fallback public OpenAI Images API: thiết kế đã chốt, runtime chưa triển khai
+
+### Tiến độ implementation hiện tại
+
+Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite project/global paths, metadata sidecar, inline image result, `/image-gen doctor`, unit tests và mocked subscription tests.
+
+Chưa có: live smoke validation, public API fallback, mask, chroma-key/native transparency, JSONL batch manifest, skill resource và A/B quality suite. Runtime hiện fail sớm cho capability chưa hỗ trợ; không thể phát sinh paid API fallback.
 
 ## 1. Tóm tắt quyết định
 

@@ -58,6 +58,7 @@ Các command còn lại chủ yếu để debug, kiểm tra, hoặc quản lý n
 
 ```txt
 extensions/
+├── image-gen/                  # experimental image_gen via Codex subscription
 ├── web-tools/                  # web_search, web_fetch, tool_search
 ├── harness/                    # observability, proposals, eval, Harness Wiki
 ├── chatgpt-usage-status/       # ChatGPT Plus/Pro usage status
@@ -67,6 +68,28 @@ extensions/
 themes/
 └── midnight-aurora.json
 ```
+
+---
+
+## Image Gen (experimental)
+
+Tool `image_gen` hiện hỗ trợ bước triển khai ban đầu:
+
+- generate bằng OAuth `openai-codex`, không cần `OPENAI_API_KEY`
+- local reference images với role rõ ràng; edit dùng strategy reference-conditioned
+- `count` nhỏ có bounded concurrency
+- output project-relative hoặc preview global, non-overwrite mặc định
+- validate PNG/JPEG/WebP, dimensions/alpha semantics và ghi metadata sidecar
+- trả ảnh inline để model kiểm tra ở turn tiếp theo
+
+Command:
+
+```txt
+/image-gen doctor
+/image-gen generate <prompt>
+```
+
+Các capability chưa có trong build này: public OpenAI Images API fallback, mask, transparency/chroma-key và batch JSONL. Request các capability này sẽ fail trước khi generate; không có paid fallback âm thầm.
 
 ---
 
@@ -284,6 +307,7 @@ Xem hướng dẫn chi tiết ở README root repo:
 
 ```txt
 extensions/
+├── image-gen/           # experimental image_gen
 ├── web-tools/
 ├── chatgpt-usage-status/
 ├── harness/             # Pi Harness + Harness Wiki commands

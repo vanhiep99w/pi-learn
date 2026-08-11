@@ -1,8 +1,11 @@
 {
   "name": "pi-learn-extensions",
   "version": "1.0.1",
-  "description": "Pi Coding Agent extensions: Harness Wiki, web tools, ChatGPT usage status, Aurora UI, prompt-with-model, and Midnight Aurora theme.",
+  "description": "Pi Coding Agent extensions: Image Gen, Harness Wiki, web tools, ChatGPT usage status, Aurora UI, prompt-with-model, and Midnight Aurora theme.",
   "type": "module",
+  "scripts": {
+    "test:image-gen": "node --experimental-transform-types --test tests/image-gen/*.test.mts"
+  },
   "keywords": [
     "pi-package",
     "pi-extension",
@@ -38,6 +41,7 @@
   },
   "files": [
     "extensions",
+    "tests",
     "themes",
     "README.md"
   ]

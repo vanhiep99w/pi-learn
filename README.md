@@ -6,6 +6,7 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 
 ## Có gì trong package này?
 
+- `image-gen` — tool `image_gen` experimental, tạo/reference-edit ảnh bằng ChatGPT/Codex subscription và lưu asset + metadata.
 - `web-tools` — `web_search`, `web_fetch`, `tool_search`.
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
 - `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
@@ -23,6 +24,19 @@ Pi load package qua root `package.json`:
   }
 }
 ```
+
+### Image Gen experimental
+
+Implementation ban đầu đăng ký tool `image_gen` và command:
+
+```txt
+/image-gen doctor
+/image-gen generate <prompt>
+```
+
+Hiện đã có subscription generate, local references, reference-conditioned edit, variants nhỏ, output validation, non-overwrite và metadata sidecar. Cần login bằng `/login` → ChatGPT Plus/Pro (Codex). Public API fallback, mask và transparency chưa được triển khai; extension fail rõ ràng và **không phát sinh paid API call** cho các capability này.
+
+Khi ảnh sẽ được source code sử dụng, truyền `outputPath` tương đối theo workspace, ví dụ `assets/hero.png`.
 
 ## Cài đặt
 

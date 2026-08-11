@@ -69,6 +69,7 @@ Enable the included theme by setting `theme` to `midnight-aurora` in Pi settings
 
 | Area | What it does | Start here |
 |---|---|---|
+| Image Gen (experimental) | Adds `image_gen` for subscription-backed image generation/reference edits with validated workspace output; paid fallback and transparency remain unavailable. | [Extensions catalog](extensions/catalog.md#image-gen-experimental) |
 | Web tools | Adds `web_search`, `web_fetch`, and `tool_search` tools for current web/docs lookups. | [Extensions catalog](extensions/catalog.md#web-tools) |
 | ChatGPT usage | Shows ChatGPT Plus/Pro usage when the active provider is `openai-codex` or `chatgpt`. | [Extensions catalog](extensions/catalog.md#chatgpt-usage-status) |
 | Prompt templates | Creates slash commands from Markdown prompts with optional model/thinking frontmatter. | [Extensions catalog](extensions/catalog.md#prompt-with-model) |
@@ -82,6 +83,9 @@ Enable the included theme by setting `theme` to `midnight-aurora` in Pi settings
 Common package commands documented by the READMEs and extension sources include:
 
 ```txt
+/image-gen doctor
+/image-gen generate <prompt>
+
 /harness-wiki-init [note]
 /harness-wiki-update [note]
 /harness-wiki-ask <question>
