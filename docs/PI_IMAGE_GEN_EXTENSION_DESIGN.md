@@ -12,7 +12,7 @@
 
 ### Tiến độ implementation hiện tại
 
-Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, metadata sidecar, inline image result, `/image-gen doctor`, unit tests và mocked subscription tests.
+Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, metadata sidecar, inline tool-result image, direct-command preview widget, `/image-gen doctor`, unit tests và mocked subscription tests.
 
 Chưa có: live smoke validation, public API fallback, mask, chroma-key/native transparency, JSONL batch manifest, skill resource và A/B quality suite. Runtime hiện fail sớm cho capability chưa hỗ trợ; không thể phát sinh paid API fallback.
 
@@ -692,6 +692,7 @@ Namespace dự kiến:
 
 ```txt
 /image-gen generate <prompt>
+/image-gen hide
 /image-gen batch <jsonl-path>
 /image-gen info [latest|path]
 /image-gen list [count]
@@ -711,9 +712,12 @@ Namespace dự kiến:
 
 UI rules:
 
-- Guard dialog/notify bằng `ctx.hasUI`.
+- Tool result render ảnh inline khi `showImages` bật.
+- `/image-gen generate` trong TUI đặt preview widget phía trên editor; `/image-gen hide` đóng preview.
+- Terminal phải hỗ trợ inline image (Kitty/Ghostty/WezTerm/Warp); nếu không, `Image` component hiện fallback placeholder/path.
+- Guard dialog/notify/widget bằng `ctx.hasUI` và TUI-only image widget bằng `ctx.mode === "tui"`.
 - Print/JSON mode phải có text result thay vì silent return.
-- V1 không khởi động server, timer hoặc watcher nền.
+- Clear preview widget trong `session_shutdown`; V1 không khởi động server, timer hoặc watcher nền.
 - Nếu sau này thêm resource dài hạn, cleanup trong `session_shutdown`.
 
 ## 17. Config

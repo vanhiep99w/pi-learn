@@ -88,7 +88,10 @@ Command:
 ```txt
 /image-gen doctor
 /image-gen generate <prompt>
+/image-gen hide
 ```
+
+Tool result hiển thị ảnh inline khi `terminal.showImages` được bật. `/image-gen generate` hiển thị preview phía trên editor; dùng `/image-gen hide` để đóng. Terminal cần hỗ trợ inline image, ví dụ Kitty, Ghostty, WezTerm hoặc Warp; terminal không hỗ trợ sẽ hiện placeholder/path.
 
 `/image-gen generate` chạy trực tiếp nên nếu không có `outputPath` thì lưu ở folder hiện tại. Khi gọi qua hội thoại, agent được hướng dẫn inspect project và chọn folder ảnh phù hợp như `public/images`, `assets/images` hoặc convention đã tồn tại.
 

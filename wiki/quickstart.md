@@ -85,6 +85,7 @@ Common package commands documented by the READMEs and extension sources include:
 ```txt
 /image-gen doctor
 /image-gen generate <prompt>
+/image-gen hide
 
 /harness-wiki-init [note]
 /harness-wiki-update [note]

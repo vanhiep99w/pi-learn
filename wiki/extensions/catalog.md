@@ -6,13 +6,14 @@ Public Pi extension and theme source lives under `packages/pi-learn-extensions/`
 
 Source: `packages/pi-learn-extensions/extensions/image-gen/`; tests: `packages/pi-learn-extensions/tests/image-gen/`
 
-The initial implementation registers tool `image_gen` and command namespace `/image-gen`. It resolves OAuth only through `ctx.modelRegistry.getProviderAuth("openai-codex")`, calls the experimental ChatGPT Codex Responses image tool, validates PNG/JPEG/WebP output, saves images non-destructively through Pi's file mutation queue, writes redacted metadata sidecars, and returns generated images inline.
+The initial implementation registers tool `image_gen` and command namespace `/image-gen`. It resolves OAuth only through `ctx.modelRegistry.getProviderAuth("openai-codex")`, calls the experimental ChatGPT Codex Responses image tool, validates PNG/JPEG/WebP output, saves images non-destructively through Pi's file mutation queue, writes redacted metadata sidecars, and renders generated images inline. Direct `/image-gen generate` calls place an image preview widget above the editor until `/image-gen hide`, replacement, reload, or shutdown.
 
 Implemented command surface:
 
 ```txt
 /image-gen doctor
 /image-gen generate <prompt>
+/image-gen hide
 ```
 
 Current scope includes subscription generate, explicit reference roles, reference-conditioned edit, and small variant batches with bounded concurrency. The agent is instructed to inspect existing project image conventions and pass a suitable project-relative `outputPath`; without one, output falls back to the current workspace root (`ctx.cwd`). Public API billing fallback, masks, transparency/chroma-key processing, and JSONL batch commands are deliberately unavailable; capability checks fail before generation and no paid fallback can occur in this build.
