@@ -3,7 +3,7 @@ import path from "node:path";
 import { atomicWriteFile, ensureDir } from "../storage/atomic-write.js";
 import { projectCacheDir, resolveHarnessHome } from "../storage/harness-home.js";
 
-export function generateProjectReport({ project, results, analysisRun, generatedAt = new Date() }) {
+export function generateProjectReport({ project, results, analysisRun, findingsProjection, generatedAt = new Date() }) {
   const totals = createEmptyTotals();
   const toolFailures = new Map();
   const bashFailures = [];
@@ -87,7 +87,16 @@ export function generateProjectReport({ project, results, analysisRun, generated
   lines.push(`- Redacted events: ${totals.safety.redactedEvents}`);
   lines.push(`- Sensitive path events: ${totals.safety.sensitivePathEvents}`);
   lines.push(`- Estimated cost: ${formatNumber(totals.usage.costTotal)}`);
+  if (findingsProjection) {
+    lines.push(`- Findings ledger: ${findingsProjection.status} at revision ${findingsProjection.ledgerRevision}`);
+    lines.push(`- Findings: ${findingsProjection.counts.total} total, ${findingsProjection.counts.active} active, ${findingsProjection.counts.completed} completed`);
+  }
   lines.push("");
+
+  if (findingsProjection?.markdown) {
+    lines.push(findingsProjection.markdown.trimEnd());
+    lines.push("");
+  }
 
   lines.push("## Sessions");
   lines.push("| Session | Events | Turns | Tool calls | Tool errors | Bash failures | Warnings |");
@@ -156,8 +165,10 @@ export function generateProjectReport({ project, results, analysisRun, generated
   }
   lines.push("");
 
-  lines.push("## Next Phase Gate");
-  lines.push("Phase 5 rules/proposals should start only after this report and `inspect --entry --full` are stable on recent real sessions.");
+  lines.push("## Report Evidence Boundary");
+  lines.push("- Session metrics and diagnostics come from the frozen normalized report population.");
+  lines.push("- The Findings section is a reader-safe presentation of the caller-supplied private canonical ledger; report generation does not infer findings or evidence states from session counts.");
+  lines.push("- This private operational report is not a shareable export. The Findings section itself omits private locators, raw evidence, prompts, and commands.");
   lines.push("");
 
   return lines.join("\n");

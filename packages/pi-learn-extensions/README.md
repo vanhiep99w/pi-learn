@@ -127,7 +127,8 @@ Harness đọc Pi session logs đã redact/normalize để tạo report, proposa
 ```txt
 ~/.pi/harness/projects/<project-key>/
 ├── sessions/<session-id>/       # manifest/events/metrics/warnings
-├── reports/latest.md
+├── findings/                    # canonical latest/history ledger, owner-only
+├── reports/latest.md            # gồm reader-safe Findings projection
 ├── reflections/latest.md
 ├── proposals/draft/P-0001-*.md
 └── evals/latest.md
@@ -144,7 +145,7 @@ Mặc định dashboard dùng **5 session gần nhất**. Có thể truyền s�
 
 | Command | Tác dụng | Ví dụ |
 |---|---|---|
-| `/harness [last]` | Gộp status, session gần đây, warning, automation và report Markdown vào một dashboard modal có scroll. | `/harness` hoặc `/harness 10` |
+| `/harness [last]` | Gộp status, session gần đây, warning, Findings ledger, automation và report Markdown vào một dashboard modal có scroll. Header hiển thị tổng/active findings; body dùng đúng Markdown projection của runtime. | `/harness` hoặc `/harness 10` |
 | `/harness-improve [last]` | Gửi reflection prompt vào model hiện tại; model phải gọi tool import để tạo draft proposals. | Cách chính để tạo proposal bằng LLM. |
 | `/harness-proposals` | Workflow review duy nhất: chọn proposal, xem chi tiết, approve/reject hoặc approve & apply với bước xác nhận. | Sau `/harness-improve`. |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu proposal có JSON Patch machine-readable. | `/harness-apply P-0001` |

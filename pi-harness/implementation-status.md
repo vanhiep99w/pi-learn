@@ -2,7 +2,7 @@
 
 > **Canonical completed/remaining tracker.** Use this page for the current Better Harness slice status, publication state, evidence, risks, and next decision. The design contracts remain in the linked source-of-truth documents below.
 
-**Snapshot:** Slice 3 was published in `35cf1c1976a75467583ad4557ba0287325981441`, Project Evidence was published at `a8e7701289819395875be693d37105971d7c6f29`, the Agent Asset Evidence Lane was published at `f67cea8`, and Evidence State + Findings was published at `4dd6026`. The bounded proposal-to-finding linkage slice below is the current uncommitted working-tree candidate based on `4dd6026`.
+**Snapshot:** Slice 3 was published in `35cf1c1976a75467583ad4557ba0287325981441`, Project Evidence was published at `a8e7701289819395875be693d37105971d7c6f29`, the Agent Asset Evidence Lane was published at `f67cea8`, Evidence State + Findings was published at `4dd6026`, and proposal-to-finding linkage was published at `fbeeb99`. The Findings-backed Markdown/Pi TUI projection below is the current uncommitted working-tree candidate based on `fbeeb99`.
 
 ## Status at a glance
 
@@ -16,7 +16,8 @@
 | Full workspace/owner topology | **Incomplete** | Existing `analysisRun()` target remains route-only | Project Evidence can identify an npm workspace member for evidence scoping, but no complete owner graph, apply binding, or sibling-owner rejection exists. | Do not claim full topology from the member hint. | Scope separately only if evidence justifies it. |
 | Agent Asset Evidence Lane | **Completed — published** | `f67cea8` | `agentAssets(options)` returns a reader-safe `pi-harness.agent-assets` projection for applicable instructions, project model prompts, and explicitly declared project-local skills/extensions/config. Focused fixtures cover discovery, ancestry, scope separation, malformed/oversized/symlinked assets, bounded declarations, and empty surfaces. | Presence/configuration only; no user-home/MCP/external package roots, raw/private evidence, content projection, or selection/use/exercise/outcome claim. Full workspace/owner topology and broader asset types remain out of scope. | Preserve this independent project-only lane. |
 | P1 — Evidence State + Findings ledger | **Completed — published** | `4dd6026` | Exact seven-state constants/normalization, schema-1 `F-####` validation, deterministic dedupe, revisioned latest/history persistence, owner-only private storage, fail-closed tamper handling, and reader-safe projection were verified by focused findings fixtures. | Caller-supplied only: no detector inference, score, session/asset reads, report/TUI, validation receipts, automation, or UI. Proposal refs do not promote finding state. | Preserve this independent ledger while linkage remains explicit. |
-| P1 — Proposal-to-finding linkage | **Implemented — current uncommitted candidate** | Based on `4dd6026`; local working tree, no commit/push | Optional finding ID/revision frontmatter, legacy compatibility, exact finding revision validation at approval and immediately before apply, stable missing/stale/invalid error codes, safe proposal summaries/history, and non-mutating rejection are covered by focused linkage fixtures. | Caller-supplied binding only: no finding creation, detector inference, state promotion, validation receipts, applied-vs-verified state, report/TUI, automation, or UI. | Review this bounded linkage candidate before findings-backed projections. |
+| P1 — Proposal-to-finding linkage | **Completed — published** | `fbeeb99` | Optional finding ID/revision frontmatter, legacy compatibility, exact finding revision validation at approval and immediately before apply, stable missing/stale/invalid error codes, safe proposal summaries/history, and non-mutating rejection are covered by focused linkage fixtures. | Caller-supplied binding only: no finding creation, detector inference, state promotion, validation receipts, applied-vs-verified state, or automation. | Preserve exact revision binding while later repair-state slices build on it. |
+| Phase F — Findings-backed Markdown/Pi TUI projection | **Implemented — current uncommitted candidate** | Based on `fbeeb99`; local working tree, no commit/push | `createFindingsProjection()` validates/re-redacts the reader ledger, produces bounded lifecycle/evidence/owner/acceptance/proposal Markdown, and `report()` embeds the exact projection returned to `/harness`. Focused and full runtime suites pass (216 tests), extension entrypoint loading succeeds, and the stale report phase gate is removed. | Presentation only: the ledger remains caller-supplied/canonical. No finding inference, scores, proposal-state lookup, validation receipts, applied-vs-verified transition, dedicated `/harness-findings`, or shareable whole-report export. At most 64 rows render, with explicit omission counts. | Review/publish this bounded projection, then scope structured validation receipts separately. |
 
 ## What is implemented in the Project Harness Evidence Lane
 
@@ -49,21 +50,21 @@ The candidate never reads user-home assets, undocumented MCP or external package
 
 ### Next implementation decision
 
-Review the current bounded P1 proposal-to-finding linkage candidate next. Keep workspace/owner topology, findings-backed projections, validation receipts, and verified repair as separate follow-up decisions. Static project/agent asset presence remains inventory evidence and is never promoted into a finding automatically.
+Review the current bounded Findings-backed Markdown/Pi TUI projection candidate next. Keep workspace/owner topology, validation receipts, and verified repair as separate follow-up decisions. Static project/agent asset presence remains inventory evidence and is never promoted into a finding automatically.
 
 ### P1 — Findings and verified repair
 
-The published base implements items 1–2:
+The published base implements items 1–3:
 
 1. Evidence states: `Present`, `Wired`, `Exercised`, `Outcome-supported`, `Missing`, `Unobserved`, and `Not-applicable`.
 2. A caller-supplied Findings ledger with stable finding identity and evidence/owner/acceptance fields.
-
-The current uncommitted candidate implements item 3 only:
-
 3. Proposal-to-finding linkage, including revision binding and legacy proposal compatibility.
 
-Remaining P1 work is deliberately separate:
+The current uncommitted candidate implements item 4 only:
+
 4. Findings-backed Markdown and Pi TUI projections.
+
+Remaining P1 work is deliberately separate:
 5. Structured validation receipts from reviewed/allowlisted validation routes.
 6. Explicit applied-versus-verified state, including partial/blocked outcomes.
 7. Stale revision/workspace protection.
@@ -122,11 +123,11 @@ git diff HEAD -- 'wiki/**/_rules.md'  → empty
 
 It contains no detector/finding generation, proposal linkage, report/TUI projection, validation receipt, automation, extension UI, session read, user-home asset read, or private evidence import.
 
-### Current P1 proposal-to-finding linkage candidate
+### Published P1 proposal-to-finding linkage
 
-The current local slice adds optional `finding_id` and `expected_finding_revision` fields to proposal render/read, validates explicit bindings against the private Findings ledger at approval and immediately before apply, preserves legacy proposals without a binding, and keeps rejection non-mutating. Stable failure codes are `PROPOSAL_FINDING_INVALID`, `PROPOSAL_FINDING_MISSING`, and `PROPOSAL_FINDING_REVISION_STALE`. Public proposal summaries, lifecycle responses, and history projections omit private paths, raw session references, and evidence content.
+Published commit `fbeeb99` adds optional `finding_id` and `expected_finding_revision` fields to proposal render/read, validates explicit bindings against the private Findings ledger at approval and immediately before apply, preserves legacy proposals without a binding, and keeps rejection non-mutating. Stable failure codes are `PROPOSAL_FINDING_INVALID`, `PROPOSAL_FINDING_MISSING`, and `PROPOSAL_FINDING_REVISION_STALE`. Public proposal summaries, lifecycle responses, and history projections omit private paths, raw session references, and evidence content.
 
-The candidate verification record includes:
+Its verification record includes:
 
 ```txt
 node --test packages/harness-runtime/tests/proposal-findings-linkage.test.js packages/harness-runtime/tests/proposal-writer.test.js packages/harness-runtime/tests/proposal-lifecycle.test.js
@@ -136,14 +137,31 @@ git diff --check
 git diff HEAD -- 'wiki/**/_rules.md'  → empty
 ```
 
-It deliberately contains no automatic finding creation/inference, finding state or revision mutation, findings report/TUI projection, validation receipts, applied-vs-verified state, automation, or extension UI.
+It deliberately contains no automatic finding creation/inference, finding state or revision mutation, validation receipts, applied-vs-verified state, or automation.
+
+### Current Phase F Findings-backed report candidate
+
+The current local slice adds `src/findings/projection.js`, which accepts only the reader-safe canonical ledger envelope, revalidates/re-redacts its records, computes lifecycle/evidence counts without a score, orders active before completed findings, and emits bounded Markdown with explicit omission diagnostics. `report()` reads the ledger once and returns/embeds the exact `pi-harness.findings-projection`; `/harness` renders that same Markdown and adds total/active counts to its TUI header without a second analysis path. Empty ledgers and `Missing` evidence remain explicit non-outcome states. The old `Next Phase Gate` text is replaced by a current evidence-boundary section.
+
+The candidate verification record includes:
+
+```txt
+node --test packages/harness-runtime/tests/findings-projection.test.js packages/harness-runtime/tests/findings.test.js packages/harness-runtime/tests/api.test.js
+npm --prefix packages/harness-runtime test  # 216 passed
+pi --no-extensions -e ./packages/pi-learn-extensions/extensions/harness/index.ts --list-models
+node --check on changed JavaScript
+git diff --check
+git diff HEAD -- 'wiki/**/_rules.md'  → empty
+```
+
+It deliberately contains no finding generation/inference, score, proposal status lookup, validation receipt, applied-versus-verified state transition, dedicated Findings command, automation wiring, or shareable whole-report export. The canonical private ledger is unchanged.
 
 ## Scope boundaries and non-goals
 
 - No raw sessions, normalized private evidence, auth data, `.env`, payload logs, or private Harness artifacts are stored in the repository.
 - No `wiki/**/_rules.md` file is edited by this tracker task.
 - No automatic commit, push, merge, force-push, deploy, or apply is implied.
-- Project and Agent Asset Evidence remain static mechanism inventories, not test runners, CI clients, acceptance checkers, or automatic finding generators. The Findings API and proposal linkage store/validate only caller-supplied records and do not infer findings from either lane or session counts.
+- Project and Agent Asset Evidence remain static mechanism inventories, not test runners, CI clients, acceptance checkers, or automatic finding generators. The Findings API and proposal linkage store/validate only caller-supplied records; the report/TUI projection reads that canonical ledger and does not infer findings from either lane or session counts.
 - No full workspace topology, broader undocumented asset lane, LLM semantic grouping, or semantic one-goal Task Episode claim is made.
 - Static script/CI/documentation/ownership presence does not prove agent read/use, exercise, pass, acceptance, repair verification, or later improvement.
 

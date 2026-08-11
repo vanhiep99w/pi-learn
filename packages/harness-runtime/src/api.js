@@ -26,6 +26,7 @@ import { approveProposal, applyProposal, readProposalHistory, rejectProposal, ro
 import { resolveProject } from "./project/resolve-project.js";
 import { pathExists, resolvePath } from "./utils/path.js";
 import { readFindingsLedger, writeFindingsLedger } from "./findings/ledger.js";
+import { createFindingsProjection } from "./findings/projection.js";
 import { EVIDENCE_STATES, EvidenceState, isEvidenceState, normalizeEvidenceState } from "./findings/evidence-states.js";
 
 const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -216,7 +217,14 @@ export async function report(options = {}) {
     const run = resolveAnalysisRun({ options, config, project, logger });
     const consumed = await consumeAnalysisRun({ analysisRun: run, config, project, logger, consumer: "report" });
     const now = new Date();
-    const markdown = generateProjectReport({ project, results: consumed.results, analysisRun: consumed.analysisRun, generatedAt: now });
+    const findingsProjection = createFindingsProjection(readFindingsLedger({ config, project }));
+    const markdown = generateProjectReport({
+      project,
+      results: consumed.results,
+      analysisRun: consumed.analysisRun,
+      findingsProjection,
+      generatedAt: now,
+    });
     const reportPaths = writeProjectReport({ config, project, markdown, now });
     logger.info("report_generated", "Markdown report generated", { component: "report", projectKey: project.projectKey, data: { latestPath: reportPaths.latestPath, datedPath: reportPaths.datedPath, sessions: consumed.results.length, runId: run.runId } });
     end(logger, project, { sessionsReported: consumed.results.length, reportPath: reportPaths.latestPath, runId: run.runId });
@@ -224,6 +232,7 @@ export async function report(options = {}) {
       ...runPopulationOutput({ project, config, sources, run: consumed.analysisRun }),
       count: consumed.results.length,
       report: reportPaths,
+      findings: findingsProjection,
       results: consumed.results.map(publicScanResult),
       warnings: [...run.warnings, ...consumed.warnings],
     };

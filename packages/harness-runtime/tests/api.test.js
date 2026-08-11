@@ -171,6 +171,9 @@ test("api report writes latest Markdown report", async () => {
   assert.match(markdown, new RegExp(output.analysisRun.runId));
   assert.match(markdown, new RegExp(output.analysisRun.selection.selectedFingerprint));
   assert.match(markdown, /Frozen scope: selected 1, accepted 1, skipped 0/);
+  assert.equal(output.findings.kind, "pi-harness.findings-projection");
+  assert.equal(output.findings.counts.total, 0);
+  assert.ok(markdown.includes(output.findings.markdown.trimEnd()));
   assert.equal(output.sessions[0].sessionId, "s1");
   assert.equal(output.analysisRun.selection.selectedFingerprint.length, 64);
   assert.doesNotThrow(() => JSON.stringify(output));
