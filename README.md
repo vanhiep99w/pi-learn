@@ -25,6 +25,12 @@ Pi load package qua root `package.json`:
 }
 ```
 
+## Code review tự động cho PR
+
+Workflow `.github/workflows/ocr-review.yml` chạy OpenCodeReview khi pull request được mở hoặc cập nhật. Thành viên repository cũng có thể yêu cầu review lại bằng comment `/open-code-review` trên PR.
+
+Workflow cần hai repository secrets (`OCR_LLM_URL`, `OCR_LLM_AUTH_TOKEN`) và hai repository variables (`OCR_LLM_MODEL`, `OCR_LLM_USE_ANTHROPIC`) trong GitHub Actions.
+
 ### Image Gen experimental
 
 Implementation ban đầu đăng ký tool `image_gen` và command:
