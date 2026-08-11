@@ -96,6 +96,8 @@ export default function harnessExtension(pi: ExtensionAPI) {
           projectName: sessionsOutput?.project?.projectKey ?? "current project",
           sessionCount: sessionsOutput?.sessions?.length ?? 0,
           warningCount: countHarnessWarnings(reportOutput?.results ?? [], reportOutput?.warnings ?? []),
+          findingCount: reportOutput?.findings?.counts?.total ?? 0,
+          activeFindingCount: reportOutput?.findings?.counts?.active ?? 0,
           automationAllowed: Boolean(automationOutput?.status?.allowed),
         });
       } else if (ctx.hasUI && ctx.ui?.editor) {
@@ -249,6 +251,7 @@ function formatHarnessDashboard({
   const warningCount = countHarnessWarnings(results, topLevelWarnings);
   const automation = automationOutput?.status;
   const analysisRun = reportOutput?.analysisRun;
+  const findings = reportOutput?.findings;
   const recentWarnings = [
     ...topLevelWarnings.map((warning: any) => ({
       sessionId: warning.sessionId,
@@ -270,6 +273,7 @@ function formatHarnessDashboard({
     `- **Session gần đây:** **${sessions.length}/${last}**`,
     `- **Analysis run:** **${markdownInline(analysisRun?.laneStatus?.consumer ?? "unknown")}** — ${markdownCode(analysisRun?.runId ?? "unknown")} · ${markdownCode(analysisRun?.selection?.selectedFingerprint ?? "unknown")}`,
     `- **Warnings:** **${warningCount}**`,
+    `- **Findings:** **${findings?.counts?.total ?? 0}** total · **${findings?.counts?.active ?? 0}** active · ledger **${markdownInline(findings?.status ?? "empty")}**`,
     `- **Automation:** **${automation?.allowed ? "allowed" : "disabled/skipped"}** — ${markdownInline(automation?.reason ?? "unknown")}`,
     `- **Report:** ${markdownCode(reportPath)}`,
     "",
@@ -297,6 +301,8 @@ async function showHarnessDashboard(
     projectName: string;
     sessionCount: number;
     warningCount: number;
+    findingCount: number;
+    activeFindingCount: number;
     automationAllowed: boolean;
   },
 ) {
@@ -310,6 +316,7 @@ async function showHarnessDashboard(
     panel.addChild(new Text([
       theme.fg("muted", `${options.sessionCount}/${options.last} sessions`),
       theme.fg(options.warningCount ? "warning" : "success", `${options.warningCount} warnings`),
+      theme.fg(options.activeFindingCount ? "warning" : "dim", `${options.findingCount} findings / ${options.activeFindingCount} active`),
       theme.fg(options.automationAllowed ? "success" : "dim", `automation ${options.automationAllowed ? "allowed" : "off"}`),
     ].join(theme.fg("dim", "  •  ")), 0, 0));
 

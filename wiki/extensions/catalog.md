@@ -53,7 +53,7 @@ Change guidance:
 
 Source: `packages/pi-learn-extensions/extensions/harness/index.ts`; runtime: `packages/harness-runtime/`
 
-The Harness extension is the single public entrypoint for session observability, improvement workflows, and Harness Wiki repository knowledge. `/harness [last]` combines status and the generated Markdown report in one scrollable dashboard modal. Core parsing/report/proposal behavior is delegated to the runtime API; Wiki orchestration lives in `harness/wiki-commands.ts` and `harness/wiki-prompt.ts`.
+The Harness extension is the single public entrypoint for session observability, improvement workflows, and Harness Wiki repository knowledge. `/harness [last]` combines status, the canonical Findings reader projection, and the generated Markdown report in one scrollable dashboard modal. Its header shows total/active finding counts and its body renders the exact bounded Findings Markdown emitted by the runtime, so the Pi TUI does not re-analyze or infer ledger state. Core parsing/report/proposal behavior is delegated to the runtime API; Wiki orchestration lives in `harness/wiki-commands.ts` and `harness/wiki-prompt.ts`.
 
 Recommended commands include:
 
@@ -69,6 +69,8 @@ Recommended commands include:
 /harness-wiki-update [extra instructions]
 /harness-wiki-ask <question>
 ```
+
+The Findings projection displays exact caller-supplied lifecycle/evidence states, confidence, impact, expected outcome, smallest owner, acceptance checks, linked proposal IDs, and reader-safe evidence-ref counts. Active records appear before completed records without a score; zero findings and `Missing` remain explicit non-outcome states. Presentation is bounded to 64 rows with an omission notice, while private `findings/latest.json` and `history.jsonl` remain canonical.
 
 In TUI mode, `/harness-proposals` is the only proposal-review workflow. Selecting a proposal opens its details and the approve, reject, or approve-and-apply actions immediately; there is no separate detail action. The detail pane has a fixed viewport: use `↑/↓` for incremental scrolling, `PgUp`/`PgDn` or `Ctrl+U/D` for larger jumps, and `←/→` to change actions. Actions remain visible inside the modal. A proposal with a JSON Patch exposes `Approve & Apply`; an already approved proposal exposes `Apply`. Approve, reject, and apply remain runtime operations invoked by the modal or `/harness-apply`, not separate approve/reject slash commands. Print/JSON mode only prints the proposal list.
 

@@ -281,7 +281,7 @@ Mặc định dashboard dùng **5 session gần nhất**; có thể truyền s�
 
 | Command | Tác dụng |
 |---|---|
-| `/harness [last]` | Gộp status, session gần đây, warning, automation và report Markdown vào một dashboard modal. |
+| `/harness [last]` | Gộp status, session gần đây, warning, Findings ledger, automation và report Markdown vào một dashboard modal; header hiển thị tổng/active findings. |
 | `/harness-improve [last]` | Gửi prompt vào model hiện tại; model gọi `harness_import_llm_reflection` để tạo draft proposals. |
 | `/harness-proposals` | Workflow review duy nhất: chọn proposal, xem chi tiết, approve/reject hoặc approve & apply với bước xác nhận. |
 | `/harness-apply P-0001` | Apply proposal đã approve nếu có JSON Patch. Không auto-push. |
@@ -290,6 +290,7 @@ Mặc định dashboard dùng **5 session gần nhất**; có thể truyền s�
 
 Ghi chú:
 
+- Findings trong `/harness` là reader-safe projection từ private canonical ledger; dashboard không tự suy luận finding/state từ session counts và không tạo maturity score.
 - `/harness-improve` chỉ dùng normalized evidence, không đọc raw session logs.
 - Reflection prompt có target routing guide để model chọn đúng `memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`.
 - `harness_import_llm_reflection` là tool nội bộ cho model gọi sau `/harness-improve`; người dùng thường không cần gọi tay.

@@ -2024,9 +2024,9 @@ coi là confirmed redaction/policy defect.
 
 ### 29.4 Stale report phase copy
 
-Current report vẫn có `Next Phase Gate` nói rule/proposal phase nên bắt đầu sau,
-trong khi phase đó đã implemented. Report contract mới phải lấy current state từ
-canonical owner hoặc bỏ phase copy khỏi runtime report.
+Phase F Findings-backed report candidate đã bỏ `Next Phase Gate` lỗi thời và thay
+bằng evidence-boundary text lấy Findings từ canonical reader ledger. Không thêm
+phase copy tĩnh trở lại runtime report.
 
 ### 29.5 Multiple discovery passes
 
