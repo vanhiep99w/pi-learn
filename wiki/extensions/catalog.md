@@ -6,7 +6,7 @@ Public Pi extension and theme source lives under `packages/pi-learn-extensions/`
 
 Source: `packages/pi-learn-extensions/extensions/image-gen/`; tests: `packages/pi-learn-extensions/tests/image-gen/`
 
-The initial implementation registers tool `image_gen` and command namespace `/image-gen`. It resolves OAuth only through `ctx.modelRegistry.getProviderAuth("openai-codex")`, calls the experimental ChatGPT Codex Responses image tool, validates PNG/JPEG/WebP output, saves images non-destructively through Pi's file mutation queue, writes redacted metadata sidecars, and renders generated images inline. Direct `/image-gen generate` calls place an image preview widget above the editor until `/image-gen hide`, replacement, reload, or shutdown.
+The initial implementation registers tool `image_gen` and command namespace `/image-gen`. It resolves OAuth only through `ctx.modelRegistry.getProviderAuth("openai-codex")`, calls the experimental ChatGPT Codex Responses image tool, validates PNG/JPEG/WebP output, saves images non-destructively through Pi's file mutation queue, writes redacted metadata under `~/.pi/agent/image-gen/metadata/<project-key>/`, and renders generated images inline. Direct `/image-gen generate` calls place an image preview widget above the editor until `/image-gen hide`, replacement, reload, or shutdown.
 
 Implemented command surface:
 
@@ -22,7 +22,7 @@ Change guidance:
 
 - Preserve provider credential resolution through Pi; do not read auth files or log requests containing data URLs.
 - Keep credential-bearing fetches pinned to `https://chatgpt.com` with redirects disabled.
-- Keep non-overwrite behavior, sidecar redaction, input/output size limits, and backend capability checks deterministic.
+- Keep non-overwrite behavior, global metadata redaction/permissions, input/output size limits, and backend capability checks deterministic.
 - Run `npm --prefix packages/pi-learn-extensions run test:image-gen`, load the entrypoint, then use `/reload` for interactive verification.
 
 ## Web tools

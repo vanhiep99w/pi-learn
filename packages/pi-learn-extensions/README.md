@@ -81,6 +81,7 @@ Tool `image_gen` hiện hỗ trợ bước triển khai ban đầu:
 - agent chọn `outputPath` theo folder/convention phù hợp trong project; nếu bỏ trống thì lưu tại workspace root (`ctx.cwd`)
 - non-overwrite mặc định
 - validate PNG/JPEG/WebP và alpha; dimension mismatch từ private subscription backend được lưu với warning thay vì làm mất ảnh hợp lệ
+- metadata JSON lưu private tại `~/.pi/agent/image-gen/metadata/<project-key>/`, không tạo `.png.json` cạnh asset
 - trả ảnh inline để model kiểm tra ở turn tiếp theo
 
 Command:

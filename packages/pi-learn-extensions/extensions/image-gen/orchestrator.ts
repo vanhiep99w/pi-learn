@@ -17,7 +17,7 @@ import { validateGeneratedImage } from "./image/validate.ts";
 import { compilePrompt } from "./prompt-compiler.ts";
 import type { ImageGenInput } from "./schema.ts";
 import { saveImageWithMetadata, type ImageMetadata, type ImageValidationMetadata } from "./storage/metadata.ts";
-import { inferOutputFormat, resolveOutputPaths, stripLeadingAt } from "./storage/paths.ts";
+import { inferOutputFormat, resolveMetadataPath, resolveOutputPaths, stripLeadingAt } from "./storage/paths.ts";
 
 const MAX_INPUT_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUBSCRIPTION_CONCURRENCY = 2;
@@ -151,7 +151,14 @@ export async function runImageGen(
       warnings: imageWarnings,
       fallbackUsed,
     };
-    metadataPaths.push(await saveImageWithMetadata(outputPaths[index], bytes, metadata, input.overwrite === true));
+    const metadataPath = resolveMetadataPath(ctx.cwd, outputPaths[index], batchId, index);
+    metadataPaths.push(await saveImageWithMetadata(
+      outputPaths[index],
+      metadataPath,
+      bytes,
+      metadata,
+      input.overwrite === true,
+    ));
     inlineImages.push({ type: "image", data: result.base64, mimeType: inspected.mimeType });
   }
 
@@ -287,7 +294,7 @@ function isCompatibleDispatcher(model: any, needsImageInput: boolean): boolean {
 async function assertNoUnexpectedOverwrite(paths: string[], overwrite: boolean): Promise<void> {
   if (overwrite) return;
   for (const path of paths) {
-    if ((await exists(path)) || (await exists(`${path}.json`))) {
+    if (await exists(path)) {
       throw new ImageGenOutputError(`Refusing to overwrite existing output: ${path}. Set overwrite=true or choose another outputPath.`);
     }
   }

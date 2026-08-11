@@ -12,7 +12,7 @@
 
 ### Tiến độ implementation hiện tại
 
-Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, dimension-mismatch warning/preservation, metadata sidecar, inline tool-result image, direct-command preview widget, `/image-gen doctor`, unit tests và mocked subscription tests.
+Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, dimension-mismatch warning/preservation, private global metadata records, inline tool-result image, direct-command preview widget, `/image-gen doctor`, unit tests và mocked subscription tests.
 
 Chưa có: live smoke validation, public API fallback, mask, chroma-key/native transparency, JSONL batch manifest, skill resource và A/B quality suite. Runtime hiện fail sớm cho capability chưa hỗ trợ; không thể phát sinh paid API fallback.
 
@@ -167,7 +167,7 @@ packages/pi-learn-extensions/
 │       │   └── mime.ts
 │       ├── storage/
 │       │   ├── paths.ts             # output path policy
-│       │   └── metadata.ts          # sidecars/index
+│       │   └── metadata.ts          # private global metadata records/index
 │       ├── config.ts
 │       └── errors.ts
 ├── skills/
@@ -436,7 +436,7 @@ Payload lõi:
 }
 ```
 
-Quan sát runtime: private subscription endpoint đôi khi bỏ qua `size` trong image tool và trả một kích thước hợp lệ khác, ví dụ request `1024x1024` nhưng nhận `1536x1024`. Vì ảnh đã được tạo và hợp lệ, subscription path không discard asset: lưu theo kích thước thực tế, đặt `validation.dimensions=false`, ghi warning trong sidecar/tool result. MIME và alpha validation vẫn strict. Agent dùng `size=auto` khi người dùng/layout không bắt buộc kích thước cụ thể. Public API backend sau này vẫn có thể giữ strict dimension validation.
+Quan sát runtime: private subscription endpoint đôi khi bỏ qua `size` trong image tool và trả một kích thước hợp lệ khác, ví dụ request `1024x1024` nhưng nhận `1536x1024`. Vì ảnh đã được tạo và hợp lệ, subscription path không discard asset: lưu theo kích thước thực tế, đặt `validation.dimensions=false`, ghi warning trong metadata/tool result. MIME và alpha validation vẫn strict. Agent dùng `size=auto` khi người dùng/layout không bắt buộc kích thước cụ thể. Public API backend sau này vẫn có thể giữ strict dimension validation.
 
 Dispatcher model selection:
 
@@ -635,7 +635,15 @@ Nếu `outputPath` được cung cấp:
 
 ### 14.3 Metadata
 
-Mỗi ảnh có sidecar:
+Metadata không nằm cạnh asset. Mỗi generation ghi một JSON record private dưới global Pi home:
+
+```txt
+~/.pi/agent/image-gen/metadata/<project-name>-<project-hash>/<image-name>-<batch-id>-<index>.json
+```
+
+Folder metadata dùng permission riêng tư; record không overwrite record cũ, kể cả khi asset được generate lại với `overwrite=true`. `details.metadataPaths` trả đường dẫn record tương ứng. Các `.png.json` từ version cũ không được tự động migrate và có thể xóa nếu không cần.
+
+Schema record:
 
 ```json
 {
@@ -852,7 +860,7 @@ Không cần auth/network:
 - Retry và `Retry-After`.
 - Abort giữa stream.
 - Batch partial success.
-- File mutation và sidecar consistency.
+- File mutation và global metadata consistency.
 - Inline Pi image result shape.
 
 Fixtures không chứa live token hoặc ảnh riêng tư.
@@ -960,7 +968,7 @@ Mỗi event có:
 - Output byte size.
 - Error category đã redact.
 
-Không emit prompt đầy đủ mặc định vào console. Prompt chỉ nằm trong local sidecar khi người dùng tạo ảnh và có thể tắt bằng config sau này.
+Không emit prompt đầy đủ mặc định vào console. Prompt chỉ nằm trong private global metadata record khi người dùng tạo ảnh và có thể tắt bằng config sau này.
 
 ## 23. Licensing và provenance
 

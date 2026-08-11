@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { extname, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, extname, isAbsolute, join, resolve, sep } from "node:path";
 import { ImageGenInputError } from "../errors.ts";
 import type { ImageOutputFormat } from "../schema.ts";
 
@@ -55,6 +56,23 @@ export function inferOutputFormat(outputPath: string | undefined): ImageOutputFo
   if (!outputPath) return;
   const extension = extname(stripLeadingAt(outputPath.trim())).toLowerCase();
   return formatForExtension(extension);
+}
+
+export function resolveMetadataPath(cwd: string, savedPath: string, batchId: string, index: number): string {
+  const canonicalCwd = resolve(cwd);
+  const projectName = slugify(basename(canonicalCwd) || "project");
+  const projectHash = createHash("sha256").update(canonicalCwd).digest("hex").slice(0, 12);
+  const imageName = slugify(basename(savedPath));
+  const generationId = batchId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 16) || "generation";
+  return join(
+    homedir(),
+    ".pi",
+    "agent",
+    "image-gen",
+    "metadata",
+    `${projectName}-${projectHash}`,
+    `${imageName}-${generationId}-${index + 1}.json`,
+  );
 }
 
 export function stripLeadingAt(value: string): string {

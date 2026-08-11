@@ -38,25 +38,29 @@ export type ImageMetadata = {
 
 export async function saveImageWithMetadata(
   savedPath: string,
+  metadataPath: string,
   data: Uint8Array,
   metadata: ImageMetadata,
   overwrite: boolean,
 ): Promise<string> {
-  const metadataPath = `${savedPath}.json`;
-
   return withFileMutationQueue(savedPath, async () => {
-    await mkdir(dirname(savedPath), { recursive: true });
+    await Promise.all([
+      mkdir(dirname(savedPath), { recursive: true }),
+      mkdir(dirname(metadataPath), { recursive: true, mode: 0o700 }),
+    ]);
     const nonce = `${process.pid}-${crypto.randomUUID()}`;
     const imageTemp = `${savedPath}.${nonce}.tmp`;
     const metadataTemp = `${metadataPath}.${nonce}.tmp`;
     const imageBackup = `${savedPath}.${nonce}.bak`;
-    const metadataBackup = `${metadataPath}.${nonce}.bak`;
     const backups: Array<[string, string]> = [];
     const installed: string[] = [];
 
     try {
-      if (!overwrite && ((await exists(savedPath)) || (await exists(metadataPath)))) {
-        throw new ImageGenOutputError(`Refusing to overwrite existing image or metadata: ${savedPath}. Set overwrite=true to replace it.`);
+      if (!overwrite && (await exists(savedPath))) {
+        throw new ImageGenOutputError(`Refusing to overwrite existing image: ${savedPath}. Set overwrite=true to replace it.`);
+      }
+      if (await exists(metadataPath)) {
+        throw new ImageGenOutputError(`Refusing to overwrite existing generation metadata: ${metadataPath}.`);
       }
 
       await writeFile(imageTemp, data, { mode: 0o644 });
@@ -65,10 +69,6 @@ export async function saveImageWithMetadata(
       if (overwrite && (await exists(savedPath))) {
         await rename(savedPath, imageBackup);
         backups.push([imageBackup, savedPath]);
-      }
-      if (overwrite && (await exists(metadataPath))) {
-        await rename(metadataPath, metadataBackup);
-        backups.push([metadataBackup, metadataPath]);
       }
 
       await rename(imageTemp, savedPath);

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, relative, sep } from "node:path";
 import test from "node:test";
-import { inferOutputFormat, resolveOutputPaths } from "../../extensions/image-gen/storage/paths.ts";
+import { inferOutputFormat, resolveMetadataPath, resolveOutputPaths } from "../../extensions/image-gen/storage/paths.ts";
 
 const fixedDate = new Date("2026-06-01T01:02:03.000Z");
 
@@ -60,6 +60,19 @@ test("existing directory gets semantic non-colliding names", async () => {
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test("stores metadata in the global Pi image-gen directory", () => {
+  const metadataPath = resolveMetadataPath(
+    "/workspace/demo-project",
+    "/workspace/demo-project/assets/hero.png",
+    "batch-123",
+    0,
+  );
+  const metadataRoot = join(homedir(), ".pi", "agent", "image-gen", "metadata");
+  assert.ok(metadataPath.startsWith(`${metadataRoot}${sep}`));
+  assert.match(relative(metadataRoot, metadataPath).split(sep).join("/"), /demo-project-[a-f0-9]{12}\/hero-png-batch-123-1\.json$/);
+  assert.notEqual(metadataPath, "/workspace/demo-project/assets/hero.png.json");
 });
 
 test("rejects format conflicts and infers known extensions", async () => {

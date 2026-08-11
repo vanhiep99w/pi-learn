@@ -10,7 +10,7 @@ export default function imageGenExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "image_gen",
     label: "Image Gen",
-    description: "Generate or reference-edit images with the experimental ChatGPT/Codex subscription backend. Saves non-destructively, validates output, writes a metadata sidecar, and returns images inline. Public API fallback, masks, and transparency are not implemented yet and fail without billing.",
+    description: "Generate or reference-edit images with the experimental ChatGPT/Codex subscription backend. Saves non-destructively, validates output, writes private metadata under the global Pi directory, and returns images inline. Public API fallback, masks, and transparency are not implemented yet and fail without billing.",
     promptSnippet: "Generate or reference-edit image assets and save them in the workspace",
     promptGuidelines: [
       "Use image_gen when the user asks to create or edit an image asset.",
@@ -157,7 +157,7 @@ async function doctor(ctx: ExtensionContext): Promise<string> {
     `Public API auth available: ${apiAuth ? "yes" : "no"}`,
     `Selected dispatcher model: ${dispatcher}`,
     "Image model: gpt-image-2",
-    "Implemented: subscription generate, references, reference-conditioned edit, small variants, output validation, sidecar metadata",
+    "Implemented: subscription generate, references, reference-conditioned edit, small variants, output validation, private global metadata",
     "Pending: public API fallback, masks, native/chroma-key transparency, batch command",
     "Paid fallback can never run in this build.",
   ].join("\n");
