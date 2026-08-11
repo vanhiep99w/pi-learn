@@ -64,6 +64,7 @@ Các file dưới đây không phải bản mirror trực tiếp từ docs chín
 - [CLAUDE_CODE_TOOLS_GUIDE.md](./CLAUDE_CODE_TOOLS_GUIDE.md)
 - [PI_DYNAMIC_AGENTS.md](./PI_DYNAMIC_AGENTS.md)
 - [PI_HARNESS_GUIDE.md](./PI_HARNESS_GUIDE.md)
+- [PI_IMAGE_GEN_EXTENSION_DESIGN.md](./PI_IMAGE_GEN_EXTENSION_DESIGN.md) - thiết kế extension `image_gen` dùng Codex subscription, có public API fallback và tiêu chí chất lượng tương đương Codex
 
 ## Ghi chú sync
 
