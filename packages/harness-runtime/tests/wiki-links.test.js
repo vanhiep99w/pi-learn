@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   formatWikiLinkIssues,
   validateWikiInternalLinks,
@@ -28,6 +29,34 @@ test("validateWikiInternalLinks accepts files, wiki-root links, anchors, unicode
 
   assert.equal(report.filesScanned, 2);
   assert.equal(report.linksChecked, 5);
+  assert.deepEqual(report.issues, []);
+});
+
+test("validateWikiInternalLinks matches GitHub punctuation and decomposed unicode anchors", () => {
+  const root = createWikiFixture();
+  const combiningAcute = "\u0301";
+  write(root, "wiki/quickstart.md", [
+    "# Quickstart",
+    "",
+    "[tokens](overview.md#layout-primitives--design-tokens)",
+    `[notes](overview.md#cre${combiningAcute}dit-notes)`,
+  ].join("\n"));
+  write(root, "wiki/overview.md", [
+    "# Overview",
+    "",
+    "## Layout Primitives & Design Tokens",
+    `## Cre${combiningAcute}dit Notes`,
+  ].join("\n"));
+
+  const report = validateWikiInternalLinks({ projectRoot: root });
+
+  assert.deepEqual(report.issues, []);
+});
+
+test("validateWikiInternalLinks accepts the repository's checked-in wiki", () => {
+  const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+  const report = validateWikiInternalLinks({ projectRoot });
+
   assert.deepEqual(report.issues, []);
 });
 

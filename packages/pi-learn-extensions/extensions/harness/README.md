@@ -74,9 +74,9 @@ repository: langchain-ai/openwiki
 commit: 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
 short:  23428de fix: use dash-delimited Anthropic model id for Opus (claude-opus-4-8) (#113)
 date checked locally: 2026-07-06
-latest upstream check: 9a02b3516fe1706d6e8f23557ac42f42a6d0896a (OpenWiki v0.3.0, 2026-08-04)
+latest upstream check: 50e897dbff260203afbdaa2d385de99957877e49 (OpenWiki v0.3.2, released 2026-08-11)
 latest coding-agent prompt review: 4d2e1a02b53dbee9cb2f13e8df39f397f1a76bb6 (v0.3.0 prompt overhaul)
-selected behavior ports: 2fb44a876db8cca461ad1c0767931d95495763a3 (coverage backlog), c95b6d6bacfa96379993ae424a705578a4882276 (interrupted-run retries), 4d2e1a02b53dbee9cb2f13e8df39f397f1a76bb6 (Wiki-first Q&A and coding-agent navigation), 5f8a8fb5c4943eb0b9474f1a74efb9c0824f6226 (internal-link validation)
+selected behavior ports: 2fb44a876db8cca461ad1c0767931d95495763a3 (coverage backlog), c95b6d6bacfa96379993ae424a705578a4882276 (interrupted-run retries), 4d2e1a02b53dbee9cb2f13e8df39f397f1a76bb6 (Wiki-first Q&A and coding-agent navigation), 5f8a8fb5c4943eb0b9474f1a74efb9c0824f6226 (internal-link validation), 1e6b395b162b52929cf39eaf219f7fb034af023f (GitHub-compatible heading-anchor slugs and link-validator dogfooding)
 ```
 
 Kept/adapted:
@@ -95,6 +95,7 @@ Intentionally different:
 - Harness owns the Wiki capability; there is no second `extensions/wiki/` entrypoint.
 - Domain-local reviewed rules are Markdown prompts under `wiki/**/_rules.md`.
 - Harness keeps its focused page budget/backlog model and English output contract; it does not adopt OpenWiki's OKF/index/visualizer pipeline, forced Mermaid generation, QA subagent graph, connectors, or personal-wiki features.
+- Harness keeps relative Markdown links inside `wiki/`; source and repository paths remain inline code references. OpenWiki v0.3.1's repo-wide link-target policy is therefore not ported, while its GitHub-compatible heading slug fix is.
 - OpenWiki's `.openwikiignore` backend gate cannot be copied safely onto Pi's shared filesystem tools; Harness continues to use the user-owned Wiki brief for scope exclusions and deterministic protection for reserved/sensitive paths.
 
 ## Upstream upgrade checklist

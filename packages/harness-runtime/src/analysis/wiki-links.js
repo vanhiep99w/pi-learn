@@ -197,8 +197,8 @@ function slugifyHeading(value) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
-    .replace(/\s+/gu, "-");
+    .replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, "")
+    .replace(/\s/gu, "-");
 }
 
 function stripOptionalLinkTitle(href) {
