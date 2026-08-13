@@ -17,7 +17,13 @@ import { validateGeneratedImage } from "./image/validate.ts";
 import { compilePrompt } from "./prompt-compiler.ts";
 import type { ImageGenInput } from "./schema.ts";
 import { saveImageWithMetadata, type ImageMetadata, type ImageValidationMetadata } from "./storage/metadata.ts";
-import { inferOutputFormat, resolveMetadataPath, resolveOutputPaths, stripLeadingAt } from "./storage/paths.ts";
+import {
+  inferOutputFormat,
+  resolveMetadataPath,
+  resolveOutputPaths,
+  stripLeadingAt,
+  workspaceMarkdownImage,
+} from "./storage/paths.ts";
 
 const MAX_INPUT_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUBSCRIPTION_CONCURRENCY = 2;
@@ -36,6 +42,7 @@ export type ImageGenDetails = {
   fallbackUsed: boolean;
   strategy: string[];
   warnings: string[];
+  markdownPreviews: string[];
   experimental: boolean;
 };
 
@@ -163,10 +170,16 @@ export async function runImageGen(
   }
 
   const savedText = outputPaths.map((path) => `- ${path}`).join("\n");
+  const markdownPreviews = outputPaths
+    .map((path, index) => workspaceMarkdownImage(ctx.cwd, path, index))
+    .filter((preview): preview is string => Boolean(preview));
+  const paseoText = markdownPreviews.length > 0
+    ? `\nPaseo preview — include these exact Markdown lines in the final assistant response:\n${markdownPreviews.join("\n")}`
+    : "\nPaseo preview unavailable because the output is outside the current workspace.";
   const warningText = warnings.length > 0 ? `\nWarnings:\n${warnings.map((warning) => `- ${warning}`).join("\n")}` : "";
   return {
     content: [
-      { type: "text", text: `Generated ${outputPaths.length} image(s) with the experimental ${backend.id} backend.\nSaved to:\n${savedText}${warningText}` },
+      { type: "text", text: `Generated ${outputPaths.length} image(s) with the experimental ${backend.id} backend.\nSaved to:\n${savedText}${paseoText}${warningText}` },
       ...inlineImages,
     ],
     details: {
@@ -183,6 +196,7 @@ export async function runImageGen(
       fallbackUsed,
       strategy: generated.map((result) => result.strategy),
       warnings,
+      markdownPreviews,
       experimental: true,
     },
   };

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, extname, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { ImageGenInputError } from "../errors.ts";
 import type { ImageOutputFormat } from "../schema.ts";
 
@@ -75,8 +75,25 @@ export function resolveMetadataPath(cwd: string, savedPath: string, batchId: str
   );
 }
 
+export function workspaceMarkdownImage(cwd: string, savedPath: string, index: number): string | undefined {
+  const workspacePath = relative(resolve(cwd), resolve(savedPath));
+  if (!workspacePath || isAbsolute(workspacePath) || workspacePath === ".." || workspacePath.startsWith(`..${sep}`)) {
+    return;
+  }
+  const markdownPath = workspacePath
+    .split(sep)
+    .map(encodeMarkdownPathSegment)
+    .join("/");
+  return `![Generated image ${index + 1}](./${markdownPath})`;
+}
+
 export function stripLeadingAt(value: string): string {
   return value.startsWith("@") ? value.slice(1) : value;
+}
+
+function encodeMarkdownPathSegment(segment: string): string {
+  return encodeURIComponent(segment).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 function variants(directory: string, name: string, extension: string, count: number): string[] {

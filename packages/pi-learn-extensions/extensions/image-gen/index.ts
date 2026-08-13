@@ -2,11 +2,14 @@ import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-c
 import { Container, Image, Text } from "@earendil-works/pi-tui";
 import { redactSensitiveText } from "./errors.ts";
 import { runImageGen, selectDispatcherModel, type ImageGenExecutionResult } from "./orchestrator.ts";
+import { appendPaseoMarkdownPreviews } from "./paseo.ts";
 import { imageGenSchema, type ImageGenInput } from "./schema.ts";
 
 const PREVIEW_WIDGET_ID = "image-gen-preview";
 
 export default function imageGenExtension(pi: ExtensionAPI) {
+  let pendingPaseoPreviews: string[] = [];
+
   pi.registerTool({
     name: "image_gen",
     label: "Image Gen",
@@ -17,14 +20,17 @@ export default function imageGenExtension(pi: ExtensionAPI) {
       "Before calling image_gen for a project asset, inspect the workspace for an existing suitable image directory (for example public/images, assets/images, or src/assets) and pass a project-relative outputPath that follows the project's convention.",
       "If image_gen has no suitable project image directory and the user did not choose one, omit outputPath; image_gen then saves in the current workspace root.",
       "Use size=auto for image_gen unless the user or target layout requires explicit dimensions; the experimental subscription backend can return a different valid size and such mismatches are saved with a warning.",
+      "After image_gen succeeds, include every line from details.markdownPreviews verbatim in the final assistant response so Paseo renders workspace images inline; do not respond with only the saved file path.",
       "For image_gen edits, assign every input image an explicit role and use edit_target only for the image to modify.",
     ],
     parameters: imageGenSchema,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       try {
-        return await runImageGen(params as ImageGenInput, signal, ctx, (message) => {
+        const result = await runImageGen(params as ImageGenInput, signal, ctx, (message) => {
           onUpdate?.({ content: [{ type: "text", text: message }], details: { phase: "generation" } });
         });
+        pendingPaseoPreviews.push(...result.details.markdownPreviews);
+        return result;
       } catch (error) {
         // Do not retain the raw error as `cause`: provider errors may contain credentials or data URLs.
         throw new Error(redactSensitiveText(error));
@@ -42,7 +48,20 @@ export default function imageGenExtension(pi: ExtensionAPI) {
     },
   });
 
+  pi.on("message_end", (event) => {
+    if (event.message.role !== "assistant" || pendingPaseoPreviews.length === 0) return;
+    const previews = pendingPaseoPreviews;
+    pendingPaseoPreviews = [];
+    const message = appendPaseoMarkdownPreviews(event.message, previews);
+    if (message !== event.message) return { message };
+  });
+
+  pi.on("agent_end", () => {
+    pendingPaseoPreviews = [];
+  });
+
   pi.on("session_shutdown", (_event, ctx) => {
+    pendingPaseoPreviews = [];
     if (ctx.hasUI) ctx.ui?.setWidget(PREVIEW_WIDGET_ID, undefined);
   });
 

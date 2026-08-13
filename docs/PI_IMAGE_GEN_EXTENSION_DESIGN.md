@@ -12,7 +12,7 @@
 
 ### Tiến độ implementation hiện tại
 
-Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, dimension-mismatch warning/preservation, private global metadata records, inline tool-result image, direct-command preview widget, `/image-gen doctor`, unit tests và mocked subscription tests.
+Đã có: public schema, prompt compiler + edit invariants, backend contract, JWT account claim, request builder, bounded SSE parser, subscription generate/reference-conditioned edit, variants nhỏ có bounded concurrency, input/output inspection, non-overwrite workspace-relative paths, dimension-mismatch warning/preservation, private global metadata records, inline tool-result image, Paseo Markdown previews, direct-command preview widget, `/image-gen doctor`, unit tests và mocked subscription tests.
 
 Chưa có: live smoke validation, public API fallback, mask, chroma-key/native transparency, JSONL batch manifest, skill resource và A/B quality suite. Runtime hiện fail sớm cho capability chưa hỗ trợ; không thể phát sinh paid API fallback.
 
@@ -257,12 +257,13 @@ Tool trả cả text và ảnh:
     metadataPaths,
     validation,
     batchId,
-    fallbackUsed
+    fallbackUsed,
+    markdownPreviews: ["![Generated image 1](./assets/image.png)"]
   }
 }
 ```
 
-Ảnh inline cho phép model ở turn kế tiếp kiểm tra semantic quality. `details` không chứa OAuth token, API key, authorization header hoặc raw data URL của reference images.
+Ảnh inline cho phép model ở turn kế tiếp kiểm tra semantic quality. Với output nằm trong workspace, text result và `details.markdownPreviews` còn chứa Markdown path tương đối đã URL-encode. Extension giữ các preview pending sau tool success và hook `message_end` bổ sung dòng còn thiếu vào final assistant response vì Paseo không render ảnh nằm riêng trong raw thinking/tool call; prompt guideline là lớp nhắc bổ sung. Pending state được clear ở `agent_end` và `session_shutdown`. Output nằm ngoài workspace không tạo Markdown preview. `details` không chứa OAuth token, API key, authorization header hoặc raw data URL của reference images.
 
 ## 7. Prompt compiler
 
@@ -724,6 +725,7 @@ Namespace dự kiến:
 UI rules:
 
 - Tool result render ảnh inline khi `showImages` bật.
+- Workspace output trả `details.markdownPreviews`; `message_end` tự append preview còn thiếu vào final assistant message để Paseo render ảnh inline.
 - `/image-gen generate` trong TUI đặt preview widget phía trên editor; `/image-gen hide` đóng preview.
 - Terminal phải hỗ trợ inline image (Kitty/Ghostty/WezTerm/Warp); nếu không, `Image` component hiện fallback placeholder/path.
 - Guard dialog/notify/widget bằng `ctx.hasUI` và TUI-only image widget bằng `ctx.mode === "tui"`.

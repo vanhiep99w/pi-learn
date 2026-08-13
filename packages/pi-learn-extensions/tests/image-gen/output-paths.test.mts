@@ -3,7 +3,12 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import test from "node:test";
-import { inferOutputFormat, resolveMetadataPath, resolveOutputPaths } from "../../extensions/image-gen/storage/paths.ts";
+import {
+  inferOutputFormat,
+  resolveMetadataPath,
+  resolveOutputPaths,
+  workspaceMarkdownImage,
+} from "../../extensions/image-gen/storage/paths.ts";
 
 const fixedDate = new Date("2026-06-01T01:02:03.000Z");
 
@@ -73,6 +78,14 @@ test("stores metadata in the global Pi image-gen directory", () => {
   assert.ok(metadataPath.startsWith(`${metadataRoot}${sep}`));
   assert.match(relative(metadataRoot, metadataPath).split(sep).join("/"), /demo-project-[a-f0-9]{12}\/hero-png-batch-123-1\.json$/);
   assert.notEqual(metadataPath, "/workspace/demo-project/assets/hero.png.json");
+});
+
+test("formats workspace images as Paseo-compatible Markdown", () => {
+  assert.equal(
+    workspaceMarkdownImage("/workspace/demo", "/workspace/demo/assets/dog image (final).png", 0),
+    "![Generated image 1](./assets/dog%20image%20%28final%29.png)",
+  );
+  assert.equal(workspaceMarkdownImage("/workspace/demo", "/workspace/outside.png", 0), undefined);
 });
 
 test("rejects format conflicts and infers known extensions", async () => {

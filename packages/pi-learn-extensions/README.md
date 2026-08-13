@@ -82,7 +82,7 @@ Tool `image_gen` hiện hỗ trợ bước triển khai ban đầu:
 - non-overwrite mặc định
 - validate PNG/JPEG/WebP và alpha; dimension mismatch từ private subscription backend được lưu với warning thay vì làm mất ảnh hợp lệ
 - metadata JSON lưu private tại `~/.pi/agent/image-gen/metadata/<project-key>/`, không tạo `.png.json` cạnh asset
-- trả ảnh inline để model kiểm tra ở turn tiếp theo
+- trả ảnh inline cho Pi; trả `details.markdownPreviews` và tự bổ sung Markdown ảnh vào final response cho Paseo
 
 Command:
 
@@ -93,6 +93,8 @@ Command:
 ```
 
 Tool result hiển thị ảnh inline khi `terminal.showImages` được bật. `/image-gen generate` hiển thị preview phía trên editor; dùng `/image-gen hide` để đóng. Terminal cần hỗ trợ inline image, ví dụ Kitty, Ghostty, WezTerm hoặc Warp; terminal không hỗ trợ sẽ hiện placeholder/path.
+
+Với Paseo, raw tool/thinking output không tự render ảnh. Sau khi tool thành công, text result và `details.markdownPreviews` chứa Markdown workspace-relative, ví dụ `![Generated image 1](./assets/dog.png)`. Extension theo dõi result và tự bổ sung preview còn thiếu vào final assistant message; prompt guideline vẫn nhắc agent không chỉ trả path. Output ngoài workspace không được tạo Markdown preview.
 
 `/image-gen generate` chạy trực tiếp nên nếu không có `outputPath` thì lưu ở folder hiện tại. Khi gọi qua hội thoại, agent được hướng dẫn inspect project và chọn folder ảnh phù hợp như `public/images`, `assets/images` hoặc convention đã tồn tại.
 

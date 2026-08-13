@@ -6,7 +6,7 @@ Public Pi extension and theme source lives under `packages/pi-learn-extensions/`
 
 Source: `packages/pi-learn-extensions/extensions/image-gen/`; tests: `packages/pi-learn-extensions/tests/image-gen/`
 
-The initial implementation registers tool `image_gen` and command namespace `/image-gen`. It resolves OAuth only through `ctx.modelRegistry.getProviderAuth("openai-codex")`, calls the experimental ChatGPT Codex Responses image tool, validates PNG/JPEG/WebP output, saves images non-destructively through Pi's file mutation queue, writes redacted metadata under `~/.pi/agent/image-gen/metadata/<project-key>/`, and renders generated images inline. Direct `/image-gen generate` calls place an image preview widget above the editor until `/image-gen hide`, replacement, reload, or shutdown.
+The initial implementation registers tool `image_gen` and command namespace `/image-gen`. It resolves OAuth only through `ctx.modelRegistry.getProviderAuth("openai-codex")`, calls the experimental ChatGPT Codex Responses image tool, validates PNG/JPEG/WebP output, saves images non-destructively through Pi's file mutation queue, writes redacted metadata under `~/.pi/agent/image-gen/metadata/<project-key>/`, and renders generated images inline. Direct `/image-gen generate` calls place an image preview widget above the editor until `/image-gen hide`, replacement, reload, or shutdown. Successful workspace-bound results also expose `details.markdownPreviews` and matching Markdown in text output; the extension appends missing preview lines to the finalized assistant message (with a tool guideline as an additional model-level reminder) so Paseo renders images outside raw tool/thinking output.
 
 Implemented command surface:
 
