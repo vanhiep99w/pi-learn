@@ -80,36 +80,7 @@ Enable the included theme by setting `theme` to `midnight-aurora` in Pi settings
 
 ## Important slash commands
 
-Common package commands documented by the READMEs and extension sources include:
-
-```txt
-/image-gen doctor
-/image-gen generate <prompt>
-/image-gen hide
-
-/harness-wiki-init [note]
-/harness-wiki-update [note]
-/harness-wiki-ask <question>
-
-/harness [last]
-/harness-improve [last]
-/harness-proposals
-/harness-apply P-0001
-/harness-eval [scenario|P-0001]
-/harness-mark success|failure|note [text]
-
-/chatgpt-login
-/chatgpt-usage
-/chatgpt-accounts
-
-/prompt-create <idea>
-/prompt-edit
-/prompt-model
-
-/aurora-themes
-```
-
-The READMEs are the best command reference for users; the source files are the source of truth for exact behavior.
+Use the relevant [extension catalog section](extensions/catalog.md) or [Harness Wiki commands](extensions/wiki-extension.md#commands) rather than loading every command description. Root `README.md` and `packages/pi-learn-extensions/README.md` contain full usage examples; extension sources remain the source of truth for exact behavior.
 
 ## How the repo is organized
 
@@ -131,18 +102,25 @@ See [Architecture overview](architecture/overview.md) for package boundaries and
 
 ## Task routing
 
-| Change intent | Canonical guidance | Owning entrypoints or symbols | Focused check and minimal validation |
-|---|---|---|---|
-| Change package boundaries, manifests, or public entrypoints | [Architecture overview](architecture/overview.md) | Root and extension `package.json` Pi manifests; public files under `packages/pi-learn-extensions/` | Inspect both manifests, then use `git diff --check`; reload Pi when an exposed entrypoint changes. |
-| Change a public tool, command, TUI component, or theme | [Extensions catalog](extensions/catalog.md) | The relevant file under `packages/pi-learn-extensions/extensions/`; `themes/midnight-aurora.json` | Run any area-specific static check, then `/reload` and exercise the affected tool, command, or UI lifecycle. |
-| Change session selection, parsing, cache, report, reflection, or automation | [Harness runtime](architecture/harness-runtime.md) | `analysisRun()`, `report()`, `reflect()`, and `automate()` in `packages/harness-runtime/src/api.js`; `packages/harness-runtime/src/analysis/analysis-run.js` | Start with `analysis-run.test.js`, `api.test.js`, or the nearest component test; use `npm --prefix packages/harness-runtime test` before integration. |
-| Change proposal, controlled apply, or eval behavior | [Harness runtime](architecture/harness-runtime.md#proposal-lifecycle-and-controlled-apply) | `packages/harness-runtime/src/proposals/lifecycle.js`; `packages/harness-runtime/src/eval/eval-harness.js` | Run `node --test packages/harness-runtime/tests/proposal-lifecycle.test.js` or `eval-harness.test.js`, then the relevant `/harness-eval` scenario when Pi integration matters. |
-| Change Harness Wiki commands, prompts, links, or metadata | [Harness Wiki capability](extensions/wiki-extension.md) | `registerHarnessWikiCommands()` in `packages/pi-learn-extensions/extensions/harness/wiki-commands.ts`; `createHarnessWikiTaskPrompt()` in `wiki-prompt.ts`; `validateWikiInternalLinks()` in `packages/harness-runtime/src/analysis/wiki-links.js` | Run `node --test packages/harness-runtime/tests/wiki-links.test.js`, then `/reload` and exercise the affected `/harness-wiki-*` flow. |
-| Change install, documentation, versioning, or release behavior | [Development operations](operations/development.md) | Root/package READMEs and manifests; `docs/README.md` for new `docs/` pages | Use `git diff --check`, verify documented commands against source, and run only the package checks affected by the release surface. |
+Choose the owning area and section below, not every linked page. Locate headings with bounded `grep`, then use `read(offset, limit)` for the needed sections; `#heading` links do not automatically constrain a filesystem read. Expand only for unresolved questions or relevant cross-area effects, and stop once grounded. Before edits, follow [Rule loading](#rule-loading) independently of this reading budget.
+
+| Change intent | Owning area and starting section | When to expand |
+|---|---|---|
+| Package boundaries, manifests, or public entrypoints | [Package boundaries](architecture/overview.md#package-boundaries) | Runtime loading and consumers when registration/exports change. |
+| A public tool, command, UI, or theme | The relevant heading in the [extensions catalog](extensions/catalog.md), selected using the capability table above | Shared host behavior, package wiring, or affected consumers only. |
+| Session selection, parsing, cache, or reports | [Harness data flow](architecture/harness-runtime.md#data-flow) | Storage, safety, and report sections for changed data/evidence contracts. |
+| Proposal approval, apply, or rollback | [Proposal lifecycle](architecture/harness-runtime.md#proposal-lifecycle-and-controlled-apply) | Evidence binding and safety boundaries when affected. |
+| Eval or automation | [Eval and automation](architecture/harness-runtime.md#eval-and-automation) | The runtime stage being evaluated or scheduled. |
+| Wiki generation depth or service/MFE coverage | [Documentation depth and planning](extensions/wiki-extension.md#documentation-depth-and-planning) | Multi-system coverage and content/navigation acceptance scenarios. |
+| Wiki question prompts or agent context usage | [Selective reading](extensions/wiki-extension.md#selective-reading) | Prompt-rule loading and agent bootstrap guidance. |
+| Wiki links, snapshots, or completion metadata | [Snapshot and metadata](extensions/wiki-extension.md#snapshot-and-metadata) | No-op behavior and link tests. |
+| Install, docs, versioning, or release | The relevant heading in [development operations](operations/development.md) | Package boundaries and only the checks affected by the change. |
+
+Target sections contain the source symbols and ownership details. Use [test commands](operations/testing-and-safety.md#test-commands) and the nearest component tests for validation, not a blanket read of all operational docs.
 
 ## Change-oriented guidance for future agents
 
-1. **Start with the relevant README and wiki page.** This repo already has substantial docs; the wiki should act as a map, not a replacement for source evidence.
+1. **Start with the relevant route and sections.** This repo already has substantial docs; the wiki is a map and explanation layer, not a reason to preload every page or skip source verification when needed.
 2. **Public extension/theme changes belong in `packages/pi-learn-extensions/`.** Do not make public package changes under `.pi/extensions/` unless the user specifically asks for local-only behavior.
 3. **Treat logs and auth as sensitive.** Do not read `.pi/logs/llm-payloads/`, `.env`, Pi auth JSON, ChatGPT account stores, private keys, or token-bearing files.
 4. **Guard UI work.** TUI extensions should check `ctx.hasUI`, use `ctx.ui?.` when appropriate, and clean up timers/compositors/listeners on shutdown.

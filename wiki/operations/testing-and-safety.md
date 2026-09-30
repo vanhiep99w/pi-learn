@@ -37,7 +37,15 @@ node --test packages/harness-runtime/tests/analysis-run.test.js packages/harness
 
 Use the full package suite before integrating a cross-cutting Harness runtime or Wiki orchestration change.
 
-Source references: `packages/harness-runtime/package.json`, `packages/harness-runtime/tests/`.
+Harness Wiki prompt changes have a separate extension-level suite. From the repository root with Node native TypeScript stripping (22.18+):
+
+```bash
+npm --prefix packages/pi-learn-extensions run test:harness-wiki
+```
+
+`packages/pi-learn-extensions/tests/harness/wiki-prompt.test.mts` renders init/update/chat prompts and checks selective reading, topic depth, service/MFE boundaries, explicit deepening, safety, and the shared agent bootstrap. It also budgets the fixed question prompt without counting arbitrary user brief/request content. These tests verify instructions and regressions, not whether an LLM follows them or writes accurate, complete prose.
+
+Source references: `packages/harness-runtime/package.json`, `packages/harness-runtime/tests/`, `packages/pi-learn-extensions/package.json`, `packages/pi-learn-extensions/tests/harness/wiki-prompt.test.mts`.
 
 ## Harness eval scenarios
 
@@ -76,6 +84,23 @@ Examples:
 - Aurora UI: verify startup banner, editor border, footer/status rendering, theme switching, and terminal cleanup after session shutdown.
 - Harness Wiki: run `/harness-wiki-ask`, a no-op `/harness-wiki-update`, and a small forced update when changing Wiki behavior. Confirm `/wiki-*` and `/harness-wiki-status` are absent and Wiki turns cannot edit `_rules.md`.
 - Harness: run `/harness`, exercise dashboard scrolling/Markdown rendering, and run targeted `/harness-eval` after runtime changes.
+
+## Harness Wiki content and navigation acceptance
+
+Use disposable checkouts with the same source revision, model, instructions, and comparable generation budget when comparing Harness with OpenWiki. Reload the changed extension before exercising it. Cover a small single-system repo, a multi-service repo, and a shell/remote microfrontend repo; do not assume a passing prompt suite establishes output parity.
+
+| Scenario | Content evidence to inspect | Expected retrieval behavior |
+|---|---|---|
+| Initialize a small repo | Mechanisms, important failures, source anchors, and focused tests; no artificial service taxonomy or quota-driven padding | Quickstart routes to the few real topics without repeating their bodies. |
+| Change a service-local behavior or MFE style | Owning entrypoint, local state/behavior, relevant dependencies and tests | Read owning sections and applicable rules; unrelated services/remotes are not preloaded. |
+| Change an API/event schema or shared package | Producer, known consumers, compatibility constraints, failure behavior and contract tests | Expand across affected boundaries even when only one source file changed; unknown consumers are identified, not guessed away. |
+| Diagnose remote loading or auth propagation | Evidenced host/remote lifecycle, shared state, fallback and deployment/version constraints | Read the relevant workflow/contract and participant sections, not every frontend page. |
+| Explicitly deepen unchanged documentation | Existing accurate prose preserved; material gaps filled with source/tests | The request can schedule work without source changes; no unrelated formatting churn. |
+| Ask what the Wiki says | Answer cites the selected page/heading, preserves qualifiers, and discloses missing/stale evidence | Use bounded grep and section reads; continue a truncated relevant section, then stop once grounded. Ordinary questions do not create plans or edit files. |
+
+Review generated text against source/tests, not page count or word count. Evaluate coverage, factual accuracy, mechanism/failure depth, and route usefulness separately from how much context was read. Observe only the test run's tool activity with appropriate authorization; do not mine private payload/session logs for this check. Record unresolved evidence gaps and distinguish a content defect from an unnecessary-read defect.
+
+The [Wiki capability](../extensions/wiki-extension.md#selective-reading) describes the prompt contract. Semantic completeness and selective stopping remain model behavior, while existing link checks validate only their documented structural boundary.
 
 ## Security and privacy rules
 

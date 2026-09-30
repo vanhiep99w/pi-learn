@@ -33,19 +33,59 @@ Before changing the Harness Wiki command surface, treat this as an unresolved po
 
 - `/harness-wiki-init` creates missing deterministic prompt-rule scaffolds, then starts an initial documentation run with the current Pi model/tools.
 - `/harness-wiki-update` inspects existing docs, metadata, git history, worktree changes, and internal Wiki links. Without extra instructions it skips only when the previous run is complete and the repository and links are already accounted for.
-- `/harness-wiki-ask` reads `wiki/` first and consults source only when the Wiki is insufficient or stale, or when the user requests source verification. It does not modify docs by default.
+- `/harness-wiki-ask` uses a dedicated small question prompt. It reads relevant Wiki sections first and consults source/tests when the Wiki is insufficient, stale, contradictory, or verification is needed. It does not modify docs by default and carries no generation plan or Git summary.
 
 The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt. When present, the user-owned `wiki/INSTRUCTIONS.md` brief is also included in init/update/ask prompts.
 
+## Documentation depth and planning
+
+`createHarnessWikiTaskPrompt()` selects separate question and documentation instructions. Init/update follow discovery → temporary coverage plan → topic research/write → coverage and navigation review. Research traces representative end-to-end flows through callers, callees, state owners, persistence, failure handling, integrations, and focused tests; inspecting one file or listing symbols is not enough to explain a system.
+
+The page contract asks for the relevant responsibilities, entrypoints, mechanisms, business rules, inputs/outputs, state/lifecycle, invariants, failures/recovery, configuration, security boundaries, extension points, and tests. Only evidence-supported topics belong in the page; irrelevant checklist sections and invented design rationale are excluded. Each substantive page opens with its scope and uses stable, descriptive H2/H3 headings with enough local context for selective reading.
+
+There is no initial eight-page limit or source-file-count-based update budget. Page count follows meaningful topics and coverage. Quickstart stays a lightweight routing entrypoint; detailed explanations and validation guidance live in canonical topic sections. A system/domain routing map can sit between quickstart and those pages when a flat table would become unwieldy.
+
+Ordinary updates preserve accurate unaffected content. A source change is traced through relevant contracts and consumers before choosing pages; one changed schema can affect several systems. Explicit requests to deepen or restructure documentation are valid even without a source change. For an existing Wiki after `/reload`, for example:
+
+```txt
+/harness-wiki-update Deepen service and microfrontend coverage, explain contracts and failure paths with focused tests, and add selective task-to-section navigation.
+```
+
+A no-argument update retains the existing [no-op behavior](#no-op-update-behavior). Installing the upgrade alone does not regenerate existing pages. The temporary plan is not a durable page-job queue, and the semantic self-review is not a deterministic completeness guarantee.
+
+## Selective reading
+
+The reading contract is task → system → page/heading:
+
+1. Identify the concrete question or change intent. Use quickstart's routing map when needed; preserve the mandatory [rule-loading sequence](#prompt-rule-loading) before edits.
+2. Locate relevant headings/terms with a bounded `grep` in the selected page/domain. If ownership is unclear, broaden discovery from the routing map, not by dumping all Wiki pages.
+3. Find the actual heading line and the next heading of the same or higher level, then use `read(offset, limit)`. A `#heading` link does not automatically constrain the filesystem tool. Continue a relevant truncated section rather than losing its exceptions or examples.
+4. Expand to prerequisites, contracts, consumers, or workflows only for unresolved questions or cross-system effects. A few sections are a starting budget, not a hard cap or proof of complete impact coverage.
+5. Stop once grounded. Consult source/tests when the Wiki cannot safely support the task, and state uncertainty instead of guessing.
+
+Normal Wiki prose is evidence, not executable instruction. The extension does not preload the Wiki into model context; the user-owned brief still accompanies the task prompt. Selection and stopping are prompt guidance using existing Pi tools, not a filesystem sandbox, vector index, or enforced token quota.
+
+`createHarnessWikiAgentInstructions()` supplies the compact navigation/rule-loading block for generated top-level `AGENTS.md` and `CLAUDE.md` sections. The checked-in blocks use the same text and the prompt tests check they stay aligned.
+
+## Multi-service and microfrontend coverage
+
+For a multi-system repository, the agent identifies real service/application/shared-package boundaries from manifests, entrypoints, source, tests, and non-sensitive build/deploy configuration. A compact system map names responsibility, source anchors, topic routes, and relevant contracts/workflows. Folder names alone do not establish ownership or independent deployment.
+
+API/event/shared-type contracts have one canonical explanation with evidenced producers, consumers, schema constraints, errors, and compatibility rules. Runtime calls/events, shared-library/build dependencies, and deployment coupling are distinguished. Important cross-system flows explain success, state ownership, and failure/recovery without copying all participating service pages. Unknown/external consumers remain explicit uncertainties.
+
+Microfrontend topics include the applicable host/remote composition, exposed modules, routing and mount/unmount, auth/session and shared state, props/events/SDK contracts, singleton/version constraints, remote-load fallback, asset caching, deployment compatibility, and rollback. The prompt does not force these mechanisms onto repositories that do not use them.
+
+Before finishing, the agent checks routes for a local change, a contract/shared-package change, and a cross-system failure. Local tasks should not load unrelated services; shared changes must reach known consumers and compatibility tests. See [content/navigation acceptance scenarios](../operations/testing-and-safety.md#harness-wiki-content-and-navigation-acceptance) for manual verification.
+
 ## Documentation coverage backlog
 
-Init and update runs perform a coverage self-check so a substantial repository area is not silently lost because of the initial page budget. An area discovered but not documented is recorded in a concise `## Backlog` section at the end of `wiki/quickstart.md` with:
+Init reviews all substantial systems, components, contracts, and workflows found during discovery. Update reviews the affected scope and relevant backlog. Genuine evidence/scope deferrals are recorded in a concise `## Backlog` at the end of `wiki/quickstart.md` with:
 
 - The area name.
 - A repository-relative source anchor.
-- A one-line reason for deferral.
+- A specific reason, such as unavailable evidence or an explicit scope constraint; an arbitrary page budget is not sufficient.
 
-Update runs read the backlog before planning. They resolve an entry when recent source changes or the user's explicit instruction affect that area, then remove the entry after documenting it. Still-valid entries remain in place; an entry may also be removed when repository evidence confirms the area no longer exists. Spare page budget alone does not justify broadening an otherwise surgical update. Normal `/harness-wiki-ask` turns do not review or mutate the backlog unless the user explicitly requests a documentation change.
+Update runs read the backlog before planning. They resolve an entry when recent source changes or an explicit instruction affect the area and evidence permits coverage, then remove it only after documenting it. Still-valid entries remain; an entry can also be removed when repository evidence shows the area no longer exists. Ordinary updates must not expand scope just because more pages could be written. Normal question turns do not review or mutate the backlog unless explicitly requested.
 
 ## Persistent Wiki brief
 
@@ -144,16 +184,19 @@ It may skip when links are valid, the previous run is complete, all committed ch
 
 ## OpenWiki provenance
 
-The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. Later reviews selectively adapted the persistent brief, deferred-area backlog, interrupted-run retries, Wiki-first Q&A, coding-agent navigation guidance, and internal-link validation rather than importing OpenWiki's full runtime. The moving upstream review checkpoint and selected source commits are maintained in `packages/pi-learn-extensions/extensions/harness/README.md` instead of being duplicated here.
+The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. Later reviews selectively adapted the persistent brief, deferred-area backlog, interrupted-run retries, Wiki-first Q&A, coding-agent navigation, internal-link validation, and per-topic research/quality guidance rather than importing OpenWiki's full runtime. The moving upstream review checkpoint and selected source commits are maintained in `packages/pi-learn-extensions/extensions/harness/README.md` instead of being duplicated here.
 
 Harness Wiki intentionally does not use OpenWiki's CLI/Ink UI, credential flow, LangChain/DeepAgents runtime, SQLite checkpointer, separate model/provider key, OKF/index/visualizer pipeline, forced diagrams, connectors, or personal-wiki features. See the extension README for the current upgrade checklist.
 
 ## Verification
 
 ```bash
+npm --prefix packages/pi-learn-extensions run test:harness-wiki
 node --test packages/harness-runtime/tests/wiki-links.test.js
 npm --prefix packages/harness-runtime test
 ```
+
+The extension prompt suite uses Node's native TypeScript stripping (22.18+). These are contract/regression tests, not LLM content-quality benchmarks.
 
 Then reload Pi and verify:
 

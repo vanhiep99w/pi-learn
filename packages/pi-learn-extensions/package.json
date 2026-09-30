@@ -4,6 +4,7 @@
   "description": "Pi Coding Agent extensions: Image Gen, Harness Wiki, ChatGPT usage status, Aurora UI, prompt-with-model, and Midnight Aurora theme.",
   "type": "module",
   "scripts": {
+    "test:harness-wiki": "node --test tests/harness/*.test.mts",
     "test:image-gen": "node --experimental-transform-types --test tests/image-gen/*.test.mts"
   },
   "keywords": [

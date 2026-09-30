@@ -154,6 +154,7 @@ Ví dụ:
 ```txt
 /harness-wiki-init
 /harness-wiki-update Document the new extension commands first
+/harness-wiki-update Deepen service and microfrontend coverage with contracts, failure paths, tests, and task-to-section routes
 /harness-wiki-ask Prompt rules được load thế nào?
 ```
 
@@ -163,7 +164,10 @@ Ghi chú:
 - Normal docs được tạo/cập nhật trong `wiki/`; reviewed prompt rules nằm tại `wiki/**/_rules.md`.
 - Pi tự nạp bootstrap trong `AGENTS.md`; model đọc `wiki/quickstart.md`, root rules và section rules phù hợp bằng tool `read`. Extension không inject toàn bộ rules vào system prompt.
 - Metadata do extension ghi tại `wiki/.last-update.json` sau khi agent settle và normal documentation thực sự thay đổi. `_rules.md` không nằm trong docs snapshot.
-- Domain/workflow quan trọng chưa được document vì giới hạn page budget phải được giữ trong `## Backlog` ở cuối `wiki/quickstart.md`; update run chỉ resolve entry khi có source evidence liên quan hoặc user yêu cầu rõ.
+- Init/update nghiên cứu sâu từng chủ đề: cơ chế, state, luồng dữ liệu, lỗi, contract và tests; không còn ngân sách mặc định 8 trang. Repo nhiều service/microfrontend có bản đồ hệ thống, producer/consumer và workflow xuyên hệ thống khi source chứng minh cần thiết.
+- Quickstart là bản đồ `tác vụ → hệ thống → trang/heading`; agent dùng `grep` có giới hạn và `read(offset, limit)` để đọc phần liên quan, không nạp cả wiki. `/harness-wiki-ask` dùng prompt riêng gọn, không mang theo hướng dẫn tạo tài liệu. Đây là hướng dẫn cho model, không phải giới hạn context được cưỡng chế bằng tool.
+- Phần chưa thể document vì thiếu bằng chứng hoặc giới hạn phạm vi rõ ràng được giữ trong `## Backlog`; không dùng quota số trang để bỏ qua nội dung quan trọng. Update thường chỉ sửa phạm vi bị ảnh hưởng; có thể yêu cầu đào sâu rõ ràng dù source chưa đổi.
+- Nâng cấp extension không tự viết lại wiki cũ. Sau `/reload`, dùng `/harness-wiki-update <yêu cầu đào sâu>` để áp dụng vào tài liệu hiện có.
 - Prompt-rule content thay đổi không cần `/reload`; extension source thay đổi vẫn cần `/reload`.
 - Rule edits chỉ đi qua proposal → approval → controlled apply; critical protection vẫn được enforce bằng code.
 - Base upstream: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem `packages/pi-learn-extensions/extensions/harness/README.md`.

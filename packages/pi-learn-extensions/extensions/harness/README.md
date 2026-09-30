@@ -34,8 +34,10 @@ The old `/wiki-*` commands are intentionally removed without compatibility alias
 ## Harness Wiki behavior
 
 - Generates and updates normal repository documentation under `wiki/` using the current Pi provider/model/tools.
-- Answers `/harness-wiki-ask` from `wiki/` first, falling back to source only when the Wiki is insufficient, appears stale, or the user asks for source verification.
-- Optimizes generated docs for coding-agent navigation: stable source paths and symbols, invariants, focused tests, narrow validation commands, compact task routing, and evidence-backed relationships between canonical pages.
+- Uses a dedicated, compact `/harness-wiki-ask` prompt: select relevant Wiki sections first, then consult source/tests when the Wiki is insufficient, stale, contradictory, or verification is needed. Question turns do not carry generation/planning instructions or Git summaries.
+- Plans and researches each substantive system/topic before writing; explains mechanisms, state, failure paths, contracts, configuration, and focused tests with inspected evidence. Page count follows repository complexity rather than an eight-page initial budget.
+- Keeps quickstart and agent bootstrap instructions lightweight. Routes tasks through system/domain maps to stable `page#heading` targets; detailed explanations stay in canonical topic pages.
+- Covers multi-service and microfrontend repositories through ownership, producer/consumer contracts, shared dependencies, and cross-system workflows without forcing that taxonomy onto small repositories.
 - Validates relative Markdown file links and heading anchors during update no-op checks and after init/update. Broken links are reported with source lines and mark the run interrupted so the next update retries.
 - Records `complete` or `interrupted` status in `wiki/.last-update.json`. An aborted/failed agent run or session shutdown after documentation changes is interrupted; a successful no-change retry clears stale interrupted status.
 - Loads the optional user-owned `wiki/INSTRUCTIONS.md` brief into init/update/ask prompts without treating it as generated documentation.
@@ -43,8 +45,22 @@ The old `/wiki-*` commands are intentionally removed without compatibility alias
 - Creates deterministic empty `_rules.md` scaffolds for root/final sections when missing.
 - Blocks Pi tool turns from modifying `_rules.md` or `.last-update.json` through write/edit and common shell mutation paths; active Wiki runs also protect `wiki/INSTRUCTIONS.md`.
 - Excludes `INSTRUCTIONS.md`, `_rules.md`, `.last-update.json`, `_plan.md`, hidden files, and temporary files from the documentation snapshot.
-- Tracks substantial areas deferred by the initial page budget in a concise `## Backlog` at the end of `wiki/quickstart.md`; update runs preserve or resolve entries using repository evidence.
+- Records genuine evidence/scope deferrals in a concise `## Backlog` at the end of `wiki/quickstart.md`. Init reviews discovered coverage; updates review affected scope and relevant backlog without rewriting unrelated pages.
 - Treats prompt-rule, Wiki brief, source, and configuration changes as meaningful repository changes for update/no-op decisions.
+
+## Content depth and selective reading
+
+Generation follows discovery → coverage plan → topic research/write → coverage and navigation review. Each substantive page states its scope and uses descriptive headings so a section can be read independently. System maps, API/event contracts, and cross-system workflows are added when repository evidence warrants them; a folder name alone is not a service boundary. Microfrontend research includes applicable host/remote, routing, auth/state, dependency-version, fallback, caching, and deployment contracts.
+
+Reading follows task → system → page/heading. The agent uses bounded `grep` results to locate headings and `read(offset, limit)` to read the selected sections. A Markdown anchor does not itself limit a filesystem read. It expands to related contracts/consumers only when needed and stops when grounded; it must still read all applicable prompt rules before edits. This is prompt guidance, not an enforced retrieval budget or a new search service. No full Wiki body is injected by the extension; the optional user brief remains included.
+
+Ordinary updates stay impact-driven, including affected consumers outside the changed source directory. To deepen an existing Wiki without requiring source changes, request that scope explicitly after `/reload`:
+
+```txt
+/harness-wiki-update Deepen the service and microfrontend documentation: trace important flows, contracts, failures, and focused tests; add task-to-section routes and keep quickstart lightweight.
+```
+
+A no-argument update may still skip through the existing no-op check. The extension upgrade does not regenerate existing documentation automatically. An explicit note requests a model run; it is not a promise of a complete rewrite.
 
 ## Persistent Wiki brief
 
@@ -74,8 +90,8 @@ repository: langchain-ai/openwiki
 commit: 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
 short:  23428de fix: use dash-delimited Anthropic model id for Opus (claude-opus-4-8) (#113)
 date checked locally: 2026-07-06
-latest upstream check: 50e897dbff260203afbdaa2d385de99957877e49 (OpenWiki v0.3.2, released 2026-08-11)
-latest coding-agent prompt review: 4d2e1a02b53dbee9cb2f13e8df39f397f1a76bb6 (v0.3.0 prompt overhaul)
+latest upstream check: fab24e77afd1055078338848f3df3af7f785e291 (checkout package version 0.6.1)
+latest coding-agent prompt review: fab24e77afd1055078338848f3df3af7f785e291 (src/agent/repository-prompts.ts and integrations/openwiki/SKILL.md: per-topic research, quality contracts, and progressive retrieval)
 selected behavior ports: 2fb44a876db8cca461ad1c0767931d95495763a3 (coverage backlog), c95b6d6bacfa96379993ae424a705578a4882276 (interrupted-run retries), 4d2e1a02b53dbee9cb2f13e8df39f397f1a76bb6 (Wiki-first Q&A and coding-agent navigation), 5f8a8fb5c4943eb0b9474f1a74efb9c0824f6226 (internal-link validation), 1e6b395b162b52929cf39eaf219f7fb034af023f (GitHub-compatible heading-anchor slugs and link-validator dogfooding)
 ```
 
@@ -85,7 +101,8 @@ Kept/adapted:
 - `wiki/` output and `.last-update.json` metadata.
 - Git evidence collection, no-op update behavior, and interrupted-run retry metadata.
 - Documentation quality, planning, privacy, update discipline, deferred-area backlog tracking, and post-run internal-link validation.
-- Wiki-first question answering plus coding-agent-oriented task routing, symbol/test/validation guidance, and evidence-backed page relationships.
+- Wiki-first question answering plus section-level task routing, symbol/test/validation guidance, and evidence-backed page relationships.
+- OpenWiki-inspired per-topic research and quality contracts, adapted to Pi's native tools and an agent-managed plan rather than importing its generation runtime.
 - User-owned persistent Wiki brief adapted from OpenWiki `openwiki/INSTRUCTIONS.md`.
 
 Intentionally different:
@@ -94,9 +111,20 @@ Intentionally different:
 - Pi slash commands and the current Pi model/tools perform the work.
 - Harness owns the Wiki capability; there is no second `extensions/wiki/` entrypoint.
 - Domain-local reviewed rules are Markdown prompts under `wiki/**/_rules.md`.
-- Harness keeps its focused page budget/backlog model and English output contract; it does not adopt OpenWiki's OKF/index/visualizer pipeline, forced Mermaid generation, QA subagent graph, connectors, or personal-wiki features.
+- Harness keeps its explicit coverage backlog and English output contract but no fixed initial page quota. It does not adopt OpenWiki's Claims sidecars, durable page queue, workspace retrieval, OKF/index/visualizer pipeline, forced Mermaid generation, QA subagent graph, connectors, or personal-wiki features.
 - Harness keeps relative Markdown links inside `wiki/`; source and repository paths remain inline code references. OpenWiki v0.3.1's repo-wide link-target policy is therefore not ported, while its GitHub-compatible heading slug fix is.
 - OpenWiki's `.openwikiignore` backend gate cannot be copied safely onto Pi's shared filesystem tools; Harness continues to use the user-owned Wiki brief for scope exclusions and deterministic protection for reserved/sensitive paths.
+
+## Verification
+
+From a repository checkout with Node supporting native TypeScript stripping (22.18+):
+
+```bash
+npm --prefix packages/pi-learn-extensions run test:harness-wiki
+npm --prefix packages/harness-runtime test
+```
+
+The prompt tests exercise all three rendered modes, context-budget regression, safety/navigation instructions, monorepo coverage requirements, explicit deepening, and the shared agent bootstrap. They do not measure model-written prose quality or prove that an agent reads only relevant sections. Reload Pi and use the content/navigation acceptance scenarios in `wiki/operations/testing-and-safety.md` for behavioral review; OpenWiki quality parity requires a same-repository/model comparison.
 
 ## Upstream upgrade checklist
 

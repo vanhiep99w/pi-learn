@@ -164,6 +164,9 @@ Harness Wiki nằm trong cùng `harness/` entrypoint:
 - Normal docs nằm trong `wiki/**/*.md`; reviewed prompt rules nằm trong `wiki/**/_rules.md`.
 - Model lazy-load rules theo `AGENTS.md` → `wiki/quickstart.md` → root/section `_rules.md` bằng tool `read`.
 - Extension không tự inject toàn bộ rules và không cần reload/cache watcher cho Markdown content.
+- Tài liệu được nghiên cứu theo từng hệ thống/chủ đề, giải thích cơ chế, state, contract, lỗi và tests; không còn quota mặc định 8 trang. Repo nhiều service/microfrontend có điều hướng tới hệ thống, hợp đồng giao tiếp và workflow liên quan.
+- Quickstart/agent bootstrap giữ gọn; agent tìm heading bằng `grep`, đọc section qua `read(offset, limit)`, chỉ mở rộng khi thiếu bằng chứng hoặc tác vụ xuyên hệ thống. `/harness-wiki-ask` dùng prompt riêng, không chứa hướng dẫn generation dài. Đây là prompt guidance, không phải hard context limit.
+- Muốn nâng chất lượng wiki cũ, sau `/reload` chạy `/harness-wiki-update <yêu cầu đào sâu và điều hướng>`; update không tự rewrite mọi trang khi chỉ nâng cấp extension.
 - Wiki turns bị chặn sửa `_rules.md`; rule changes chỉ đi qua approved controlled apply.
 
 Apply/automation policy:
