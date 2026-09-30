@@ -22,7 +22,7 @@ The root package is not a conventional application server or web app. There is n
 }
 ```
 
-It is ESM (`"type": "module"`) and declares Pi host-provided packages, including `@sinclair/typebox`, as peer dependencies. Source references: `package.json`, extension imports such as `packages/pi-learn-extensions/extensions/web-tools/index.ts`.
+It is ESM (`"type": "module"`) and declares Pi host-provided packages, including `@sinclair/typebox`, as peer dependencies. Source references: `package.json` and extension imports under `packages/pi-learn-extensions/extensions/`.
 
 ### Public extension/theme package
 
@@ -57,7 +57,6 @@ Pi loads extension entrypoints from the directories listed in the manifest. Each
 
 Representative patterns:
 
-- `web-tools/index.ts` imports and calls `registerWebSearch`, `registerWebFetch`, and `registerToolSearch` (registered as `pi_tool_search` to avoid Pi's built-in `tool_search`), then shows a startup notification.
 - `harness/index.ts` is the single public Harness entrypoint. It registers `harness_import_llm_reflection`, observability/proposal commands, and the Harness Wiki module.
 - `harness/wiki-commands.ts` registers `/harness-wiki-*`, sends concise task prompts into the current Pi session, protects reserved rule/metadata files, and finalizes scaffolds/metadata after `agent_settled`.
 - `harness/wiki-prompt.ts` defines documentation-task discipline but does not inject all prompt rules. Pi auto-loads the `AGENTS.md` bootstrap and the model reads root/section `_rules.md` files lazily.

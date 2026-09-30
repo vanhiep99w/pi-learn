@@ -97,7 +97,6 @@ Where to change common features:
 
 | Feature | Files |
 |---|---|
-| Web search/fetch/tool discovery | `packages/pi-learn-extensions/extensions/web-tools/**` |
 | ChatGPT usage UI and account commands | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts` |
 | Prompt commands/model switching | `packages/pi-learn-extensions/extensions/prompt-with-model.ts` |
 | Aurora TUI/editor/footer | `packages/pi-learn-extensions/extensions/aurora-ui.ts` |

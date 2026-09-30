@@ -71,7 +71,7 @@ For extension/theme changes, normal verification is interactive:
 
 Examples:
 
-- Web tools: call `web_search`, then `web_fetch` on a result; test DuckDuckGo fallback when Tavily is not configured if relevant.
+- External web search: if `pi-web-access` is installed, verify its `web_search` tool; it is not shipped by Pi Learn.
 - Prompt templates: create or edit a small test prompt under `.pi/agent/model-prompts/`, `/reload`, then run the generated command.
 - Aurora UI: verify startup banner, editor border, footer/status rendering, theme switching, and terminal cleanup after session shutdown.
 - Harness Wiki: run `/harness-wiki-ask`, a no-op `/harness-wiki-update`, and a small forced update when changing Wiki behavior. Confirm `/wiki-*` and `/harness-wiki-status` are absent and Wiki turns cannot edit `_rules.md`.

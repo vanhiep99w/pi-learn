@@ -59,7 +59,6 @@ Các command còn lại chủ yếu để debug, kiểm tra, hoặc quản lý n
 ```txt
 extensions/
 ├── image-gen/                  # experimental image_gen via Codex subscription
-├── web-tools/                  # web_search, web_fetch, pi_tool_search
 ├── harness/                    # observability, proposals, eval, Harness Wiki
 ├── chatgpt-usage-status/       # ChatGPT Plus/Pro usage status
 ├── prompt-with-model.ts        # prompt templates có model/thinking riêng
@@ -104,22 +103,12 @@ Các capability chưa có trong build này: public OpenAI Images API fallback, m
 
 ---
 
-## 1. Web tools
+## 1. Web search (external)
 
-Extension `web-tools/` đăng ký các tool cho agent dùng khi cần search/fetch tài liệu.
-
-| Tool | Tác dụng | Khi nào dùng |
-|---|---|---|
-| `web_search` | Search web, dùng Tavily nếu có `TAVILY_API_KEY`, fallback DuckDuckGo. Hỗ trợ batch `queries`. | Tìm docs/current info/tutorial. |
-| `web_fetch` | Fetch URL, GitHub blob → raw, HTML → Markdown, hỗ trợ `max_length`, `start_index`, `raw`. | Đọc nội dung URL cụ thể. |
-| `pi_tool_search` | Liệt kê/tìm tools và slash commands trong Pi session. | Khi không nhớ command/tool nào đang có. |
-
-`pi_tool_search` được đặt tên riêng để không xung đột với built-in `tool_search` của Pi; có thể bật cả hai.
-
-Cấu hình Tavily optional:
+Pi Learn không đóng gói web tools. Nếu cần tool `web_search`, hãy cài [pi-web-access](https://github.com/nicobailon/pi-web-access) riêng:
 
 ```bash
-export TAVILY_API_KEY="tvly-..."
+pi install git:github.com/nicobailon/pi-web-access
 ```
 
 ---
@@ -321,7 +310,6 @@ Xem hướng dẫn chi tiết ở README root repo:
 ```txt
 extensions/
 ├── image-gen/           # experimental image_gen
-├── web-tools/
 ├── chatgpt-usage-status/
 ├── harness/             # Pi Harness + Harness Wiki commands
 ├── prompt-with-model.ts # model-aware prompt template commands

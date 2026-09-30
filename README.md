@@ -7,7 +7,6 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 ## Có gì trong package này?
 
 - `image-gen` — tool `image_gen` experimental, tạo/reference-edit ảnh bằng ChatGPT/Codex subscription và lưu asset + metadata.
-- `web-tools` — `web_search`, `web_fetch`, `pi_tool_search` (để built-in `tool_search` vẫn dùng được).
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
 - `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
 - `harness` — report/reflection/proposal/eval cùng Harness Wiki và reviewed domain-local prompt rules.
@@ -73,6 +72,7 @@ Danh sách thêm ngoài package này:
 
 - `npm:@juicesharp/rpiv-ask-user-question` — tool `ask_user_question` để agent hỏi clarification có cấu trúc.
 - `git:github.com/edxeth/pi-gpt-config` — config/GPT helpers. Local cache: `/home/hieptran/.pi/agent/git/github.com/edxeth/pi-gpt-config`
+- `git:github.com/nicobailon/pi-web-access` — package cung cấp tool `web_search` bên ngoài.
 
 `pi install` nhận **một source mỗi lần**, nên khi cài nhiều package hãy chạy lần lượt hoặc dùng loop.
 
@@ -83,6 +83,7 @@ for pkg in \
   git:github.com/vanhiep99w/pi-learn@main \
   npm:@juicesharp/rpiv-ask-user-question \
   git:github.com/edxeth/pi-gpt-config \
+  git:github.com/nicobailon/pi-web-access \
   npm:pi-tool-display \
   npm:pi-mcp-adapter \
   npm:pi-image-preview
@@ -98,6 +99,7 @@ for pkg in \
   git:github.com/vanhiep99w/pi-learn@main \
   npm:@juicesharp/rpiv-ask-user-question \
   git:github.com/edxeth/pi-gpt-config \
+  git:github.com/nicobailon/pi-web-access \
   npm:pi-tool-display \
   npm:pi-mcp-adapter \
   npm:pi-image-preview
@@ -166,15 +168,13 @@ Ghi chú:
 - Rule edits chỉ đi qua proposal → approval → controlled apply; critical protection vẫn được enforce bằng code.
 - Base upstream: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem `packages/pi-learn-extensions/extensions/harness/README.md`.
 
-### Tavily cho `web_search`
+### Web search
 
-Không bắt buộc. Nếu có key, search tốt hơn:
+Pi Learn không còn đăng ký tool `web_search` để tránh xung đột. Cài [pi-web-access](https://github.com/nicobailon/pi-web-access) riêng:
 
 ```bash
-export TAVILY_API_KEY="tvly-..."
+pi install git:github.com/nicobailon/pi-web-access
 ```
-
-Thêm lâu dài vào `~/.bashrc` hoặc `~/.zshrc` nếu cần.
 
 ### ChatGPT usage
 

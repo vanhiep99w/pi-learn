@@ -25,29 +25,9 @@ Change guidance:
 - Keep non-overwrite behavior, global metadata redaction/permissions, input/output size limits, and backend capability checks deterministic.
 - Run `npm --prefix packages/pi-learn-extensions run test:image-gen`, load the entrypoint, then use `/reload` for interactive verification.
 
-## Web tools
+## Web search (external)
 
-Source: `packages/pi-learn-extensions/extensions/web-tools/`
-
-Registered tools:
-
-- `web_search` — searches the web, using Tavily when `TAVILY_API_KEY` is configured and DuckDuckGo otherwise.
-- `web_fetch` — fetches URL content, normalizes HTTP to HTTPS, converts GitHub blob URLs to raw content, follows permitted redirects, converts HTML to Markdown unless `raw` is set, and supports pagination by `start_index`/`max_length`.
-- `pi_tool_search` — lists/searches tools and slash commands available in the current Pi session. It is named separately so Pi's built-in `tool_search` can load alongside this extension.
-
-Implementation notes from source:
-
-- `index.ts` registers the three tools and displays which engine is active on session start.
-- `web-search.ts` supports either `query` or batched `queries`, limits batch size to 5, caps results at 10, caches results, and has rendering for single and batch calls.
-- `web-fetch.ts` validates and normalizes URLs, uses `curl` via `pi.exec`, limits fetch size/time, avoids automatic cross-host redirects, and caches full fetched content.
-- `utils.ts` contains cache, rate-limit, key, URL, and formatting helpers; `parsers.ts` contains result and HTML parsing helpers.
-
-Change guidance:
-
-- Keep `TAVILY_API_KEY` optional and preserve DuckDuckGo fallback.
-- Do not log or document actual API keys.
-- Preserve safe URL/redirect behavior when extending fetch support.
-- If adding tool parameters, update the TypeBox schema and tool descriptions together.
+Pi Learn does not include a web-tools extension. Install [pi-web-access](https://github.com/nicobailon/pi-web-access) separately if you want the `web_search` tool.
 
 ## Harness extension
 
