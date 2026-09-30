@@ -16,7 +16,7 @@ export default function (pi: ExtensionAPI) {
     const keys = getTavilyKeys();
     const engine = keys.length > 0 ? `Tavily ×${keys.length}` : "DuckDuckGo";
     pi.ctx?.ui?.notify(
-      `🌐 Web Tools v2 (${engine}): web_search, web_fetch, tool_search`,
+      `🌐 Web Tools v2 (${engine}): web_search, web_fetch, pi_tool_search`,
       2000
     );
   });

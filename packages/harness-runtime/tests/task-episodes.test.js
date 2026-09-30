@@ -602,6 +602,8 @@ test("preview_export is potentially mutating while known finite read tools remai
   assert.deepEqual(unknown.observation.reasons, ["unknown-potentially-mutating-tool"]);
   const readOnly = build([event("user_message"), toolCall("read", "read-1", { path: "README.md" })]).readerArtifact.episodes[0];
   assert.equal(readOnly.observation.coverage, "complete");
+  const piToolSearch = build([event("user_message"), toolCall("pi_tool_search", "pi-tool-search-1", { query: "harness" })]).readerArtifact.episodes[0];
+  assert.equal(piToolSearch.observation.coverage, "complete");
 });
 
 test("classifier rejects expansion metacharacters and controls even when quoted", () => {

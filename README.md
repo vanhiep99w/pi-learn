@@ -7,7 +7,7 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 ## Có gì trong package này?
 
 - `image-gen` — tool `image_gen` experimental, tạo/reference-edit ảnh bằng ChatGPT/Codex subscription và lưu asset + metadata.
-- `web-tools` — `web_search`, `web_fetch`, `tool_search`.
+- `web-tools` — `web_search`, `web_fetch`, `pi_tool_search` (để built-in `tool_search` vẫn dùng được).
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
 - `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
 - `harness` — report/reflection/proposal/eval cùng Harness Wiki và reviewed domain-local prompt rules.

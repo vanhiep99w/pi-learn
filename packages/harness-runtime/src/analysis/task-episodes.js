@@ -29,6 +29,7 @@ const READ_ONLY_TOOLS = new Set([
   "grep",
   "ls",
   "read",
+  "pi_tool_search",
   "tool_search",
   "web_fetch",
   "web_search",

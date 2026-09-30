@@ -33,7 +33,7 @@ Registered tools:
 
 - `web_search` — searches the web, using Tavily when `TAVILY_API_KEY` is configured and DuckDuckGo otherwise.
 - `web_fetch` — fetches URL content, normalizes HTTP to HTTPS, converts GitHub blob URLs to raw content, follows permitted redirects, converts HTML to Markdown unless `raw` is set, and supports pagination by `start_index`/`max_length`.
-- `tool_search` — lists/searches tools and slash commands available in the current Pi session.
+- `pi_tool_search` — lists/searches tools and slash commands available in the current Pi session. It is named separately so Pi's built-in `tool_search` can load alongside this extension.
 
 Implementation notes from source:
 

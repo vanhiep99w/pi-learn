@@ -4,12 +4,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export function registerToolSearch(pi: ExtensionAPI) {
   pi.registerTool({
-    name: "tool_search",
-    label: "Tool Search",
+    name: "pi_tool_search",
+    label: "Pi Tool Search",
     description:
       "Search for available tools, slash commands, and capabilities in the current Pi session. Use this to discover what tools are available.",
     promptSnippet:
-      "Use `tool_search` to list or search for available tools and commands.",
+      "Use `pi_tool_search` to list or search for available tools and commands.",
     promptGuidelines: [
       "Use when you need to discover what tools are available.",
       "Leave query empty to list all tools and commands.",
@@ -70,7 +70,7 @@ export function registerToolSearch(pi: ExtensionAPI) {
     },
 
     renderCall(args: any, theme: any) {
-      let text = theme.fg("toolTitle", theme.bold("🔧 tool_search "));
+      let text = theme.fg("toolTitle", theme.bold("🔧 pi_tool_search "));
       if (args.query) text += theme.fg("dim", `"${args.query}"`);
       else text += theme.fg("dim", "(list all)");
       return new Text(text, 0, 0);

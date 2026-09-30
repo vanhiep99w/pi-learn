@@ -59,7 +59,7 @@ Các command còn lại chủ yếu để debug, kiểm tra, hoặc quản lý n
 ```txt
 extensions/
 ├── image-gen/                  # experimental image_gen via Codex subscription
-├── web-tools/                  # web_search, web_fetch, tool_search
+├── web-tools/                  # web_search, web_fetch, pi_tool_search
 ├── harness/                    # observability, proposals, eval, Harness Wiki
 ├── chatgpt-usage-status/       # ChatGPT Plus/Pro usage status
 ├── prompt-with-model.ts        # prompt templates có model/thinking riêng
@@ -112,7 +112,9 @@ Extension `web-tools/` đăng ký các tool cho agent dùng khi cần search/fet
 |---|---|---|
 | `web_search` | Search web, dùng Tavily nếu có `TAVILY_API_KEY`, fallback DuckDuckGo. Hỗ trợ batch `queries`. | Tìm docs/current info/tutorial. |
 | `web_fetch` | Fetch URL, GitHub blob → raw, HTML → Markdown, hỗ trợ `max_length`, `start_index`, `raw`. | Đọc nội dung URL cụ thể. |
-| `tool_search` | Liệt kê/tìm tools và slash commands trong Pi session. | Khi không nhớ command/tool nào đang có. |
+| `pi_tool_search` | Liệt kê/tìm tools và slash commands trong Pi session. | Khi không nhớ command/tool nào đang có. |
+
+`pi_tool_search` được đặt tên riêng để không xung đột với built-in `tool_search` của Pi; có thể bật cả hai.
 
 Cấu hình Tavily optional:
 

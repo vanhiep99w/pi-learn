@@ -21,7 +21,8 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-tui": "*",
+    "@sinclair/typebox": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-ai": {
@@ -33,8 +34,5 @@
     "@earendil-works/pi-tui": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "@sinclair/typebox": "^0.34.49"
   }
 }
