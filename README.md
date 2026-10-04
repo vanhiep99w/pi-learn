@@ -10,7 +10,7 @@ Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
 - `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
 - `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
 - `harness` — report/reflection/proposal/eval cùng Harness Wiki và reviewed domain-local prompt rules.
-- `aurora-ui` — input có viền trên/dưới (không viền dọc) + ChatGPT usage badge.
+- `aurora-ui` — input không khung + các dòng trạng thái và ChatGPT usage badge.
 - `midnight-aurora` — theme dark custom.
 
 Pi load package qua root `package.json`:

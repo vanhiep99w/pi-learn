@@ -1,12 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Aurora UI Extension — Open-sided Input + Custom Footer
+//  Aurora UI Extension — Borderless Input + Custom Footer
 //  • Startup banner (tự ẩn sau 5s)
-//  • Open-sided editor: giữ viền trên/dưới, không vẽ viền dọc để copy sạch
-//    - Top border: context usage (left) + model/thinking/session (right)
-//    - Bottom border: cwd + git branch
+//  • Borderless editor: không vẽ khung để terminal copy sạch
+//    - Top status: context/cwd (left) + model/thinking/session (right)
+//    - Bottom status: ChatGPT usage
 //  • Minimal footer: chỉ hiển thị extension statuses
 //  • Custom working messages cho tool execution
 //  • /aurora-themes, Ctrl+Shift+T
@@ -49,7 +50,7 @@ export default function (pi: ExtensionAPI) {
     let disposed = false;
     let gitStatsTimer: ReturnType<typeof setInterval> | undefined;
     let bannerTimer: ReturnType<typeof setTimeout> | undefined;
-    let currentEditor: BorderedEditor | null = null;
+    let currentEditor: AuroraEditor | null = null;
 
     const unregisterCleanup = addSessionCleanup(() => {
       disposed = true;
@@ -64,10 +65,10 @@ export default function (pi: ExtensionAPI) {
       try { ctx.ui.setWidget("aurora-banner", undefined); } catch { /* ctx may be stale during session replacement */ }
     }, 5000);
 
-    // ── Bordered Editor ─────────────────────────────────────────
+    // ── Borderless Editor ───────────────────────────────────────
     // CustomEditor constructor: (tui, theme, keybindings, options?)
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-      currentEditor = new BorderedEditor(tui, theme, keybindings, pi, ctx, cwd, () => gitBranch, () => gitStats);
+      currentEditor = new AuroraEditor(tui, theme, keybindings, pi, ctx, cwd, () => gitBranch, () => gitStats);
       return currentEditor;
     });
 
@@ -115,12 +116,13 @@ export default function (pi: ExtensionAPI) {
             if (parts.length > 0) statusLine = parts.join("  ");
           } catch { /* footer data can be transient during session switch */ }
 
-          // Pi 0.84's fullscreen layout reserves one row for the footer even
-          // when a custom footer renders no text. Reuse that row for Aurora's
-          // bottom border instead of leaving a blank line under the editor.
+          // Reuse fullscreen's reserved footer row for the unframed usage status.
           if (isFullscreenTui(tui) && currentEditor) {
-            const border = currentEditor.renderFooterBorder(w);
-            return statusLine ? [border, statusLine] : [border];
+            const lines: string[] = [];
+            const usageLine = currentEditor.renderFooterStatus(w);
+            if (usageLine) lines.push(usageLine);
+            if (statusLine) lines.push(statusLine);
+            return lines;
           }
 
           return statusLine ? [statusLine] : [];
@@ -193,15 +195,15 @@ export default function (pi: ExtensionAPI) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  BorderedEditor — Input box mở hai bên để terminal copy không kèm viền dọc
+//  AuroraEditor — Input không khung để terminal copy không kèm ký tự trang trí
 //
 //  Layout:
-//  ╭─ 7% of 300k ──────────────────── sonnet─◑ medium─my-session ─╮
-//    > type your prompt here_
-//  ╰───────────────────────────────── ~/Desktop/project (main) ─────╯
+//  7% of 300k  ·  ~/Desktop/project (main)          sonnet  ·  ◑ medium
+//  > type your prompt here_
+//  ChatGPT  ·  usage
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class BorderedEditor extends CustomEditor {
+class AuroraEditor extends CustomEditor {
   private piRef: ExtensionAPI;
   private ctxRef: any;
   private cwd: string;
@@ -262,10 +264,11 @@ class BorderedEditor extends CustomEditor {
 
     const result: string[] = [];
 
-    // ── Top border with badges ──
-    result.push(this.topBorder(width, t));
+    // ── Unframed status with badges ──
+    const topStatus = this.topStatusLine(width, t);
+    if (topStatus) result.push(topStatus);
 
-    // ── Content lines without vertical borders ──
+    // ── Borderless content lines ──
     // Keep the prompt box readable even when the editor has only one line.
     const minContentRows = 3;
     const visibleContentLines = [...contentLines];
@@ -275,11 +278,10 @@ class BorderedEditor extends CustomEditor {
       result.push(line);
     }
 
-    // ── Bottom border with cwd ──
-    // Fullscreen Pi reserves a footer row; Aurora renders this border there
-    // so the reserved row is useful instead of appearing as bottom padding.
+    // ── Unframed ChatGPT usage status ──
     if (!isFullscreenTui(this.tui)) {
-      result.push(this.bottomBorder(width, t));
+      const bottomStatus = this.bottomStatusLine(width, t);
+      if (bottomStatus) result.push(bottomStatus);
     }
 
     // ── Autocomplete dropdown ──
@@ -290,20 +292,21 @@ class BorderedEditor extends CustomEditor {
     return result;
   }
 
-  renderFooterBorder(width: number): string {
-    return this.bottomBorder(width, getSafeTheme(this.ctxRef));
+  renderFooterStatus(width: number): string | undefined {
+    return this.bottomStatusLine(width, getSafeTheme(this.ctxRef));
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  Top border: ╭─ context ──────── model─thinking─session ─╮
+  //  Top status: context/cwd (left), model/thinking/session (right)
   // ─────────────────────────────────────────────────────────────
-  private topBorder(w: number, t: any): string {
-    const bc = "borderAccent";
+  private topStatusLine(w: number, t: any): string {
+    const width = Math.max(0, Math.floor(w));
+    if (width === 0) return "";
 
-    // Fallback for very narrow terminals
-    if (w < 20) return t.fg(bc, "╭" + "─".repeat(Math.max(0, w - 2)) + "╮");
+    const separatorRaw = "  ·  ";
+    const separatorStyled = t.fg("dim", separatorRaw);
 
-    // ── Left badges: context usage ─ cwd/branch ──
+    // ── Left badges: context usage + cwd/branch ──
     const lParts: { raw: string; styled: string }[] = [];
 
     let usage: ReturnType<typeof this.ctxRef.getContextUsage> | null = null;
@@ -356,65 +359,45 @@ class BorderedEditor extends CustomEditor {
       rParts.push({ raw: sessionName, styled: t.fg("accent", sessionName) });
     }
 
-    // Join badges with ─ separators (embedded in border)
-    const rRaw = rParts.map(p => p.raw).join("─");
-    const rStyled = rParts.map(p => p.styled).join(t.fg(bc, "─"));
-    let lRaw = lParts.map(p => p.raw).join(" ─ ");
-    let lStyled = lParts.map(p => p.styled).join(t.fg(bc, " ─ "));
-    let lW = lRaw.length;
-    const rW = rRaw.length;
+    const rRaw = rParts.map(p => p.raw).join(separatorRaw);
+    const rStyled = rParts.map(p => p.styled).join(separatorStyled);
+    let lRaw = lParts.map(p => p.raw).join(separatorRaw);
+    let lStyled = lParts.map(p => p.styled).join(separatorStyled);
+    let lW = visibleWidth(lRaw);
+    const rW = visibleWidth(rRaw);
 
     // If the terminal is too narrow, keep context usage and drop cwd first.
-    if (rW > 0 && lW + rW + 8 > w && lParts.length > 1) {
+    if (rW > 0 && lW + rW + 2 > width && lParts.length > 1) {
       lRaw = lParts[0].raw;
       lStyled = lParts[0].styled;
-      lW = lRaw.length;
+      lW = visibleWidth(lRaw);
     }
 
-    // Layout: ╭─ left ───...─── right ─╮
-    // Width:  3 + lW + 1 + filler + 1 + rW + 3 = w
     if (lW > 0 && rW > 0) {
-      const fill = Math.max(1, w - 8 - lW - rW);
-      return (
-        t.fg(bc, "╭─ ") + lStyled + " " +
-        t.fg(bc, "─".repeat(fill)) + " " +
-        rStyled + t.fg(bc, " ─╮")
-      );
+      if (rW >= width) return truncateToWidth(rStyled, width, "");
+      const left = truncateToWidth(lStyled, Math.max(0, width - rW - 1), "");
+      const gap = Math.max(1, width - visibleWidth(left) - rW);
+      return left + " ".repeat(gap) + rStyled;
     }
-    if (lW > 0) {
-      const fill = Math.max(1, w - 5 - lW);
-      return t.fg(bc, "╭─ ") + lStyled + t.fg(bc, " " + "─".repeat(fill) + "╮");
-    }
+    if (lW > 0) return truncateToWidth(lStyled, width, "");
     if (rW > 0) {
-      const fill = Math.max(1, w - 5 - rW);
-      return t.fg(bc, "╭" + "─".repeat(fill) + " ") + rStyled + t.fg(bc, " ─╮");
+      const right = truncateToWidth(rStyled, width, "");
+      return " ".repeat(Math.max(0, width - visibleWidth(right))) + right;
     }
-    return t.fg(bc, "╭" + "─".repeat(w - 2) + "╮");
+    return "";
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  Bottom border: ╰─ ChatGPT usage ───────────────────────────╯
+  //  Bottom status: ChatGPT usage
   // ─────────────────────────────────────────────────────────────
-  private bottomBorder(w: number, t: any): string {
-    const bc = "borderAccent";
+  private bottomStatusLine(w: number, t: any): string | undefined {
+    const width = Math.max(0, Math.floor(w));
+    if (width === 0) return;
 
-    if (w < 20) return t.fg(bc, "╰" + "─".repeat(Math.max(0, w - 2)) + "╯");
-
-    // ChatGPT subscription usage is supplied by .pi/extensions/chatgpt-usage-status.
-    // Put it on the lower-left corner. If usage is not available, draw a clean border.
+    // ChatGPT subscription usage is supplied by the usage-status extension.
     const usage = getChatGptUsageBadge(t);
-    if (!usage || usage.raw.length + 6 > w) {
-      return t.fg(bc, "╰" + "─".repeat(w - 2) + "╯");
-    }
-
-    // Layout: ╰─ usage ───...───╯
-    // Width:  3 + usage + 1 + filler + 1 = w
-    const fill = Math.max(1, w - 5 - usage.raw.length);
-    return (
-      t.fg(bc, "╰─ ") +
-      usage.styled +
-      t.fg(bc, " " + "─".repeat(fill) + "╯")
-    );
+    if (!usage) return;
+    return truncateToWidth(usage.styled, width, "");
   }
 }
 

@@ -241,7 +241,7 @@ async function updateStatus(ctx: any, force = false, isChatGpt = isChatGptProvid
   }
   applyUsageState(state);
 
-  // Aurora UI reads the shared state and paints it on the input border.
+  // Aurora UI reads the shared state and paints it on the input status row.
   // Keep the normal footer clean (avoid duplicate status line below editor).
   ui?.setStatus(STATUS_ID, undefined);
   ui?.setWidget(STATUS_ID, undefined);
