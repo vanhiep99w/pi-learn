@@ -1,11 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Aurora UI Extension — Bordered Input + Custom Footer
+//  Aurora UI Extension — Open-sided Input + Custom Footer
 //  • Startup banner (tự ẩn sau 5s)
-//  • Bordered editor: rounded border bao quanh ô input
+//  • Open-sided editor: giữ viền trên/dưới, không vẽ viền dọc để copy sạch
 //    - Top border: context usage (left) + model/thinking/session (right)
 //    - Bottom border: cwd + git branch
 //  • Minimal footer: chỉ hiển thị extension statuses
@@ -194,11 +193,11 @@ export default function (pi: ExtensionAPI) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  BorderedEditor — Input box với rounded border
+//  BorderedEditor — Input box mở hai bên để terminal copy không kèm viền dọc
 //
 //  Layout:
 //  ╭─ 7% of 300k ──────────────────── sonnet─◑ medium─my-session ─╮
-//  │ > type your prompt here_                                       │
+//    > type your prompt here_
 //  ╰───────────────────────────────── ~/Desktop/project (main) ─────╯
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -230,11 +229,9 @@ class BorderedEditor extends CustomEditor {
 
   render(width: number): string[] {
     const t = getSafeTheme(this.ctxRef);
-    // Inner width = width - 4 (for "│ " on left + " │" on right)
-    const inner = Math.max(1, width - 4);
 
-    // Get editor content with reduced width
-    const allLines = super.render(inner);
+    // Use the full width now that content rows have no vertical frame.
+    const allLines = super.render(Math.max(1, width));
 
     // super.render() returns: [topBorder, ...contentLines, bottomBorder, ...autocompleteLines]
     // We need to strip the Editor's own top/bottom borders (─────) and keep
@@ -268,18 +265,14 @@ class BorderedEditor extends CustomEditor {
     // ── Top border with badges ──
     result.push(this.topBorder(width, t));
 
-    // ── Content lines with side borders ──
+    // ── Content lines without vertical borders ──
     // Keep the prompt box readable even when the editor has only one line.
     const minContentRows = 3;
     const visibleContentLines = [...contentLines];
     while (visibleContentLines.length < minContentRows) visibleContentLines.push("");
 
     for (const line of visibleContentLines) {
-      const vw = visibleWidth(line);
-      const pad = " ".repeat(Math.max(0, inner - vw));
-      result.push(
-        t.fg("borderAccent", "│") + " " + line + pad + " " + t.fg("borderAccent", "│")
-      );
+      result.push(line);
     }
 
     // ── Bottom border with cwd ──

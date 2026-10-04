@@ -247,7 +247,7 @@ Sau khi thêm/sửa prompt, chạy:
 Extension `aurora-ui.ts` custom TUI:
 
 - Startup banner.
-- Bordered editor (rounded border + badges).
+- Editor có viền trên/dưới + badges; không vẽ viền dọc để copy prompt sạch.
 - Footer tối giản.
 - Working messages tiếng Việt.
 - Hiển thị cwd/git branch/git stats.
@@ -316,7 +316,7 @@ extensions/
 ├── chatgpt-usage-status/
 ├── harness/             # Pi Harness + Harness Wiki commands
 ├── prompt-with-model.ts # model-aware prompt template commands
-└── aurora-ui.ts         # bordered editor + custom footer
+└── aurora-ui.ts         # open-sided editor + custom footer
 
 themes/
 └── midnight-aurora.json
