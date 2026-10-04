@@ -132,10 +132,10 @@ Sources:
 Aurora customizes the interactive Pi TUI:
 
 - startup banner
-- borderless custom editor with unframed status rows
+- custom editor with straight top/bottom borders and no vertical sides or rounded corners
 - minimal footer showing extension statuses
 - Vietnamese working messages for agent/tool activity
-- cwd, git branch, and git working-tree stats in the editor status row
+- cwd, git branch, and git working-tree stats in the top editor border
 - `/aurora-themes` command and `ctrl+shift+t` shortcut
 
 Source-level safety patterns to preserve:
