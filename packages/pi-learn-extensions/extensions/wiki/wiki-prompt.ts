@@ -154,12 +154,6 @@ Agent bootstrap:
 ${createWikiAgentInstructions()}
 \`\`\`
 
-Command reference:
-- /wiki [message] initializes repository Wiki documentation.
-- /wiki-update [message] updates existing Wiki documentation.
-- /wiki-update may edit _rules.md only when [message] explicitly requests rule changes.
-- There is no Wiki question command: ordinary project questions follow AGENTS.md and load quickstart only when needed.
-
 Documentation contract:
 - ${WIKI_DIR}/quickstart.md is the lightweight entrypoint: project purpose, essential setup, task/system routes, conditional rule loading, and a concise evidence-based backlog if needed.
 - Put detailed architecture, contracts, workflows, failures, and validation guidance in canonical topic pages, not quickstart.

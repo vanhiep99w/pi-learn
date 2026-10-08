@@ -59,12 +59,14 @@ for (const mode of modes) {
   });
 }
 
-test("init and update expose only the new command surface", () => {
-  const prompt = render("init");
-  assert.match(prompt, /\/wiki \[message\]/);
-  assert.match(prompt, /\/wiki-update \[message\]/);
-  assert.match(prompt, /There is no Wiki question command/);
-  assert.doesNotMatch(prompt, /\/wiki-ask|\/wiki-init/i);
+test("init and update omit command reference while keeping the public command surface", () => {
+  for (const mode of modes) {
+    for (const allowRuleUpdates of [false, true]) {
+      const prompt = render(mode, "REQUEST_SENTINEL", allowRuleUpdates);
+      assert.doesNotMatch(prompt, /Command reference:|\/wiki \[message\]|\/wiki-update \[message\]|There is no Wiki question command/);
+      assert.doesNotMatch(prompt, /\/wiki-ask|\/wiki-init/i);
+    }
+  }
 
   const source = readFileSync(new URL("../../extensions/wiki/wiki-commands.ts", import.meta.url), "utf8");
   const commands = [...source.matchAll(/registerCommand\("([^"]+)"/g)].map((match) => match[1]);
