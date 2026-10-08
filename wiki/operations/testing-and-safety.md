@@ -1,110 +1,58 @@
 # Testing and safety
 
-This repository has a mixed verification story: extension code is usually verified in Pi itself, while the harness runtime has a Node test suite. Use targeted checks instead of assuming a root build/test script exists.
+This page defines focused checks and privacy boundaries for the reduced Pi Learn package.
 
-## Test commands
+## Automated tests
 
-The root `package.json` does not define a root `test` script. The harness runtime package does:
-
-```bash
-cd packages/harness-runtime
-npm test
-```
-
-This runs `node --test` over `packages/harness-runtime/tests/*.test.js`.
-
-Representative test files include:
-
-- `analysis-run.test.js`
-- `api.test.js`
-- `config.test.js`
-- `discover-sessions.test.js`
-- `parse-tree.test.js`
-- `redaction.test.js`
-- `proposal-lifecycle.test.js`
-- `proposal-writer.test.js`
-- `reflection.test.js`
-- `rules.test.js`
-- `eval-harness.test.js`
-- `wiki-links.test.js`
-- `wiki-prompt-rules.test.js`
-
-For the new frozen-run and Wiki-link boundaries, a narrow root-level check is:
+The root package has no root test script. Wiki behavior is tested from the extension package:
 
 ```bash
-node --test packages/harness-runtime/tests/analysis-run.test.js packages/harness-runtime/tests/wiki-links.test.js
+npm --prefix packages/pi-learn-extensions run test:wiki
 ```
 
-Use the full package suite before integrating a cross-cutting Harness runtime or Wiki orchestration change.
+The suite includes:
 
-Harness Wiki prompt changes have a separate extension-level suite. From the repository root with Node native TypeScript stripping (22.18+):
+- prompt and command-surface contracts;
+- conditional quickstart/rule-loading bootstrap alignment;
+- explicit rule-update request detection;
+- rule path classification, scaffolding, lint, and symlink safety;
+- internal Wiki links, anchors, traversal rejection, and symlink rejection;
+- validation of the checked-in Wiki.
 
-```bash
-npm --prefix packages/pi-learn-extensions run test:harness-wiki
-```
-
-`packages/pi-learn-extensions/tests/harness/wiki-prompt.test.mts` renders init/update/chat prompts and checks selective reading, topic depth, service/MFE boundaries, explicit deepening, safety, and the shared agent bootstrap. It also budgets the fixed question prompt without counting arbitrary user brief/request content. These tests verify instructions and regressions, not whether an LLM follows them or writes accurate, complete prose.
-
-Source references: `packages/harness-runtime/package.json`, `packages/harness-runtime/tests/`, `packages/pi-learn-extensions/package.json`, `packages/pi-learn-extensions/tests/harness/wiki-prompt.test.mts`.
-
-## Harness eval scenarios
-
-The runtime also has deterministic eval scenarios exposed through `/harness-eval` and implemented in `packages/harness-runtime/src/eval/eval-harness.js`:
-
-```txt
-redaction-fixture
-parser-unknown-entry
-edit-oldText-workflow
-file-protection
-smart-commit-basic
-ts-extension-safety
-wiki-prompt-rule-file-protection
-wiki-prompt-rule-section-routing
-wiki-prompt-rule-lazy-loading
-harness-wiki-command-surface
-```
-
-These scenarios validate safety and workflow behaviors that are easy to regress: secret redaction, parser resilience, prompt-rule routing/loading/protection, file target protection, controlled apply, and the merged command surface.
-
-When changing harness logic, run both Node tests and the relevant `/harness-eval` scenario from Pi if possible.
+Tests validate deterministic boundaries and prompt text, not whether every model-generated page is semantically complete.
 
 ## Manual Pi verification
 
-For extension/theme changes, normal verification is interactive:
+After source changes:
 
-1. Make the code change.
-2. Run any targeted static/test check available for the changed area.
-3. Restart Pi or run `/reload`.
-4. Exercise the specific command/tool/UI path.
+1. Run focused automated tests.
+2. Run `/reload` or restart Pi.
+3. Exercise the affected surface.
 
-Examples:
+### Wiki scenarios
 
-- External web search: if `pi-web-access` is installed, verify its `web_search` tool; it is not shipped by Pi Learn.
-- Prompt templates: create or edit a small test prompt under `.pi/agent/model-prompts/`, `/reload`, then run the generated command.
-- Aurora UI: verify startup banner, editor border, footer/status rendering, theme switching, and terminal cleanup after session shutdown.
-- Harness Wiki: run `/harness-wiki-ask`, a no-op `/harness-wiki-update`, and a small forced update when changing Wiki behavior. Confirm `/wiki-*` and `/harness-wiki-status` are absent and Wiki turns cannot edit `_rules.md`.
-- Harness: run `/harness`, exercise dashboard scrolling/Markdown rendering, and run targeted `/harness-eval` after runtime changes.
+| Scenario | Expected result |
+|---|---|
+| `/wiki` in a disposable repository | Creates a routed Wiki and compact Project Wiki bootstrap; does not edit rules beyond deterministic missing scaffolds. |
+| `/wiki-update` with no changes | Skips when metadata, links, rules, Git head, and worktree allow a no-op. |
+| `/wiki-update Refresh changed extension docs` | Updates affected docs only; `_rules.md` remains protected. |
+| `/wiki-update Update wiki/**/_rules.md for new commands` | Enables rule edits, preserves unrelated rules, validates the final layout, and records metadata. |
+| Invalid internal link | Reports source/line and records interrupted status after a changed run. |
+| Invalid final rule layout | Reports lint details and records interrupted status. |
+| Ordinary project question | Reads quickstart only when not already in context; does not require rules unless an edit begins. |
 
-## Harness Wiki content and navigation acceptance
+Also confirm only `/wiki` and `/wiki-update` are registered.
 
-Use disposable checkouts with the same source revision, model, instructions, and comparable generation budget when comparing Harness with OpenWiki. Reload the changed extension before exercising it. Cover a small single-system repo, a multi-service repo, and a shell/remote microfrontend repo; do not assume a passing prompt suite establishes output parity.
+### ChatGPT usage and Aurora
 
-| Scenario | Content evidence to inspect | Expected retrieval behavior |
-|---|---|---|
-| Initialize a small repo | Mechanisms, important failures, source anchors, and focused tests; no artificial service taxonomy or quota-driven padding | Quickstart routes to the few real topics without repeating their bodies. |
-| Change a service-local behavior or MFE style | Owning entrypoint, local state/behavior, relevant dependencies and tests | Read owning sections and applicable rules; unrelated services/remotes are not preloaded. |
-| Change an API/event schema or shared package | Producer, known consumers, compatibility constraints, failure behavior and contract tests | Expand across affected boundaries even when only one source file changed; unknown consumers are identified, not guessed away. |
-| Diagnose remote loading or auth propagation | Evidenced host/remote lifecycle, shared state, fallback and deployment/version constraints | Read the relevant workflow/contract and participant sections, not every frontend page. |
-| Explicitly deepen unchanged documentation | Existing accurate prose preserved; material gaps filled with source/tests | The request can schedule work without source changes; no unrelated formatting churn. |
-| Ask what the Wiki says | Answer cites the selected page/heading, preserves qualifiers, and discloses missing/stale evidence | Use bounded grep and section reads; continue a truncated relevant section, then stop once grounded. Ordinary questions do not create plans or edit files. |
+- Verify usage status appears only for supported ChatGPT providers.
+- Never use real credential contents as test fixtures.
+- Verify Aurora startup/editor/footer/theme selection in a TUI and confirm non-TUI modes do not fail.
+- Verify timers/status/compositor state are cleaned up after shutdown or reload.
 
-Review generated text against source/tests, not page count or word count. Evaluate coverage, factual accuracy, mechanism/failure depth, and route usefulness separately from how much context was read. Observe only the test run's tool activity with appropriate authorization; do not mine private payload/session logs for this check. Record unresolved evidence gaps and distinguish a content defect from an unnecessary-read defect.
+## Security and privacy
 
-The [Wiki capability](../extensions/wiki-extension.md#selective-reading) describes the prompt contract. Semantic completeness and selective stopping remain model behavior, while existing link checks validate only their documented structural boundary.
-
-## Security and privacy rules
-
-Do not read or document live secrets, credentials, private keys, tokens, `.env` files, auth files, or payload logs. Specific sensitive locations called out by source/docs include:
+Do not read or document live secrets, credentials, private keys, tokens, `.env` files, auth files, payload logs, or raw session logs. Sensitive examples include:
 
 ```txt
 .env and .env.* live config
@@ -113,54 +61,29 @@ Do not read or document live secrets, credentials, private keys, tokens, `.env` 
 .pi/agent/chatgpt-usage-accounts.json
 ~/.pi/agent/auth.json
 ~/.pi/agent/chatgpt-usage-accounts.json
-~/.pi/agent/sessions/ raw session logs
-private keys such as *.pem, *.key, id_rsa, id_ed25519
+~/.pi/agent/sessions/
+*.pem, *.key, id_rsa, id_ed25519
 ```
 
-`.env.example` or other sample config can be read only when it contains placeholders rather than live values.
+Sample files such as `.env.example` are readable only when they contain placeholders rather than live values.
 
-Source references: `AGENTS.md`, `packages/harness-runtime/src/safety/redaction.js`, `packages/harness-runtime/README.md`.
+## Wiki path safety
 
-## Redaction model
+Rule and link helpers enforce repository-root boundaries and reject unsafe symlink/path escapes. During an active Wiki run:
 
-`packages/harness-runtime/src/safety/redaction.js` redacts:
+- metadata is always extension-owned;
+- `wiki/INSTRUCTIONS.md` is protected;
+- `_rules.md` is protected unless `/wiki-update` explicitly opted into rule changes.
 
-- OpenAI-like keys (`sk-...`)
-- GitHub PAT/token patterns
-- Tavily keys (`tvly-...`)
-- bearer authorization headers
-- secret/token/password/key assignments
-- sensitive YAML assignments
-- long opaque tokens
-- object keys matching token/secret/password/authorization/api-key/cookie patterns
-
-It also marks sensitive paths, including `.env`, private key files, Pi auth/account files, Pi session logs, and local LLM payload logs.
-
-When expanding harness evidence collection, update redaction tests first or in the same change.
-
-## Controlled apply safety
-
-Harness proposal apply is intentionally conservative. `packages/harness-runtime/src/proposals/lifecycle.js` requires:
-
-- proposal status `approved`
-- a machine-applicable JSON `## Patch` section
-- patch paths listed in the proposal target files
-- a git repository
-- a clean worktree unless `allowDirty` is explicitly allowed
-- a proposal branch named `harness/<proposal-id>`
-- proposal history entries for lifecycle changes
-
-Rollback either reverts the recorded commit or checks out recorded changed paths, while refusing rollback if unrelated files are dirty.
-
-Tests and eval scenarios cover this behavior (`proposal-lifecycle.test.js`, `file-protection`, `smart-commit-basic`). Preserve these guarantees unless a user explicitly requests a different safety policy.
+The rule opt-in changes authorization for rule files only; it does not weaken secret handling, repository boundaries, or final validation.
 
 ## Git hygiene
 
-Before finalizing changes, use:
+Before completion:
 
 ```bash
 git status --short --untracked-files=all
-git diff -- <paths-you-changed>
+git diff -- <changed paths>
 ```
 
-Do not commit generated private harness outputs, payload logs, auth stores, or `node_modules/`. The current `.gitignore` ignores `.pi/teams` and `node_modules/`, but sensitive generated paths may still need care in local workflows.
+Do not auto-push. Do not commit auth stores, `.env`, payload/session logs, private keys, generated temporary `wiki/_plan.md`, or unrelated local changes.

@@ -72,7 +72,5 @@ Ngoài ra phần session navigation hiện được tổ chức quanh `sessions.
 Các file dưới đây là tài liệu mở rộng riêng của project, không phải doc chính thức của Pi:
 
 - `CLAUDE_CODE_TOOLS_GUIDE.md`
-- `PI_DYNAMIC_AGENTS.md`
-- `PI_HARNESS_GUIDE.md`
 
-Điều này là có chủ đích: chúng giữ giá trị học tập và thiết kế riêng cho repo này.
+Điều này là có chủ đích: file này giữ giá trị học tập riêng cho repo.

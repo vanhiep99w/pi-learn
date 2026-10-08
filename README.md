@@ -1,206 +1,77 @@
-# Pi Learn Extensions
+# Pi Learn
 
-Repo Pi package: `https://github.com/vanhiep99w/pi-learn`
+Pi Learn là package cho Pi Coding Agent, tập trung vào Wiki repository, giao diện Aurora và tài liệu học Pi bằng tiếng Việt.
 
-Dùng để cài nhanh các extension/theme mình hay dùng cho Pi Coding Agent.
-
-## Có gì trong package này?
-
-- `image-gen` — tool `image_gen` experimental, tạo/reference-edit ảnh bằng ChatGPT/Codex subscription và lưu asset + metadata.
-- `chatgpt-usage-status` — xem usage ChatGPT Plus/Pro qua OAuth `openai-codex`.
-- `prompt-with-model` — prompt templates nâng cao: tạo prompt bằng AI, gắn model/thinking riêng cho từng slash command, preview trước khi lưu.
-- `harness` — report/reflection/proposal/eval cùng Harness Wiki và reviewed domain-local prompt rules.
-- `aurora-ui` — input chỉ có viền ngang trên/dưới + ChatGPT usage badge.
-- `midnight-aurora` — theme dark custom.
-
-Pi load package qua root `package.json`:
-
-```json
-{
-  "pi": {
-    "extensions": ["./packages/pi-learn-extensions/extensions"],
-    "themes": ["./packages/pi-learn-extensions/themes"]
-  }
-}
-```
-
-### Image Gen experimental
-
-Implementation ban đầu đăng ký tool `image_gen` và command:
+## Thành phần
 
 ```txt
-/image-gen doctor
-/image-gen generate <prompt>
-/image-gen hide
+packages/pi-learn-extensions/
+├── extensions/
+│   ├── wiki/                    # /wiki và /wiki-update
+│   ├── chatgpt-usage-status/    # trạng thái usage ChatGPT
+│   └── aurora-ui.ts             # editor/footer/status tùy biến
+└── themes/
+    └── midnight-aurora.json
+
+docs/                            # tài liệu Pi tiếng Việt
+wiki/                            # Wiki của chính repository này
 ```
 
-Hiện đã có subscription generate, local references, reference-conditioned edit, variants nhỏ, output validation, non-overwrite và metadata riêng. Metadata không còn nằm cạnh ảnh; file JSON được lưu private dưới `~/.pi/agent/image-gen/metadata/<project-key>/`. Tool result hiển thị ảnh inline trong Pi; `/image-gen generate` mở preview phía trên editor và `/image-gen hide` đóng preview. Với Paseo, tool trả thêm `details.markdownPreviews` và các dòng `![Generated image](./workspace-path.png)`; extension tự bổ sung các dòng còn thiếu vào final assistant response để Paseo render ảnh inline thay vì chỉ hiện đường dẫn. Cần terminal hỗ trợ inline image (Kitty/Ghostty/WezTerm/Warp) và `terminal.showImages` bật cho Pi tool result. Cần login bằng `/login` → ChatGPT Plus/Pro (Codex). Public API fallback, mask và transparency chưa được triển khai; extension fail rõ ràng và **không phát sinh paid API call** cho các capability này.
-
-`size` trên private subscription backend là best-effort: backend đôi khi trả kích thước khác yêu cầu. Extension vẫn lưu ảnh hợp lệ theo kích thước thực tế, ghi `validation.dimensions=false` và trả warning; agent được hướng dẫn dùng `size=auto` khi người dùng không yêu cầu kích thước cụ thể.
-
-Agent nên xem cấu trúc project và truyền `outputPath` theo convention sẵn có, ví dụ `public/images/hero.png` hoặc `assets/images/hero.png`. Nếu không truyền `outputPath`, ảnh được lưu ngay tại workspace root hiện tại (`ctx.cwd`).
+Package không còn runtime quan sát session, proposal/eval/apply, công cụ tạo ảnh hoặc công cụ prompt theo model.
 
 ## Cài đặt
 
-### Cài package này
-
-Khuyến nghị cài theo branch `main` để máy khác update bằng `pi update`, không phải đổi tag version thủ công.
-
-Cài global cho mọi project:
+Cài toàn cục từ GitHub:
 
 ```bash
 pi install git:github.com/vanhiep99w/pi-learn@main
 ```
 
-Cài vào project hiện tại (`.pi/settings.json`):
+Cài riêng cho project hiện tại:
 
 ```bash
 pi install -l git:github.com/vanhiep99w/pi-learn@main
 ```
 
-Test tạm không ghi settings:
+Chạy thử mà không ghi settings:
 
 ```bash
 pi -e git:github.com/vanhiep99w/pi-learn@main
 ```
 
-Nếu cần bản ổn định cố định, có thể pin tag release, ví dụ `@v1.0.1`.
-
-### Cài full bộ extension hay dùng
-
-Danh sách thêm ngoài package này:
-
-- `npm:@juicesharp/rpiv-ask-user-question` — tool `ask_user_question` để agent hỏi clarification có cấu trúc.
-- `git:github.com/edxeth/pi-gpt-config` — config/GPT helpers. Local cache: `/home/hieptran/.pi/agent/git/github.com/edxeth/pi-gpt-config`
-- `git:github.com/nicobailon/pi-web-access` — package cung cấp tool `web_search` bên ngoài.
-
-`pi install` nhận **một source mỗi lần**, nên khi cài nhiều package hãy chạy lần lượt hoặc dùng loop.
-
-Global:
-
-```bash
-for pkg in \
-  git:github.com/vanhiep99w/pi-learn@main \
-  npm:@juicesharp/rpiv-ask-user-question \
-  git:github.com/edxeth/pi-gpt-config \
-  git:github.com/nicobailon/pi-web-access \
-  npm:pi-tool-display \
-  npm:pi-mcp-adapter \
-  npm:pi-image-preview
-do
-  pi install "$pkg"
-done
-```
-
-Project-local:
-
-```bash
-for pkg in \
-  git:github.com/vanhiep99w/pi-learn@main \
-  npm:@juicesharp/rpiv-ask-user-question \
-  git:github.com/edxeth/pi-gpt-config \
-  git:github.com/nicobailon/pi-web-access \
-  npm:pi-tool-display \
-  npm:pi-mcp-adapter \
-  npm:pi-image-preview
-do
-  pi install -l "$pkg"
-done
-```
-
-Sau khi cài, restart Pi hoặc chạy:
+Sau khi cài hoặc cập nhật extension/theme, restart Pi hoặc chạy:
 
 ```txt
 /reload
 ```
 
-## Bật theme
+## Wiki repository
 
-Thêm vào `~/.pi/agent/settings.json` hoặc `.pi/settings.json`:
-
-```json
-{
-  "theme": "midnight-aurora"
-}
-```
-
-Nếu project settings đã có package:
-
-```json
-{
-  "theme": "midnight-aurora",
-  "packages": [
-    "git:github.com/vanhiep99w/pi-learn@main"
-  ]
-}
-```
-
-## Cấu hình tùy chọn
-
-### Harness Wiki
-
-Harness Wiki là capability tài liệu repository bên trong extension `harness`. Nó giữ output `wiki/`, git context, `.last-update.json` và no-op update của Pi-native OpenWiki port, nhưng dùng model/provider/tools hiện tại của Pi.
-
-Commands:
+Wiki dùng model, provider và filesystem tools hiện tại của Pi:
 
 ```txt
-/harness-wiki-init [ghi chú thêm]
-/harness-wiki-update [ghi chú thêm]
-/harness-wiki-ask <câu hỏi>
+/wiki [ghi chú thêm]
+/wiki-update [ghi chú thêm]
 ```
 
-Ví dụ:
+- `/wiki` khởi tạo tài liệu dưới `wiki/`.
+- `/wiki-update` cập nhật tài liệu theo source, Git và yêu cầu cụ thể.
+- `_rules.md` chỉ được phép sửa khi nội dung lệnh `/wiki-update` yêu cầu rõ việc cập nhật rule, ví dụ:
 
-```txt
-/harness-wiki-init
-/harness-wiki-update Document the new extension commands first
-/harness-wiki-update Deepen service and microfrontend coverage with contracts, failure paths, tests, and task-to-section routes
-/harness-wiki-ask Prompt rules được load thế nào?
-```
+  ```txt
+  /wiki-update Cập nhật wiki/**/_rules.md cho command surface mới
+  ```
 
-Ghi chú:
+- Không có command hỏi Wiki riêng. Với câu hỏi về project, agent đọc `wiki/quickstart.md` một lần khi context hiện tại chưa có; câu hỏi không liên quan project thì không cần đọc.
+- Rule chỉ được load ngay trước khi agent cần sửa component/domain mà rule đó quản lý. Read-only question không bắt buộc load rule.
+- `wiki/INSTRUCTIONS.md` là brief tùy chọn để định hướng scope, ưu tiên và ngôn ngữ.
+- Extension tự kiểm tra internal Markdown links, rule layout và cập nhật `wiki/.last-update.json` sau khi run kết thúc.
 
-- Không còn `/wiki-*` aliases hoặc public `extensions/wiki/` entrypoint.
-- Normal docs được tạo/cập nhật trong `wiki/`; reviewed prompt rules nằm tại `wiki/**/_rules.md`.
-- Pi tự nạp bootstrap trong `AGENTS.md`; model đọc `wiki/quickstart.md`, root rules và section rules phù hợp bằng tool `read`. Extension không inject toàn bộ rules vào system prompt.
-- Metadata do extension ghi tại `wiki/.last-update.json` sau khi agent settle và normal documentation thực sự thay đổi. `_rules.md` không nằm trong docs snapshot.
-- Init/update nghiên cứu sâu từng chủ đề: cơ chế, state, luồng dữ liệu, lỗi, contract và tests; không còn ngân sách mặc định 8 trang. Repo nhiều service/microfrontend có bản đồ hệ thống, producer/consumer và workflow xuyên hệ thống khi source chứng minh cần thiết.
-- Quickstart là bản đồ `tác vụ → hệ thống → trang/heading`; agent dùng `grep` có giới hạn và `read(offset, limit)` để đọc phần liên quan, không nạp cả wiki. `/harness-wiki-ask` dùng prompt riêng gọn, không mang theo hướng dẫn tạo tài liệu. Đây là hướng dẫn cho model, không phải giới hạn context được cưỡng chế bằng tool.
-- Phần chưa thể document vì thiếu bằng chứng hoặc giới hạn phạm vi rõ ràng được giữ trong `## Backlog`; không dùng quota số trang để bỏ qua nội dung quan trọng. Update thường chỉ sửa phạm vi bị ảnh hưởng; có thể yêu cầu đào sâu rõ ràng dù source chưa đổi.
-- Nâng cấp extension không tự viết lại wiki cũ. Sau `/reload`, dùng `/harness-wiki-update <yêu cầu đào sâu>` để áp dụng vào tài liệu hiện có.
-- Prompt-rule content thay đổi không cần `/reload`; extension source thay đổi vẫn cần `/reload`.
-- Rule edits chỉ đi qua proposal → approval → controlled apply; critical protection vẫn được enforce bằng code.
-- Base upstream: `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f`; xem `packages/pi-learn-extensions/extensions/harness/README.md`.
+Chi tiết: [`wiki/extensions/wiki-extension.md`](wiki/extensions/wiki-extension.md).
 
-### Web search
+## ChatGPT usage status
 
-Pi Learn không còn đăng ký tool `web_search` để tránh xung đột. Cài [pi-web-access](https://github.com/nicobailon/pi-web-access) riêng:
-
-```bash
-pi install git:github.com/nicobailon/pi-web-access
-```
-
-### ChatGPT usage
-
-Mỗi máy cần login riêng:
-
-```txt
-/chatgpt-login
-```
-
-Hoặc:
-
-```txt
-/login openai-codex
-```
-
-Nếu browser login xong mà Pi hỏi code/URL, paste full redirect URL:
-
-```txt
-http://localhost:1455/auth/callback?code=...&state=...
-```
-
-Commands:
+Extension hiển thị usage khi provider hiện tại là `openai-codex` hoặc `chatgpt`.
 
 ```txt
 /chatgpt-login
@@ -208,196 +79,63 @@ Commands:
 /chatgpt-usage-refresh
 /chatgpt-accounts
 /chatgpt-switch
-/chatgpt-delete    # xoá một/tất cả account đã lưu
-/chatgpt-logout    # alias của /chatgpt-delete
+/chatgpt-delete
+/chatgpt-logout
 ```
 
-Credential lưu local, không commit:
+Credential được lưu local bởi Pi/extension, không nằm trong repository.
+
+## Aurora UI và theme
+
+Aurora UI cung cấp startup banner, editor/footer/status tùy biến, thông tin cwd/git và command:
 
 ```txt
-~/.pi/agent/auth.json
-~/.pi/agent/chatgpt-usage-accounts.json
+/aurora-themes
 ```
 
-### Model prompt templates
+Bật theme đi kèm trong Pi settings:
 
-Extension `prompt-with-model` cho phép tạo slash command từ file Markdown nhưng có thêm frontmatter `model` và `thinking` riêng cho từng prompt.
-
-Nơi scan prompt:
-
-```txt
-~/.pi/agent/model-prompts/*.md      # global
-.pi/agent/model-prompts/*.md        # project-local
+```json
+{
+  "theme": "midnight-aurora"
+}
 ```
 
-Lệnh chính:
+## Web search
 
-```txt
-/prompt-create <ý tưởng prompt>      # AI tự viết prompt, cho preview/edit trước khi lưu
-/prompt-edit                         # sửa prompt hiện có
-/prompt-model                        # chọn prompt rồi đổi model/thinking
-/prompt-model <prompt> <provider/model|clear>
+Pi Learn không đóng gói web tools. Nếu cần `web_search`, cài riêng:
+
+```bash
+pi install git:github.com/nicobailon/pi-web-access
 ```
 
-Ví dụ frontmatter:
+## Tài liệu
 
-```md
----
-description: "Review code và chỉ ra rủi ro chính"
-argument-hint: "<file-or-scope>"
-model: "anthropic/claude-sonnet-4-20250514"
-thinking: "high"
----
+- [`docs/README.md`](docs/README.md) — mục lục tài liệu Pi tiếng Việt.
+- [`PI_DOCUMENTATION.md`](PI_DOCUMENTATION.md) — tài liệu tổng hợp ở root.
+- [`wiki/quickstart.md`](wiki/quickstart.md) — bản đồ thay đổi cho repository này.
+- [`packages/pi-learn-extensions/README.md`](packages/pi-learn-extensions/README.md) — package extension/theme.
 
-Review phạm vi sau và trả lời có cấu trúc:
+## Kiểm thử và bảo trì
 
-$@
+Chạy test Wiki:
+
+```bash
+npm --prefix packages/pi-learn-extensions run test:wiki
 ```
 
-Ghi chú:
+Sau thay đổi extension/theme:
 
-- `/prompt-create` chỉ cần bạn nhập ý tưởng; AI sẽ sinh `name`, `description`, `argument-hint`, `model`, `thinking` và nội dung prompt.
-- Trước khi lưu, Pi mở editor preview để bạn sửa trực tiếp.
-- Khi chạy prompt có `model`, extension sẽ thông báo nổi bật `🤖 MODEL SWITCH`, đổi model tạm thời, chạy prompt, rồi restore model ban đầu.
-- Autocomplete của slash command hiển thị `🤖 current` hoặc `🤖 provider/model`, và `🧠 <thinking>` nếu có.
-- Sau khi thêm/sửa prompt hoặc đổi model, chạy `/reload` để cập nhật danh sách/mô tả slash command.
-
-## Pi Harness commands
-
-Harness giúp xem lại các Pi sessions gần đây của project và tạo proposal cải thiện có evidence. Output private mặc định nằm ở:
-
-```txt
-~/.pi/harness/projects/<project-key>/
-```
-
-Mặc định dashboard dùng **5 session gần nhất**; có thể truyền số khác như `/harness 10`.
-
-### Workflow khuyến nghị
-
-```txt
-/harness 10             # status + report Markdown trong một modal, có scroll
-/harness-improve        # dùng model hiện tại tạo draft improvement proposals
-/harness-proposals       # chọn proposal, xem chi tiết, approve/reject hoặc approve & apply
-/harness-apply P-0001    # apply nếu proposal có patch machine-readable
-```
-
-### Danh sách command chính
-
-| Command | Tác dụng |
-|---|---|
-| `/harness [last]` | Gộp status, session gần đây, warning, automation và report Markdown vào một dashboard modal. |
-| `/harness-improve [last]` | Gửi prompt vào model hiện tại; model gọi `harness_import_llm_reflection` để tạo draft proposals. |
-| `/harness-proposals` | Workflow review duy nhất: chọn proposal, xem chi tiết, approve/reject hoặc approve & apply với bước xác nhận. |
-| `/harness-apply P-0001` | Apply proposal đã approve nếu có JSON Patch. Không auto-push. |
-| `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite/scenario/proposal check. |
-| `/harness-mark success\|failure\|note [text]` | Ghi note hoặc tag outcome cho current session leaf. |
-
-Ghi chú:
-
-- `/harness-improve` chỉ dùng normalized evidence, không đọc raw session logs.
-- Reflection prompt có target routing guide để model chọn đúng `memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`.
-- `harness_import_llm_reflection` là tool nội bộ cho model gọi sau `/harness-improve`; người dùng thường không cần gọi tay.
-- Nếu project root không phải git repo, review kỹ trước khi apply vì rollback bằng git có thể không đầy đủ.
-
-Chi tiết đầy đủ về các extension/command nằm ở:
-
-```txt
-packages/pi-learn-extensions/README.md
-```
+1. Chạy test mục tiêu.
+2. Chạy `/reload`.
+3. Kiểm tra command hoặc UI liên quan.
+4. Xem `git status` và diff; không commit auth, `.env`, payload log hoặc session log.
 
 ## Update / remove
 
-Xem package đã cài:
-
 ```bash
 pi list
-```
-
-Nếu đã cài theo `@main`, update bằng:
-
-```bash
 pi update
-```
-
-Sau đó restart Pi hoặc chạy:
-
-```txt
-/reload
-```
-
-Nếu máy đang dùng tag cũ như `@v1.0.0` hoặc `@v1.0.1`, chuyển sang `main` một lần:
-
-```bash
-pi install git:github.com/vanhiep99w/pi-learn@main
-```
-
-Project-local:
-
-```bash
-pi install -l git:github.com/vanhiep99w/pi-learn@main
-```
-
-Remove global:
-
-```bash
 pi remove git:github.com/vanhiep99w/pi-learn
-```
-
-Remove project-local:
-
-```bash
 pi remove -l git:github.com/vanhiep99w/pi-learn
 ```
-
-## Maintain repo
-
-Source test trong project:
-
-```txt
-.pi/extensions/
-.pi/themes/
-```
-
-Source package public:
-
-```txt
-packages/pi-learn-extensions/extensions/
-packages/pi-learn-extensions/themes/
-```
-
-Public extension/theme changes phải được thực hiện trực tiếp dưới `packages/pi-learn-extensions/`. `.pi/extensions/` hiện chỉ chứa local/dev-only behavior; không copy đè toàn bộ public package từ `.pi/` khi release.
-
-Sau khi sửa Harness runtime/extension:
-
-```bash
-npm --prefix packages/harness-runtime test
-# Sau đó restart Pi hoặc chạy /reload và test command liên quan.
-```
-
-Publish thay đổi lên `main`:
-
-```bash
-git add .
-git commit -m "Update extensions"
-git push origin main
-```
-
-Người dùng đã cài `@main` update bằng:
-
-```bash
-pi update
-```
-
-Nếu muốn phát hành bản ổn định cố định, tạo tag release:
-
-```bash
-git tag v1.0.2
-git push origin v1.0.2
-```
-
-Người dùng muốn pin bản ổn định có thể cài:
-
-```bash
-pi install git:github.com/vanhiep99w/pi-learn@v1.0.2
-```
-

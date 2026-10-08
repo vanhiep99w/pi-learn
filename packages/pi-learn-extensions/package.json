@@ -1,11 +1,10 @@
 {
   "name": "pi-learn-extensions",
   "version": "1.0.1",
-  "description": "Pi Coding Agent extensions: Image Gen, Harness Wiki, ChatGPT usage status, Aurora UI, prompt-with-model, and Midnight Aurora theme.",
+  "description": "Pi Coding Agent extensions: repository Wiki, ChatGPT usage status, Aurora UI, and Midnight Aurora theme.",
   "type": "module",
   "scripts": {
-    "test:harness-wiki": "node --test tests/harness/*.test.mts",
-    "test:image-gen": "node --experimental-transform-types --test tests/image-gen/*.test.mts"
+    "test:wiki": "node --test tests/wiki/*.test.mjs tests/wiki/*.test.mts"
   },
   "keywords": [
     "pi-package",
@@ -24,8 +23,7 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "@sinclair/typebox": "*"
+    "@earendil-works/pi-tui": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-ai": {

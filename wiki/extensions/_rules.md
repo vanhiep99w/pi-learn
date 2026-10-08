@@ -1,6 +1,6 @@
 # Pi extension and theme rules
 
-Apply these reviewed prompt rules when working with:
+Apply these rules when editing:
 
 - `packages/pi-learn-extensions/extensions/**`
 - `packages/pi-learn-extensions/themes/**`
@@ -9,31 +9,27 @@ Apply these reviewed prompt rules when working with:
 
 ## EXT-UI-001 — Guard interactive UI operations
 
-Guard dialogs, editors, selectors, notifications, status updates, widgets, and other UI work with `ctx.hasUI` and optional UI access where appropriate.
-
-Provide a console/text fallback in print or JSON mode when the command should still produce output.
+Guard dialogs, editors, selectors, notifications, status updates, widgets, and other UI work with `ctx.hasUI` and optional UI access where appropriate. Provide a console/text fallback when a command should still produce output without a TUI.
 
 ## EXT-LIFECYCLE-001 — Clean up session-scoped state
 
-Clear timers, listeners, compositor state, pending runs, and extension status during `session_shutdown` or replacement flows.
+Clear timers, listeners, compositor state, pending runs, and extension status during `session_shutdown` or replacement flows. Do not reuse captured session-bound contexts after replacement.
 
-Do not reuse captured session-bound `ctx`, `pi`, UI, or `SessionManager` objects after a session replacement.
+## EXT-WIKI-CMD-001 — Keep the Wiki command surface minimal
 
-## EXT-CMD-001 — Use the Harness Wiki namespace
-
-Public Harness Wiki commands must be:
+Public Wiki commands are exactly:
 
 ```txt
-/harness-wiki-init
-/harness-wiki-update
-/harness-wiki-ask
-/harness-wiki-status
+/wiki
+/wiki-update
 ```
 
-Do not register `/wiki-*` compatibility aliases. Keep command help, startup text, README examples, tests, and autocomplete expectations aligned.
+Do not register init, ask, status, compatibility aliases, or commands with the retired prefix. Keep source, tests, READMEs, and Wiki docs aligned.
 
-## EXT-PACKAGE-001 — Keep one public Harness entrypoint
+## EXT-WIKI-RULE-001 — Require explicit rule-update opt-in
 
-Harness Wiki is a module of `packages/pi-learn-extensions/extensions/harness/index.ts`, not a second public Pi extension entrypoint.
+The extension may create deterministic empty scaffolds for missing rule sections. It may make substantive edits to `wiki/**/_rules.md` only when `/wiki-update` explicitly asks for `_rules.md`, Wiki rules, prompt rules, or rule files. Without that opt-in, block model-driven rule mutations. Always keep metadata and the active run's `wiki/INSTRUCTIONS.md` protected.
 
-Public package source belongs under `packages/pi-learn-extensions/`; `.pi/extensions/` remains local/dev-only unless explicitly requested otherwise.
+## EXT-PACKAGE-001 — Keep one Wiki entrypoint
+
+Wiki source belongs under `packages/pi-learn-extensions/extensions/wiki/`, with `index.ts` as its only public entrypoint. Keep helper logic self-contained in that directory.

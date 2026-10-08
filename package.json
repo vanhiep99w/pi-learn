@@ -1,7 +1,7 @@
 {
   "name": "pi-learn",
   "version": "1.0.1",
-  "description": "Pi Learn package: custom Pi Coding Agent extensions, Harness Wiki prompt rules, and Midnight Aurora theme.",
+  "description": "Pi Learn package: repository Wiki, ChatGPT usage UI, Aurora UI, and Midnight Aurora theme.",
   "type": "module",
   "private": false,
   "keywords": [
@@ -21,8 +21,7 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "@sinclair/typebox": "*"
+    "@earendil-works/pi-tui": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-ai": {

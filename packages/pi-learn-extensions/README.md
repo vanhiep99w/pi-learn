@@ -1,32 +1,88 @@
 # Pi Learn Extensions Package
 
-Đây là package extension/theme mà root repo expose cho Pi Coding Agent.
+Package extension/theme mà root repository expose cho Pi Coding Agent.
 
-Repo GitHub:
-
-```txt
-https://github.com/vanhiep99w/pi-learn
-```
-
-Cài từ root repo:
+## Cài và reload
 
 ```bash
 pi install git:github.com/vanhiep99w/pi-learn@main
-```
-
-Test tạm không ghi settings:
-
-```bash
+# hoặc test tạm
 pi -e git:github.com/vanhiep99w/pi-learn@main
 ```
 
-Sau khi cài/update, restart Pi hoặc chạy:
+Sau khi cài/update, restart Pi hoặc chạy `/reload`.
+
+## Nội dung package
 
 ```txt
-/reload
+extensions/
+├── wiki/                    # /wiki và /wiki-update
+├── chatgpt-usage-status/    # ChatGPT Plus/Pro usage
+└── aurora-ui.ts             # custom TUI/editor/footer/status
+
+themes/
+└── midnight-aurora.json
 ```
 
-Root `package.json` expose package này như sau:
+## Wiki
+
+```txt
+/wiki [ghi chú]
+/wiki-update [ghi chú]
+```
+
+- `/wiki` tạo Wiki ban đầu dưới `wiki/`.
+- `/wiki-update` dùng Git/source hiện tại để cập nhật có chọn lọc.
+- Wiki update chỉ được sửa `wiki/**/_rules.md` khi phần ghi chú yêu cầu rõ `_rules.md`, prompt rules, Wiki rules hoặc rule files.
+- Không có command hỏi Wiki riêng. Agent dùng block `Project Wiki` trong `AGENTS.md`/`CLAUDE.md`: chỉ đọc `wiki/quickstart.md` cho câu hỏi về project khi context chưa có, và chỉ đọc rule áp dụng ngay trước khi sửa component liên quan.
+- `wiki/INSTRUCTIONS.md` là brief do người dùng quản lý. `wiki/.last-update.json` do extension quản lý.
+- Sau mỗi run, extension kiểm tra link nội bộ và rule layout trước khi đánh dấu hoàn tất.
+
+Test:
+
+```bash
+npm --prefix packages/pi-learn-extensions run test:wiki
+```
+
+## ChatGPT usage status
+
+```txt
+/chatgpt-login
+/chatgpt-usage
+/chatgpt-usage-refresh
+/chatgpt-accounts
+/chatgpt-switch
+/chatgpt-delete
+/chatgpt-logout
+```
+
+Extension chỉ hiện status cho provider `openai-codex` hoặc `chatgpt`. Auth/account data được lưu local, không commit vào repository.
+
+## Aurora UI
+
+Aurora UI cung cấp startup banner, editor chỉ có viền ngang, footer tối giản, working message tiếng Việt, cwd/git status và theme picker:
+
+```txt
+/aurora-themes
+```
+
+Theme đi kèm:
+
+```txt
+midnight-aurora
+```
+
+Bật trong settings:
+
+```json
+{
+  "theme": "midnight-aurora"
+}
+```
+
+## Package manifest
+
+Root package expose resources này:
 
 ```json
 {
@@ -37,287 +93,4 @@ Root `package.json` expose package này như sau:
 }
 ```
 
----
-
-## Nên dùng command nào trước?
-
-Nếu thấy quá nhiều command, dùng theo thứ tự này:
-
-```txt
-1. /harness                 Xem status + report Markdown trong một dashboard modal.
-2. /harness-improve         Nhờ model hiện tại tạo improvement proposals.
-3. /harness-proposals       Chọn, xem chi tiết, approve/reject hoặc approve & apply trong một modal.
-4. /harness-apply P-0001    Apply proposal đã approve, nếu proposal có patch.
-```
-
-Các command còn lại chủ yếu để debug, kiểm tra, hoặc quản lý nâng cao.
-
----
-
-## Included extensions/themes
-
-```txt
-extensions/
-├── image-gen/                  # experimental image_gen via Codex subscription
-├── harness/                    # observability, proposals, eval, Harness Wiki
-├── chatgpt-usage-status/       # ChatGPT Plus/Pro usage status
-├── prompt-with-model.ts        # prompt templates có model/thinking riêng
-└── aurora-ui.ts                # custom TUI/editor/footer/status
-
-themes/
-└── midnight-aurora.json
-```
-
----
-
-## Image Gen (experimental)
-
-Tool `image_gen` hiện hỗ trợ bước triển khai ban đầu:
-
-- generate bằng OAuth `openai-codex`, không cần `OPENAI_API_KEY`
-- local reference images với role rõ ràng; edit dùng strategy reference-conditioned
-- `count` nhỏ có bounded concurrency
-- agent chọn `outputPath` theo folder/convention phù hợp trong project; nếu bỏ trống thì lưu tại workspace root (`ctx.cwd`)
-- non-overwrite mặc định
-- validate PNG/JPEG/WebP và alpha; dimension mismatch từ private subscription backend được lưu với warning thay vì làm mất ảnh hợp lệ
-- metadata JSON lưu private tại `~/.pi/agent/image-gen/metadata/<project-key>/`, không tạo `.png.json` cạnh asset
-- trả ảnh inline cho Pi; trả `details.markdownPreviews` và tự bổ sung Markdown ảnh vào final response cho Paseo
-
-Command:
-
-```txt
-/image-gen doctor
-/image-gen generate <prompt>
-/image-gen hide
-```
-
-Tool result hiển thị ảnh inline khi `terminal.showImages` được bật. `/image-gen generate` hiển thị preview phía trên editor; dùng `/image-gen hide` để đóng. Terminal cần hỗ trợ inline image, ví dụ Kitty, Ghostty, WezTerm hoặc Warp; terminal không hỗ trợ sẽ hiện placeholder/path.
-
-Với Paseo, raw tool/thinking output không tự render ảnh. Sau khi tool thành công, text result và `details.markdownPreviews` chứa Markdown workspace-relative, ví dụ `![Generated image 1](./assets/dog.png)`. Extension theo dõi result và tự bổ sung preview còn thiếu vào final assistant message; prompt guideline vẫn nhắc agent không chỉ trả path. Output ngoài workspace không được tạo Markdown preview.
-
-`/image-gen generate` chạy trực tiếp nên nếu không có `outputPath` thì lưu ở folder hiện tại. Khi gọi qua hội thoại, agent được hướng dẫn inspect project và chọn folder ảnh phù hợp như `public/images`, `assets/images` hoặc convention đã tồn tại.
-
-Private subscription backend đôi khi bỏ qua `size` đã request, ví dụ yêu cầu `1024x1024` nhưng trả `1536x1024`. Extension vẫn lưu ảnh đúng MIME/hợp lệ theo kích thước thực tế, đánh dấu `validation.dimensions=false` và trả warning. Agent mặc định dùng `size=auto` nếu người dùng không yêu cầu kích thước cụ thể.
-
-Các capability chưa có trong build này: public OpenAI Images API fallback, mask, transparency/chroma-key và batch JSONL. Request các capability này sẽ fail trước khi generate; không có paid fallback âm thầm.
-
----
-
-## 1. Web search (external)
-
-Pi Learn không đóng gói web tools. Nếu cần tool `web_search`, hãy cài [pi-web-access](https://github.com/nicobailon/pi-web-access) riêng:
-
-```bash
-pi install git:github.com/nicobailon/pi-web-access
-```
-
----
-
-## 2. Harness extension
-
-Harness đọc Pi session logs đã redact/normalize để tạo report, proposals, eval và self-improvement workflow. Output mặc định nằm ngoài repo:
-
-```txt
-~/.pi/harness/projects/<project-key>/
-├── sessions/<session-id>/       # manifest/events/metrics/warnings
-├── reports/latest.md
-├── reflections/latest.md
-├── proposals/draft/P-0001-*.md
-└── evals/latest.md
-```
-
-Mặc định dashboard dùng **5 session gần nhất**. Có thể truyền số khác, ví dụ:
-
-```txt
-/harness 10
-/harness-improve 10
-```
-
-### Command chính khuyến nghị
-
-| Command | Tác dụng | Ví dụ |
-|---|---|---|
-| `/harness [last]` | Gộp status, session gần đây, warning, automation và report Markdown vào một dashboard modal có scroll. | `/harness` hoặc `/harness 10` |
-| `/harness-improve [last]` | Gửi reflection prompt vào model hiện tại; model phải gọi tool import để tạo draft proposals. | Cách chính để tạo proposal bằng LLM. |
-| `/harness-proposals` | Workflow review duy nhất: chọn proposal, xem chi tiết, approve/reject hoặc approve & apply với bước xác nhận. | Sau `/harness-improve`. |
-| `/harness-apply P-0001` | Apply proposal đã approve nếu proposal có JSON Patch machine-readable. | `/harness-apply P-0001` |
-| `/harness-eval [scenario\|P-0001]` | Chạy deterministic eval suite hoặc scenario/proposal cụ thể. | `/harness-eval`, `/harness-eval redaction-fixture` |
-| `/harness-mark success\|failure\|note [text]` | Mark current session bằng success/failure hoặc ghi note riêng. | `/harness-mark success fixed Redis config` |
-
-Ghi chú `/harness-improve`:
-
-- Chỉ dùng normalized evidence, không đọc raw session logs.
-- Prompt có target routing guide để chọn đúng `memory`, `rules`, `agents`, `skill`, `docs`, `parser`, `redaction`, `eval`, `tool`.
-- Tool `harness_import_llm_reflection` chỉ dành cho model gọi tự động sau command này; người dùng thường không cần gọi tay.
-
-### Harness Wiki
-
-Harness Wiki nằm trong cùng `harness/` entrypoint:
-
-```txt
-/harness-wiki-init [ghi chú]
-/harness-wiki-update [ghi chú]
-/harness-wiki-ask <câu hỏi>
-```
-
-- Không còn `/wiki-*` aliases hoặc `extensions/wiki/` entrypoint.
-- Normal docs nằm trong `wiki/**/*.md`; reviewed prompt rules nằm trong `wiki/**/_rules.md`.
-- Model lazy-load rules theo `AGENTS.md` → `wiki/quickstart.md` → root/section `_rules.md` bằng tool `read`.
-- Extension không tự inject toàn bộ rules và không cần reload/cache watcher cho Markdown content.
-- Tài liệu được nghiên cứu theo từng hệ thống/chủ đề, giải thích cơ chế, state, contract, lỗi và tests; không còn quota mặc định 8 trang. Repo nhiều service/microfrontend có điều hướng tới hệ thống, hợp đồng giao tiếp và workflow liên quan.
-- Quickstart/agent bootstrap giữ gọn; agent tìm heading bằng `grep`, đọc section qua `read(offset, limit)`, chỉ mở rộng khi thiếu bằng chứng hoặc tác vụ xuyên hệ thống. `/harness-wiki-ask` dùng prompt riêng, không chứa hướng dẫn generation dài. Đây là prompt guidance, không phải hard context limit.
-- Muốn nâng chất lượng wiki cũ, sau `/reload` chạy `/harness-wiki-update <yêu cầu đào sâu và điều hướng>`; update không tự rewrite mọi trang khi chỉ nâng cấp extension.
-- Wiki turns bị chặn sửa `_rules.md`; rule changes chỉ đi qua approved controlled apply.
-
-Apply/automation policy:
-
-- Không auto-push.
-- `/harness-apply` yêu cầu proposal approved và chỉ apply file nằm trong target list của proposal.
-- Với project không phải git repo, nên review kỹ vì rollback bằng git có thể không đầy đủ.
-- Automation mặc định off. Nếu bật trong `harness/config.json`, vẫn chỉ draft/report/eval, không tự apply.
-
----
-
-## 3. ChatGPT usage status
-
-Hiển thị usage ChatGPT Plus/Pro khi dùng provider `openai-codex` hoặc `chatgpt`.
-
-| Command | Tác dụng |
-|---|---|
-| `/chatgpt-login` | Login thêm account ChatGPT và lưu local. |
-| `/chatgpt-usage` | Hiển thị usage hiện tại. |
-| `/chatgpt-usage-refresh` | Refresh usage. |
-| `/chatgpt-accounts` | Liệt kê account đã lưu. |
-| `/chatgpt-switch` | Chuyển sang account tiếp theo. |
-| `/chatgpt-delete` | Xoá một/tất cả account. |
-| `/chatgpt-logout` | Alias của `/chatgpt-delete`. |
-
-Credential lưu local, không commit:
-
-```txt
-~/.pi/agent/auth.json
-~/.pi/agent/chatgpt-usage-accounts.json
-```
-
----
-
-## 4. Prompt with model
-
-Extension `prompt-with-model.ts` tạo slash command từ Markdown prompt, hỗ trợ frontmatter `model` và `thinking` riêng.
-
-Nơi scan prompt:
-
-```txt
-~/.pi/agent/model-prompts/*.md
-.pi/agent/model-prompts/*.md
-```
-
-| Command | Tác dụng |
-|---|---|
-| `/prompt-create <ý tưởng>` | AI tạo prompt mới, mở preview/editor trước khi lưu. |
-| `/prompt-edit` | Chọn và sửa prompt hiện có. |
-| `/prompt-model` | Wizard đổi model/thinking của prompt. |
-| `/prompt-model <prompt> <provider/model\|clear>` | Set/clear model cho prompt bằng command. |
-
-Ví dụ frontmatter:
-
-```md
----
-description: "Review code và chỉ ra rủi ro chính"
-argument-hint: "<file-or-scope>"
-model: "anthropic/claude-sonnet-4-20250514"
-thinking: "high"
----
-
-Review phạm vi sau và trả lời có cấu trúc:
-
-$@
-```
-
-Sau khi thêm/sửa prompt, chạy:
-
-```txt
-/reload
-```
-
----
-
-## 5. Aurora UI
-
-Extension `aurora-ui.ts` custom TUI:
-
-- Startup banner.
-- Editor chỉ giữ viền ngang trên/dưới; không có viền dọc hoặc góc bo.
-- Footer tối giản.
-- Working messages tiếng Việt.
-- Hiển thị cwd/git branch/git stats.
-- Tích hợp status extension.
-
-Command:
-
-| Command | Tác dụng |
-|---|---|
-| `/aurora-themes` | Chọn theme nhanh. |
-
-Theme đi kèm:
-
-```txt
-midnight-aurora
-```
-
-Bật theme trong settings:
-
-```json
-{
-  "theme": "midnight-aurora"
-}
-```
-
----
-
-## Update / remove
-
-Xem package đã cài:
-
-```bash
-pi list
-```
-
-Update nếu đã cài theo `@main`:
-
-```bash
-pi update
-```
-
-Remove global:
-
-```bash
-pi remove git:github.com/vanhiep99w/pi-learn
-```
-
-Remove project-local:
-
-```bash
-pi remove -l git:github.com/vanhiep99w/pi-learn
-```
-
-Xem hướng dẫn chi tiết ở README root repo:
-
-```txt
-../../README.md
-```
-
-
-## Included
-
-```txt
-extensions/
-├── image-gen/           # experimental image_gen
-├── chatgpt-usage-status/
-├── harness/             # Pi Harness + Harness Wiki commands
-├── prompt-with-model.ts # model-aware prompt template commands
-└── aurora-ui.ts         # horizontal-only editor + custom footer
-
-themes/
-└── midnight-aurora.json
-```
+Pi load file extension trực tiếp và thư mục có `index.ts`; vì vậy `wiki/index.ts` là entrypoint duy nhất cho Wiki.

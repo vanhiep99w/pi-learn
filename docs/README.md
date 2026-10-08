@@ -62,9 +62,6 @@ Thư mục này là bản hướng dẫn tiếng Việt cho các chủ đề qua
 Các file dưới đây không phải bản mirror trực tiếp từ docs chính thức, nhưng vẫn hữu ích cho việc học hoặc mở rộng Pi:
 
 - [CLAUDE_CODE_TOOLS_GUIDE.md](./CLAUDE_CODE_TOOLS_GUIDE.md)
-- [PI_DYNAMIC_AGENTS.md](./PI_DYNAMIC_AGENTS.md)
-- [PI_HARNESS_GUIDE.md](./PI_HARNESS_GUIDE.md)
-- [PI_IMAGE_GEN_EXTENSION_DESIGN.md](./PI_IMAGE_GEN_EXTENSION_DESIGN.md) - thiết kế và tiến độ triển khai experimental của `image_gen`; subscription core đã bắt đầu, public API fallback/transparency vẫn ở roadmap
 
 ## Ghi chú sync
 

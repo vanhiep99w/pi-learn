@@ -1,112 +1,68 @@
 # Development operations
 
-This page summarizes the practical workflows for installing, changing, documenting, and releasing this repository.
+This page covers installation, package maintenance, documentation, and release workflows.
 
-## Install/test the Pi package
-
-From the root README, the recommended install source is the GitHub repository on `main`:
+## Install and reload
 
 ```bash
 pi install git:github.com/vanhiep99w/pi-learn@main
-```
-
-Project-local install:
-
-```bash
 pi install -l git:github.com/vanhiep99w/pi-learn@main
-```
-
-Temporary test without writing settings:
-
-```bash
 pi -e git:github.com/vanhiep99w/pi-learn@main
 ```
 
-After changing extension or theme code, restart Pi or run:
+After extension or theme changes, restart Pi or run `/reload`.
 
-```txt
-/reload
-```
+## Package manifests and versions
 
-Source references: `README.md`, `packages/pi-learn-extensions/README.md`, `AGENTS.md`.
+Two manifests expose the same resources:
 
-## Package manifests and versioning
+- root `package.json` points to `packages/pi-learn-extensions/extensions` and `themes`;
+- `packages/pi-learn-extensions/package.json` points to its local `extensions` and `themes`.
 
-There are two package manifests that matter for Pi package distribution:
+Both currently use version `1.0.1`. Keep versions synchronized when intentionally cutting a package release. Keep host-provided Pi libraries in `peerDependencies`, not bundled runtime dependencies.
 
-- `package.json` at the repository root
-- `packages/pi-learn-extensions/package.json`
+## Public source map
 
-Both currently expose extensions and themes to Pi. Both also carry version `1.0.1` during this inspection. If bumping versions for a release, keep these versions synchronized when the package-level behavior changes.
+| Feature | Source |
+|---|---|
+| Wiki commands and lifecycle | `packages/pi-learn-extensions/extensions/wiki/wiki-commands.ts` |
+| Wiki task/bootstrap prompt | `packages/pi-learn-extensions/extensions/wiki/wiki-prompt.ts` |
+| Wiki rule/link helpers | `packages/pi-learn-extensions/extensions/wiki/wiki-rules.js`, `wiki-links.js` |
+| ChatGPT usage | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts` |
+| Aurora UI | `packages/pi-learn-extensions/extensions/aurora-ui.ts` |
+| Theme | `packages/pi-learn-extensions/themes/midnight-aurora.json` |
 
-The harness runtime has its own private package manifest at `packages/harness-runtime/package.json` with version `0.0.1`. Do not assume it is published independently; the harness extension resolves it from the repository package layout.
-
-## Release/update workflow
-
-The README documents two common distribution flows:
-
-- Users installed from `@main` can update with:
-
-  ```bash
-  pi update
-  ```
-
-- Stable releases can be tagged in git, for example:
-
-  ```bash
-  git tag v1.0.2
-  git push origin v1.0.2
-  ```
-
-Before tagging, verify the README examples, package versions, extension commands, and theme name still match source.
+Use TypeScript/ESM style consistent with nearby extension code. Keep UI work guarded, provide non-TUI fallback where the command should still report output, and clean up session state.
 
 ## Documentation workflow
 
-This repository has several documentation layers:
+Documentation layers are:
 
-- `README.md` — user-facing package overview and install guide.
-- `packages/pi-learn-extensions/README.md` — detailed extension/theme command reference.
-- `packages/harness-runtime/README.md` — harness runtime API and safety summary.
-- `docs/` — Vietnamese Pi docs, indexed by `docs/README.md`.
-- `pi-harness/` — harness design and roadmap material.
-- `wiki/` — synthesized repository wiki for humans and future agents.
+- root `README.md` — install and public capability overview;
+- package README — extension/theme details;
+- `docs/` — Vietnamese Pi learning/reference material;
+- `PI_DOCUMENTATION.md` — long root reference;
+- `wiki/` — repository-specific architecture/change routing.
 
-When adding or changing docs:
+When changing docs:
 
-- Write Vietnamese for `docs/` unless the surrounding file uses another language.
-- Update `docs/README.md` if adding a new `docs/*.md` page.
-- Avoid duplicating whole existing docs in the wiki; link to them and summarize the repository-specific implications.
-- Keep generated Wiki pages concise and source-referenced.
-- Treat `wiki/**/_rules.md` as reviewed prompt policy, not generated documentation; normal Wiki updates must not edit it.
-- Keep the quickstart Rule loading index aligned when real Wiki sections are added/removed.
+- update `docs/README.md` when indexed files are added or removed;
+- keep README command names and package paths aligned with source;
+- use the Wiki as synthesis/navigation rather than duplicating complete docs;
+- keep quickstart lightweight and route detail to canonical pages;
+- change `_rules.md` through an explicitly requested `/wiki-update` rule run.
 
-Harness Wiki is documented in [Harness Wiki capability](../extensions/wiki-extension.md).
+## Release/update workflow
 
-## Working with extension code
+Users installed from `@main` can run `pi update`. Before a tag:
 
-General rules:
-
-- Use TypeScript/ESM style consistent with nearby extension files.
-- Keep Pi imports in the current `@earendil-works/*` namespace unless you have verified compatibility with a different Pi version.
-- Register tools with accurate descriptions, prompt snippets/guidelines, and TypeBox parameter schemas.
-- Register commands with concise descriptions and robust UI/no-UI behavior.
-- Guard UI-heavy work with `ctx.hasUI` and use optional chaining or try/catch for transient UI cleanup.
-- Clean up timers, compositor state, and listeners on `session_shutdown` or component disposal.
-
-Where to change common features:
-
-| Feature | Files |
-|---|---|
-| ChatGPT usage UI and account commands | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts` |
-| Prompt commands/model switching | `packages/pi-learn-extensions/extensions/prompt-with-model.ts` |
-| Aurora TUI/editor/footer | `packages/pi-learn-extensions/extensions/aurora-ui.ts` |
-| Harness command surface | `packages/pi-learn-extensions/extensions/harness/index.ts` |
-| Harness Wiki commands/task prompt | `packages/pi-learn-extensions/extensions/harness/wiki-commands.ts`, `wiki-prompt.ts` |
-| Reviewed domain prompt rules | `wiki/_rules.md`, `wiki/<section>/_rules.md` |
-| Harness core/lint behavior | `packages/harness-runtime/src/**` |
+1. Run focused tests.
+2. Confirm both package versions and manifests.
+3. Confirm README commands and theme name match source.
+4. Reload Pi and manually test changed commands/UI.
+5. Inspect `git status` and diff for stale files or private data.
+6. Tag/push only when explicitly requested.
 
 ## Local-only files
 
-`.pi/extensions/log-llm-payload.ts` is documented by `AGENTS.md` as a local/dev-only extension that writes request payloads under `.pi/logs/llm-payloads/`. Those logs may contain sensitive prompts, context, file paths, or metadata.
-
-Do not read, commit, or summarize payload logs unless the user explicitly asks and the task requires it. Public package behavior should normally be implemented under `packages/pi-learn-extensions/`, not under `.pi/extensions/`.
+`.pi/` is development/local state, not public package source. Payload logs under `.pi/logs/llm-payloads/` may contain sensitive prompts or context and must not be read or committed without exact authorization.

@@ -1,17 +1,12 @@
 # Architecture overview
 
-Pi Learn has two main roles:
-
-1. It is a **Pi package** that exposes extensions and a theme to Pi Coding Agent.
-2. It is a **learning/documentation repository** for Pi usage and extension development, especially in Vietnamese.
-
-The root package is not a conventional application server or web app. There is no database schema, HTTP routing layer, or frontend build pipeline in the inspected source. The runtime behavior is driven by Pi loading extension entrypoints from package manifests.
+This page explains Pi Learn's package boundaries and runtime-loading model. Read it when changing manifests, extension entrypoints, theme exposure, or repository documentation ownership.
 
 ## Package boundaries
 
 ### Root package
 
-`package.json` is the package Pi users install from Git/GitHub. Its `pi` block points Pi to the public extension and theme directories:
+The root `package.json` is the install target. Its Pi manifest exposes:
 
 ```json
 {
@@ -22,73 +17,59 @@ The root package is not a conventional application server or web app. There is n
 }
 ```
 
-It is ESM (`"type": "module"`) and declares Pi host-provided packages, including `@sinclair/typebox`, as peer dependencies. Source references: `package.json` and extension imports under `packages/pi-learn-extensions/extensions/`.
+Pi supplies the `@earendil-works/*` host packages declared as peers. The root has no application server, database, or frontend build pipeline.
 
-### Public extension/theme package
+### Public extension and theme package
 
-`packages/pi-learn-extensions/package.json` mirrors the Pi manifest at package level:
+`packages/pi-learn-extensions/` is the source of truth for executable package behavior. Its own manifest exposes `./extensions` and `./themes` and includes source, tests, themes, and its README in package files.
 
-```json
-{
-  "pi": {
-    "extensions": ["./extensions"],
-    "themes": ["./themes"]
-  },
-  "files": ["extensions", "themes", "README.md"]
-}
-```
+Current public entrypoints are:
 
-This package is the source of truth for public Pi extensions and themes. The README describes user-facing commands and installation examples. Source references: `packages/pi-learn-extensions/package.json`, `packages/pi-learn-extensions/README.md`.
+- `extensions/wiki/index.ts`
+- `extensions/chatgpt-usage-status/index.ts`
+- `extensions/aurora-ui.ts`
 
-### Harness runtime package
-
-`packages/harness-runtime/` is a private Node ESM package exported as `@pi-learn/harness-runtime` from `src/api.js`. The Pi harness extension delegates to this runtime instead of maintaining a separate CLI process. Source references: `packages/harness-runtime/package.json`, `packages/harness-runtime/README.md`, `packages/pi-learn-extensions/extensions/harness/index.ts`.
+The bundled theme is `themes/midnight-aurora.json`.
 
 ### Documentation areas
 
-- `docs/` contains Vietnamese Pi documentation, indexed by `docs/README.md`.
-- `PI_DOCUMENTATION.md` is a long root-level Pi document.
-- `pi-harness/` contains harness-specific design, roadmap, and session-format notes.
-- `wiki/` contains this synthesized, change-oriented repository wiki.
+- `README.md` and `packages/pi-learn-extensions/README.md` describe installation and public commands.
+- `docs/` contains Vietnamese Pi learning/reference material, indexed by `docs/README.md`.
+- `PI_DOCUMENTATION.md` is a root-level long-form reference.
+- `wiki/` is the repository-specific routing and change guide.
+- `wiki/INSTRUCTIONS.md` is a user-owned brief consumed by `/wiki` and `/wiki-update`.
 
 ## Runtime loading model
 
-Pi loads extension entrypoints from the directories listed in the manifest. Each extension exports a default function accepting the Pi extension API and then registers tools, slash commands, event handlers, UI customizations, or shortcuts.
+Pi scans direct `.ts`/`.js` files and subdirectories containing `index.ts`/`index.js` from the manifest's extension directory.
 
-Representative patterns:
+- `wiki/index.ts` registers only `/wiki` and `/wiki-update` through `wiki-commands.ts`.
+- `wiki/wiki-prompt.ts` builds the documentation task and compact AGENTS/CLAUDE bootstrap.
+- `wiki/wiki-rules.js` owns rule path classification, scaffolding, and lint.
+- `wiki/wiki-links.js` validates relative links and heading anchors.
+- `chatgpt-usage-status/index.ts` manages provider-gated usage display and account commands.
+- `aurora-ui.ts` owns editor/footer/status customization and theme selection.
 
-- `harness/index.ts` is the single public Harness entrypoint. It registers `harness_import_llm_reflection`, observability/proposal commands, and the Harness Wiki module.
-- `harness/wiki-commands.ts` registers `/harness-wiki-*`, sends concise task prompts into the current Pi session, protects reserved rule/metadata files, and finalizes scaffolds/metadata after `agent_settled`.
-- `harness/wiki-prompt.ts` defines documentation-task discipline but does not inject all prompt rules. Pi auto-loads the `AGENTS.md` bootstrap and the model reads root/section `_rules.md` files lazily.
-- `aurora-ui.ts` registers event handlers, a custom editor/footer, working messages, `/aurora-themes`, and `ctrl+shift+t`.
+Extension code runs in the Pi process with the user's OS permissions. UI work must remain guarded and session-scoped resources must be cleaned up.
 
-## Source-of-truth rules
+## Reduced supported surface
 
-When changing behavior, use these boundaries:
+The repository intentionally excludes previously bundled session-observability/proposal/eval/apply behavior, image generation, and model-aware prompt management. Their source packages, tests, commands, and design docs are removed. Reintroduction is a new product decision, not an implicit compatibility requirement.
 
-| Change type | Primary files |
+## Source-of-truth table
+
+| Change | Primary source |
 |---|---|
-| Public extension behavior | `packages/pi-learn-extensions/extensions/**` |
-| Public theme tokens | `packages/pi-learn-extensions/themes/midnight-aurora.json` |
-| Harness core logic | `packages/harness-runtime/src/**` |
-| Harness Pi command surface | `packages/pi-learn-extensions/extensions/harness/index.ts` |
-| Harness Wiki orchestration/prompt | `packages/pi-learn-extensions/extensions/harness/wiki-commands.ts`, `wiki-prompt.ts` |
-| Reviewed project prompt guidance | `wiki/_rules.md`, `wiki/<section>/_rules.md` |
-| Prompt-rule discovery/lint | `packages/harness-runtime/src/analysis/wiki-prompt-rules.js` |
-| Vietnamese Pi reference docs | `docs/**` and `docs/README.md` |
-| User install/package docs | `README.md`, `packages/pi-learn-extensions/README.md` |
+| Package resource exposure | `package.json`, `packages/pi-learn-extensions/package.json` |
+| Wiki command/lifecycle behavior | `packages/pi-learn-extensions/extensions/wiki/wiki-commands.ts` |
+| Wiki generation/update instructions | `packages/pi-learn-extensions/extensions/wiki/wiki-prompt.ts` |
+| Rule discovery and link validation | `packages/pi-learn-extensions/extensions/wiki/wiki-rules.js`, `wiki-links.js` |
+| ChatGPT usage | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts` |
+| Aurora TUI | `packages/pi-learn-extensions/extensions/aurora-ui.ts` |
+| Theme tokens | `packages/pi-learn-extensions/themes/midnight-aurora.json` |
+| Reviewed component guidance | `wiki/**/_rules.md` |
+| User-facing package docs | root and package READMEs |
 
-`.pi/extensions/log-llm-payload.ts` is local/dev-only and writes payload logs under `.pi/logs/llm-payloads/`. Those logs can contain sensitive prompt/context data and are not part of the public package contract.
+## Local-only boundary
 
-## Git history context
-
-Recent history shows two major streams:
-
-- The OpenWiki-derived workflow started as a separate Pi-native Wiki extension, then became the Harness Wiki capability with `/harness-wiki-*` commands and no compatibility aliases.
-- Harness now combines extension-driven observability/proposal/eval behavior with Wiki knowledge. Reviewed project guidance uses domain-local `_rules.md`; deterministic detectors/defaults remain runtime code.
-
-Do not overfit future documentation to commit hashes; prefer current source unless a historical rename or migration explains current design.
-
-## Import compatibility note
-
-Current package manifests and inspected public extension imports use `@earendil-works/*`. Keep the import style used by each extension and verify the installed Pi version before any namespace-wide migration.
+`.pi/` contains local/development resources and may contain sensitive payload logs. It is not public package source. Public changes belong under `packages/pi-learn-extensions/` unless the user explicitly requests local-only behavior.

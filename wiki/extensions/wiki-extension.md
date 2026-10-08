@@ -1,209 +1,143 @@
-# Harness Wiki capability
+# Wiki capability
 
-Harness Wiki is the repository-knowledge capability of the single public Harness extension. It preserves the useful Pi-native OpenWiki workflow while sharing command ownership, safety, proposals, and status with Harness.
+This page describes command behavior, selective reading, explicit rule updates, metadata, and verification for `packages/pi-learn-extensions/extensions/wiki/`.
 
-Sources:
-
-```txt
-packages/pi-learn-extensions/extensions/harness/index.ts
-packages/pi-learn-extensions/extensions/harness/wiki-commands.ts
-packages/pi-learn-extensions/extensions/harness/wiki-prompt.ts
-packages/pi-learn-extensions/extensions/harness/README.md
-packages/harness-runtime/src/analysis/wiki-prompt-rules.js
-packages/harness-runtime/src/analysis/wiki-links.js
-```
-
-## Commands
+## Commands and run lifecycle
 
 ```txt
-/harness-wiki-init [extra instructions]
-/harness-wiki-update [extra instructions]
-/harness-wiki-ask <question>
+/wiki [extra instructions]
+/wiki-update [extra instructions]
 ```
 
-The old `/wiki-*` commands and `/harness-wiki-status` are intentionally absent; there are no deprecated or hidden aliases.
+- `/wiki` initializes documentation from repository source, tests, existing docs, and relevant Git evidence.
+- `/wiki-update` performs a surgical maintenance update based on changes since `wiki/.last-update.json` plus its explicit message.
+- There is no ask/status/init alias. Ordinary project questions use the top-level `Project Wiki` agent instructions.
 
-## Known reviewed-rule mismatch
+Both commands require an idle agent. They create missing deterministic rule scaffolds, capture a Wiki snapshot, send a task through the current Pi provider/model/tools, and finalize after `agent_settled`. Shutdown marks a changed in-flight run interrupted so the next update retries.
 
-Current source, READMEs, git history, and the `harness-wiki-command-surface` eval agree that `/harness-wiki-status` was intentionally removed. However, reviewed rule `EXT-CMD-001` in `wiki/extensions/_rules.md` still lists that command as required. This Wiki run cannot repair the rule because `_rules.md` changes must use the Harness proposal, approval, and controlled-apply workflow.
+## Source ownership
 
-Before changing the Harness Wiki command surface, treat this as an unresolved policy/source mismatch: do not silently re-add or further remove commands. First create and review a proposal that reconciles `EXT-CMD-001` with the intended public contract, then keep source, tests/evals, READMEs, and Wiki docs aligned.
-
-## Command behavior
-
-- `/harness-wiki-init` creates missing deterministic prompt-rule scaffolds, then starts an initial documentation run with the current Pi model/tools.
-- `/harness-wiki-update` inspects existing docs, metadata, git history, worktree changes, and internal Wiki links. Without extra instructions it skips only when the previous run is complete and the repository and links are already accounted for.
-- `/harness-wiki-ask` uses a dedicated small question prompt. It reads relevant Wiki sections first and consults source/tests when the Wiki is insufficient, stale, contradictory, or verification is needed. It does not modify docs by default and carries no generation plan or Git summary.
-
-The command-specific instructions are sent as a user task prompt. They are not a replacement system prompt. When present, the user-owned `wiki/INSTRUCTIONS.md` brief is also included in init/update/ask prompts.
-
-## Documentation depth and planning
-
-`createHarnessWikiTaskPrompt()` selects separate question and documentation instructions. Init/update follow discovery → temporary coverage plan → topic research/write → coverage and navigation review. Research traces representative end-to-end flows through callers, callees, state owners, persistence, failure handling, integrations, and focused tests; inspecting one file or listing symbols is not enough to explain a system.
-
-The page contract asks for the relevant responsibilities, entrypoints, mechanisms, business rules, inputs/outputs, state/lifecycle, invariants, failures/recovery, configuration, security boundaries, extension points, and tests. Only evidence-supported topics belong in the page; irrelevant checklist sections and invented design rationale are excluded. Each substantive page opens with its scope and uses stable, descriptive H2/H3 headings with enough local context for selective reading.
-
-There is no initial eight-page limit or source-file-count-based update budget. Page count follows meaningful topics and coverage. Quickstart stays a lightweight routing entrypoint; detailed explanations and validation guidance live in canonical topic sections. A system/domain routing map can sit between quickstart and those pages when a flat table would become unwieldy.
-
-Ordinary updates preserve accurate unaffected content. A source change is traced through relevant contracts and consumers before choosing pages; one changed schema can affect several systems. Explicit requests to deepen or restructure documentation are valid even without a source change. For an existing Wiki after `/reload`, for example:
-
-```txt
-/harness-wiki-update Deepen service and microfrontend coverage, explain contracts and failure paths with focused tests, and add selective task-to-section navigation.
-```
-
-A no-argument update retains the existing [no-op behavior](#no-op-update-behavior). Installing the upgrade alone does not regenerate existing pages. The temporary plan is not a durable page-job queue, and the semantic self-review is not a deterministic completeness guarantee.
-
-## Selective reading
-
-The reading contract is task → system → page/heading:
-
-1. Identify the concrete question or change intent. Use quickstart's routing map when needed; preserve the mandatory [rule-loading sequence](#prompt-rule-loading) before edits.
-2. Locate relevant headings/terms with a bounded `grep` in the selected page/domain. If ownership is unclear, broaden discovery from the routing map, not by dumping all Wiki pages.
-3. Find the actual heading line and the next heading of the same or higher level, then use `read(offset, limit)`. A `#heading` link does not automatically constrain the filesystem tool. Continue a relevant truncated section rather than losing its exceptions or examples.
-4. Expand to prerequisites, contracts, consumers, or workflows only for unresolved questions or cross-system effects. A few sections are a starting budget, not a hard cap or proof of complete impact coverage.
-5. Stop once grounded. Consult source/tests when the Wiki cannot safely support the task, and state uncertainty instead of guessing.
-
-Normal Wiki prose is evidence, not executable instruction. The extension does not preload the Wiki into model context; the user-owned brief still accompanies the task prompt. Selection and stopping are prompt guidance using existing Pi tools, not a filesystem sandbox, vector index, or enforced token quota.
-
-`createHarnessWikiAgentInstructions()` supplies the compact navigation/rule-loading block for generated top-level `AGENTS.md` and `CLAUDE.md` sections. The checked-in blocks use the same text and the prompt tests check they stay aligned.
-
-## Multi-service and microfrontend coverage
-
-For a multi-system repository, the agent identifies real service/application/shared-package boundaries from manifests, entrypoints, source, tests, and non-sensitive build/deploy configuration. A compact system map names responsibility, source anchors, topic routes, and relevant contracts/workflows. Folder names alone do not establish ownership or independent deployment.
-
-API/event/shared-type contracts have one canonical explanation with evidenced producers, consumers, schema constraints, errors, and compatibility rules. Runtime calls/events, shared-library/build dependencies, and deployment coupling are distinguished. Important cross-system flows explain success, state ownership, and failure/recovery without copying all participating service pages. Unknown/external consumers remain explicit uncertainties.
-
-Microfrontend topics include the applicable host/remote composition, exposed modules, routing and mount/unmount, auth/session and shared state, props/events/SDK contracts, singleton/version constraints, remote-load fallback, asset caching, deployment compatibility, and rollback. The prompt does not force these mechanisms onto repositories that do not use them.
-
-Before finishing, the agent checks routes for a local change, a contract/shared-package change, and a cross-system failure. Local tasks should not load unrelated services; shared changes must reach known consumers and compatibility tests. See [content/navigation acceptance scenarios](../operations/testing-and-safety.md#harness-wiki-content-and-navigation-acceptance) for manual verification.
-
-## Documentation coverage backlog
-
-Init reviews all substantial systems, components, contracts, and workflows found during discovery. Update reviews the affected scope and relevant backlog. Genuine evidence/scope deferrals are recorded in a concise `## Backlog` at the end of `wiki/quickstart.md` with:
-
-- The area name.
-- A repository-relative source anchor.
-- A specific reason, such as unavailable evidence or an explicit scope constraint; an arbitrary page budget is not sufficient.
-
-Update runs read the backlog before planning. They resolve an entry when recent source changes or an explicit instruction affect the area and evidence permits coverage, then remove it only after documenting it. Still-valid entries remain; an entry can also be removed when repository evidence shows the area no longer exists. Ordinary updates must not expand scope just because more pages could be written. Normal question turns do not review or mutate the backlog unless explicitly requested.
-
-## Persistent Wiki brief
-
-`wiki/INSTRUCTIONS.md` is optional user-owned control metadata for documentation scope, priorities, language, exclusions, and intended audience. Harness reads at most 64 KiB from a regular non-symlink file and includes the content in init/update/ask prompts.
-
-Normal Harness Wiki runs cannot modify this file. Users may edit it directly or in a regular Pi turn. It is excluded from generated-documentation snapshots, but a worktree or committed change to the brief remains meaningful for `/harness-wiki-update` no-op detection. Reviewed `wiki/**/_rules.md` instructions and deterministic privacy/protection/apply controls take precedence over the brief.
-
-## Prompt-rule loading
-
-Reviewed prompt rules use one Markdown file for root and each final Wiki section:
-
-```txt
-wiki/_rules.md
-wiki/architecture/_rules.md
-wiki/extensions/_rules.md
-wiki/operations/_rules.md
-```
-
-Loading is lazy:
-
-```txt
-Pi auto-loads AGENTS.md
-  → model reads wiki/quickstart.md
-  → model reads wiki/_rules.md
-  → model identifies target domains
-  → model reads applicable section/_rules.md
-  → rule text enters context as read-tool results
-```
-
-The extension does not use `before_agent_start`, `context`, or provider-payload rewriting to inject all rules. It does not maintain a rule-content watcher or mtime/hash cache. A later `read` sees current file content, so editing Markdown rules does not require `/reload`; changing extension code does.
-
-This is best-effort prompt discipline. File protection, approval, target allowlists, path safety, redaction, and rollback remain deterministic code behavior.
-
-## Ownership and file protection
-
-| Path | Owner |
+| File | Responsibility |
 |---|---|
-| Normal `wiki/**/*.md` pages | Harness Wiki documentation workflow |
-| `wiki/INSTRUCTIONS.md` | User-owned persistent Wiki brief |
-| `wiki/**/_rules.md` | Harness proposal → approval → controlled apply |
-| `wiki/.last-update.json` | Harness Wiki metadata finalizer |
-| `wiki/_plan.md` | Temporary documentation run; removed before completion |
+| `wiki/index.ts` | Public extension entrypoint |
+| `wiki/wiki-commands.ts` | Commands, lifecycle, Git summary, protection, snapshots, metadata |
+| `wiki/wiki-prompt.ts` | Task prompt, rule opt-in detector, AGENTS/CLAUDE bootstrap |
+| `wiki/wiki-rules.js` | Rule path classification, section discovery, scaffold creation, lint |
+| `wiki/wiki-links.js` | Relative Markdown file/anchor validation |
 
-The Harness extension blocks built-in write/edit and common shell mutation attempts against `_rules.md` and `.last-update.json` in normal Pi tool turns. Approved `/harness-apply` writes through the controlled runtime lifecycle rather than model tool calls.
+All paths above are under `packages/pi-learn-extensions/extensions/`.
 
-Missing `_rules.md` files are a narrow bootstrap exception: the extension may create deterministic prompt-empty scaffolds for root/final sections. It does not invent policy or proposal origins.
+## Conditional project reading
+
+The generated top-level AGENTS/CLAUDE block has two independent conditions:
+
+1. When a request is about the repository, read `wiki/quickstart.md` only if it is not already present in current context. Do not read it for unrelated requests.
+2. Before editing a component, read only root/domain `_rules.md` files that govern that component. Read-only questions do not require rule loading.
+
+Quickstart routes task intent to a page/heading and to applicable rules. The model should use bounded `grep` and ranged reads, expand only across relevant contracts/consumers/workflows, and stop once grounded. This is prompt guidance, not an enforced context sandbox.
+
+## Explicit rule-update mode
+
+Rule changes are allowed only through an explicitly opted-in `/wiki-update` message. `isExplicitRuleUpdateRequest()` recognizes direct references such as:
+
+- `_rules.md` or `_rules`
+- `Wiki rules` or `prompt rules`
+- `rule file(s)`
+- equivalent supported Vietnamese wording
+
+Example:
+
+```txt
+/wiki-update Cập nhật wiki/**/_rules.md để phản ánh command surface mới
+```
+
+When opt-in is absent, write/edit and common shell mutation attempts against `_rules.md` are blocked. When present, the task prompt requires surgical rule edits, preservation of unrelated rules, unique stable rule IDs, and a valid root/final-section layout. No proposal or approval subsystem is involved.
+
+`wiki/.last-update.json` remains extension-owned in every mode. The active run's `wiki/INSTRUCTIONS.md` also remains protected.
+
+## Agent bootstrap maintenance
+
+Init and update ensure top-level `AGENTS.md` and `CLAUDE.md`, when present, contain one compact `## Project Wiki` section. If neither exists, init/update may create `AGENTS.md` containing only that section.
+
+The block must not copy detailed Wiki content. Its job is only to express conditional quickstart loading, component-scoped rule loading, and source verification when documentation is insufficient.
+
+## Documentation workflow
+
+Documentation modes follow:
+
+```txt
+discovery -> temporary wiki/_plan.md -> topic research/write -> coverage/navigation review
+```
+
+The prompt asks the agent to:
+
+- map manifests, public entrypoints, existing docs, systems, schemas, tests, and operations;
+- trace representative control/data flow, state, persistence, consumers, failures, and recovery;
+- keep one canonical explanation per concept or contract;
+- preserve accurate unaffected content during updates;
+- avoid page quotas, formatting-only churn, and speculative architecture;
+- remove `wiki/_plan.md` before completion;
+- verify changed internal links and heading anchors.
+
+`wiki/INSTRUCTIONS.md` supplies optional user-owned scope, priorities, language, exclusions, and audience. It cannot override privacy or protected metadata boundaries.
 
 ## Snapshot and metadata
 
-The documentation snapshot hashes only normal Wiki Markdown. It excludes:
+The Wiki snapshot includes:
 
-```txt
-wiki/INSTRUCTIONS.md
-wiki/**/_rules.md
-wiki/.last-update.json
-wiki/_plan.md
-hidden/temp files
-```
+- normal `wiki/**/*.md` documentation;
+- `wiki/**/_rules.md`.
 
-After `agent_settled`:
+It excludes:
 
-1. Harness creates any missing final-section scaffolds and recomputes the normal documentation snapshot.
-2. `validateWikiInternalLinks()` scans normal Wiki pages for relative Markdown file links and heading anchors. External URLs and images are ignored; checked links may target reserved Wiki Markdown such as `_rules.md`, but may not escape the Wiki root or resolve through symlink targets.
-3. A changed, valid, non-aborted run writes `.last-update.json` with `status: "complete"`. Invalid internal links, or an aborted/failed agent run that changed docs, write `status: "interrupted"`; session shutdown does the same when an active documentation run changed docs.
-4. A later successful no-change retry can clear stale interrupted status. Scaffold-only or prompt-rule-only changes still do not create a fake documentation update.
+- `wiki/INSTRUCTIONS.md`;
+- `wiki/_plan.md` and hidden/temp paths;
+- `wiki/.last-update.json`.
 
-Link failures are reported with source path and line so they can be repaired on the retry. A prompt-rule or `wiki/INSTRUCTIONS.md` Git change remains meaningful for no-op detection because normal docs may need to reflect updated workflow, policy, scope, or priorities.
+After settlement, the extension creates any newly needed scaffolds, validates internal documentation links and the rule layout, then writes metadata:
 
-## Rule validation and controlled apply
+- `complete` when changed content is valid and the agent did not abort;
+- `interrupted` when links/rules are invalid or an aborted run changed Wiki content;
+- unchanged metadata for a successful no-op, except a valid retry may clear an earlier interrupted state.
 
-`packages/harness-runtime/src/analysis/wiki-prompt-rules.js` provides lightweight Markdown/path lint:
+A rule-only update therefore participates in snapshot and metadata finalization just like a documentation update.
 
-- Reserved basename `_rules.md`.
-- Root/final-section completeness.
-- Project-root and symlink safety.
-- UTF-8/NUL/64 KiB checks.
-- Stable rule-heading IDs and duplicate detection.
-- Proposal-origin syntax checks.
+## Link and rule validation
 
-It does not parse natural language into detector parameters or build an effective runtime detector registry. Status always reports lint errors; init/update/ask fail closed after deterministic scaffold creation if the prompt-rule layout remains invalid.
+Internal link validation scans normal Wiki documentation, ignoring images and external URLs. Relative links must remain inside `wiki/`; target files must exist and cannot be symlinks; heading anchors use GitHub-like slugging with duplicate suffixes.
 
-Approved prompt-rule proposals patch exact Markdown blocks. Controlled apply validates the complete prompt-rule layout afterward and restores original content if validation fails.
+Rule validation requires:
 
-## No-op update behavior
+- a real `wiki/` directory;
+- root `wiki/_rules.md`;
+- one `_rules.md` in each final Wiki section;
+- bounded UTF-8 files without NUL bytes;
+- valid, non-duplicated rule IDs inside each file;
+- no path or symlink escape.
 
-`/harness-wiki-update` runs when:
+An explicitly requested rule repair can start with invalid rules so it can fix them, but finalization remains interrupted until the complete layout validates.
 
-- No previous update Git head exists, or the previous status is `interrupted`.
-- Internal Wiki links are invalid.
-- The worktree has meaningful changes other than metadata.
-- Prompt rules changed.
-- Source/config paths changed.
-- Git changed but changed paths cannot be determined safely.
+## No-op behavior
 
-It may skip when links are valid, the previous run is complete, all committed changes since that update are normal Wiki documentation/metadata, and the worktree is otherwise clean.
+A no-argument `/wiki-update` runs when metadata is missing/interrupted, links or rules are invalid, the worktree has meaningful changes, source/configuration changed, or changed paths cannot be determined safely.
 
-## OpenWiki provenance
+It may skip when the previous run is complete, links/rules validate, the worktree is clean apart from metadata, and commits since the recorded head contain only already-accounted Wiki documentation/metadata changes.
 
-The initial Pi-native port used `langchain-ai/openwiki@23428de0cc0b1b6d3e5d09be413e92a5d6ee451f` as its upstream base. Later reviews selectively adapted the persistent brief, deferred-area backlog, interrupted-run retries, Wiki-first Q&A, coding-agent navigation, internal-link validation, and per-topic research/quality guidance rather than importing OpenWiki's full runtime. The moving upstream review checkpoint and selected source commits are maintained in `packages/pi-learn-extensions/extensions/harness/README.md` instead of being duplicated here.
-
-Harness Wiki intentionally does not use OpenWiki's CLI/Ink UI, credential flow, LangChain/DeepAgents runtime, SQLite checkpointer, separate model/provider key, OKF/index/visualizer pipeline, forced diagrams, connectors, or personal-wiki features. See the extension README for the current upgrade checklist.
+An explicit message always bypasses the no-op shortcut because it defines new requested scope.
 
 ## Verification
 
 ```bash
-npm --prefix packages/pi-learn-extensions run test:harness-wiki
-node --test packages/harness-runtime/tests/wiki-links.test.js
-npm --prefix packages/harness-runtime test
+npm --prefix packages/pi-learn-extensions run test:wiki
 ```
 
-The extension prompt suite uses Node's native TypeScript stripping (22.18+). These are contract/regression tests, not LLM content-quality benchmarks.
+The suite covers prompt contracts, explicit rule opt-in detection, AGENTS/CLAUDE alignment, rule discovery/lint, path safety, and internal links.
 
-Then reload Pi and verify:
+After source changes, run `/reload`, then verify:
 
 ```txt
-/reload
-/harness-wiki-ask How are prompt rules loaded into context?
-/harness-wiki-update
+/wiki-update
+/wiki-update Update wiki/**/_rules.md for the changed component policy
 ```
 
-Also verify legacy `/wiki-*` commands and `/harness-wiki-status` are absent, and that a normal Harness Wiki turn cannot modify `_rules.md`.
+Confirm that `/wiki`, `/wiki-update` are present, retired aliases are absent, a normal update cannot edit rules, an explicit rule update can edit them, and invalid links/rules produce interrupted metadata.
