@@ -32,12 +32,12 @@
     "userPanelBg": "#22304f",
     "userPanelBg2": "#3a3947",
     "userPanelText": "#e0e4ee",
-    "userPanelBorder": "#5d7cff"
+    "userPanelBorder": "#9d86d9"
   },
   "colors": {
     "accent": "auroraCyan",
     "border": "userPanelBorder",
-    "borderAccent": "auroraSky",
+    "borderAccent": "userPanelBorder",
     "borderMuted": "border0",
     "success": "auroraGreen",
     "error": "coral",
