@@ -57,17 +57,21 @@ Khi opt-in, prompt yêu cầu sửa tối thiểu, giữ rule không liên quan 
 
 ## Agent bootstrap maintenance
 
-Prompt giao agent đảm bảo mỗi top-level `AGENTS.md`/`CLAUDE.md` hiện có chứa đúng một section `## Project Wiki`; nếu cả hai vắng thì tạo AGENTS. Giữ nội dung khác, không sửa agent instruction file lồng nhau. Không có code rewrite bootstrap trực tiếp trong lifecycle.
+Prompt `/wiki` giao agent đảm bảo mỗi top-level `AGENTS.md`/`CLAUDE.md` hiện có chứa đúng một section `## Project Wiki`; nếu cả hai vắng thì tạo AGENTS. Giữ nội dung khác, không sửa agent instruction file lồng nhau. `/wiki-update` không nhận mẫu bootstrap và chỉ được sửa section Project Wiki của các file này khi người dùng yêu cầu rõ ràng. Không có code rewrite bootstrap trực tiếp trong lifecycle.
 
-Section chỉ chứa conditional quickstart loading, component-scoped rules và kiểm chứng source khi Wiki thiếu/cũ/mâu thuẫn. Test `wiki-prompt.test.mts` so sánh bootstrap sinh ra với hai file checked-in.
+Section chứa conditional quickstart loading, component-scoped rules, kiểm chứng source khi Wiki thiếu/cũ/mâu thuẫn và hướng dẫn selective reading. Khối selective reading nằm trong mẫu Markdown bootstrap, không lặp thành một khối riêng ngoài mẫu. Test `wiki-prompt.test.mts` so sánh bootstrap sinh ra với hai file checked-in.
 
 ## Documentation workflow
 
-`discovery → wiki/_plan.md tạm → research/write từng topic → coverage/navigation review`.
+`createWikiTaskPrompt()` trong `packages/pi-learn-extensions/extensions/wiki/wiki-prompt.ts` tách hai nhánh:
 
-Prompt yêu cầu inventory manifests/entrypoints/contracts/tests/operations, trace control/data flow và ownership, không đặt quota trang, không suy đoán từ tên thư mục. Update giữ nội dung đúng không bị ảnh hưởng và đi theo consumer/shared contract của thay đổi. Xóa plan trước khi kết thúc, kiểm tra links/anchors; generated docs chỉ ở Wiki, ngoại lệ duy nhất là bootstrap top-level.
+- `/wiki`: khảo sát manifests/entrypoints/contracts/tests/operations, trace control/data flow và ownership; `discovery → wiki/_plan.md tạm → research/write từng topic → coverage/navigation review`. Không đặt quota trang, không suy đoán từ tên thư mục; chèn mẫu bootstrap và contract tài liệu đầy đủ.
+- `/wiki-update`: dùng `createUpdateInstructions()` riêng, không chèn inventory, mẫu bootstrap hoặc contract khởi tạo đầy đủ. Yêu cầu người dùng xác định scope; agent tạo impact map ngắn trong context, đọc quickstart khi cần định tuyến và chỉ đọc pages/source/tests/rules liên quan. Không bắt buộc plan file. Chỉ mở rộng sang producer/consumer/shared contract khi cần kiểm chứng; giữ nội dung đúng không bị ảnh hưởng, báo no-op khi không có impact.
+- Update rule có opt-in: đọc target rules và evidence component liên quan rồi sửa các rules trong scope; không viết lại tài liệu/bootstrap nếu yêu cầu không cần. Guard và validation toàn Wiki của extension vẫn giữ nguyên, prompt tập trung không có nghĩa bỏ kiểm tra finalization.
 
-`wiki/INSTRUCTIONS.md` là brief do người dùng quản lý: scope, ngôn ngữ, ưu tiên, exclusions, audience. `readWikiBrief()` chấp nhận regular file không symlink, tối đa 64 KiB; thiếu file là bình thường, loại file/size sai làm command báo lỗi. Brief không vượt safety boundaries hoặc applicable rules.
+Generated docs chỉ ở Wiki, ngoại lệ là section bootstrap top-level theo quyền của từng mode. Nếu dùng plan tạm thì xóa trước khi kết thúc; kiểm tra links/anchors và validation liên quan.
+
+`wiki/INSTRUCTIONS.md` là brief do người dùng quản lý: scope, ngôn ngữ, ưu tiên, exclusions, audience. Init đọc và chèn brief: `readWikiBrief()` chấp nhận regular file không symlink, tối đa 64 KiB; thiếu file là bình thường, loại file/size sai làm command init báo lỗi. Update không tự đọc/chèn toàn bộ brief qua `createRunContext()`; prompt hướng dẫn agent chỉ đọc khi cần ngôn ngữ/quy ước tài liệu và không dùng ưu tiên rộng để mở scope. Brief không vượt safety boundaries hoặc applicable rules và vẫn được bảo vệ trong active run.
 
 ## Snapshot and metadata
 

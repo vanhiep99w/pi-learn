@@ -26,36 +26,54 @@ function render(mode: Mode, request = "REQUEST_SENTINEL", allowRuleUpdates = fal
 }
 
 for (const mode of modes) {
-  test(`${mode}: includes repository context, brief, and exact request once`, () => {
+  test(`${mode}: includes repository context and exact request with mode-scoped brief`, () => {
     const request = '  REQUEST_SENTINEL: giải thích "retry"\nKeep API names unchanged.  ';
     const prompt = render(mode, request);
     assert.ok(prompt.includes(root));
     assert.ok(prompt.endsWith(request.trim()));
     assert.equal(prompt.split("REQUEST_SENTINEL").length - 1, 1);
-    assert.equal(prompt.split("BRIEF_SENTINEL").length - 1, 1);
+    assert.equal(prompt.split("BRIEF_SENTINEL").length - 1, mode === "init" ? 1 : 0);
   });
 
   test(`${mode}: keeps selective reading and evidence boundaries`, () => {
     const prompt = render(mode);
-    assert.match(prompt, /Do not preload the entire wiki/);
-    assert.match(prompt, /task -> system -> page\/heading/);
+    assert.match(prompt, /preload the entire wiki/);
     assert.match(prompt, /targeted grep/);
-    assert.match(prompt, /#anchor is a navigation hint/);
     assert.match(prompt, /Stop once the task is grounded/);
+    if (mode === "init") {
+      assert.match(prompt, /task -> system -> page\/heading/);
+      assert.match(prompt, /#anchor is a navigation hint/);
+    } else {
+      assert.match(prompt, /quickstart\.md only if routing is needed/);
+      assert.match(prompt, /Load applicable _rules\.md files immediately before edits/);
+      assert.match(prompt, /Read wiki\/INSTRUCTIONS\.md only when needed/);
+      assert.match(prompt, /Do not create, edit, move, or delete wiki\/INSTRUCTIONS\.md or wiki\/\.last-update\.json/);
+    }
     assert.match(prompt, /source, tests, manifests/);
     assert.match(prompt, /Never read secrets/);
   });
 
   test(`${mode}: preserves planning, depth, and navigation quality`, () => {
     const prompt = render(mode);
-    assert.match(prompt, /discovery -> plan -> topic research\/write -> coverage\/navigation review/);
-    assert.match(prompt, /control and data flows through callers, state owners, persistence/);
-    assert.match(prompt, /Do not stop at directory names/);
-    assert.match(prompt, /Choose page count from real repository complexity/);
-    assert.match(prompt, /one canonical explanation per concept or contract/);
-    assert.match(prompt, /confirmed behavior from inference and unknowns/);
-    assert.match(prompt, /important systems, schemas, configuration, tests/);
-    assert.match(prompt, /verify all added or changed internal Wiki links/);
+    if (mode === "init") {
+      assert.match(prompt, /discovery -> plan -> topic research\/write -> coverage\/navigation review/);
+      assert.match(prompt, /control and data flows through callers, state owners, persistence/);
+      assert.match(prompt, /Do not stop at directory names/);
+      assert.match(prompt, /Choose page count from real repository complexity/);
+      assert.match(prompt, /one canonical explanation per concept or contract/);
+      assert.match(prompt, /confirmed behavior from inference and unknowns/);
+      assert.match(prompt, /important systems, schemas, configuration, tests/);
+      assert.match(prompt, /verify all added or changed internal Wiki links/);
+    } else {
+      assert.match(prompt, /Let the user's request define the update scope/);
+      assert.match(prompt, /No full discovery or mandatory plan file is needed/);
+      assert.match(prompt, /do not edit files and report the no-op/);
+      assert.match(prompt, /Preserve accurate unaffected content/);
+      assert.match(prompt, /Verify added or changed internal Wiki links/);
+      assert.match(prompt, /Edit top-level AGENTS\.md or CLAUDE\.md only when explicitly requested/);
+      assert.doesNotMatch(prompt, /Agent bootstrap:|Documentation contract:|Research and writing:|```markdown|Build a repository inventory|discovery -> plan/);
+      assert.ok(prompt.length < render("init").length * 0.6);
+    }
   });
 }
 
@@ -81,6 +99,10 @@ test("rule updates are disabled unless the update request explicitly opts in", (
   assert.match(normal, /only by \/wiki-update when its command request explicitly asks/);
   assert.match(optedIn, /Explicit rule-update mode/);
   assert.match(optedIn, /do not require a proposal or approval workflow/i);
+  assert.match(optedIn, /For a rule-only request, inspect the target rules and relevant component evidence/);
+  assert.match(optedIn, /Do not rewrite documentation or bootstrap files unless the request requires it/);
+  assert.doesNotMatch(normal, /For a rule-only request/);
+  assert.doesNotMatch(render("init", "Update wiki rules", true), /Explicit rule-update mode/);
   assert.doesNotMatch(optedIn, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
 });
 
@@ -127,11 +149,10 @@ test("the reusable bootstrap is compact and matches checked-in agent files", () 
   assert.ok(bootstrap.length < 2000);
   assert.match(bootstrap, /Selective Wiki reading:/);
   assert.match(bootstrap, /Do not preload the entire wiki/);
-  for (const mode of modes) {
-    const prompt = render(mode);
-    assert.equal(prompt.split("Selective Wiki reading:").length - 1, 1);
-    assert.ok(prompt.includes("```markdown\n" + bootstrap + "\n```"));
-  }
+  const prompt = render("init");
+  assert.equal(prompt.split("Selective Wiki reading:").length - 1, 1);
+  assert.ok(prompt.includes("```markdown\n" + bootstrap + "\n```"));
+  assert.doesNotMatch(render("update"), /Selective Wiki reading:|## Project Wiki/);
   assert.match(bootstrap, /read `wiki\/quickstart\.md` if it has not already been read/);
   assert.match(bootstrap, /For unrelated requests, do not read it/);
   assert.match(bootstrap, /Before editing a project component/);

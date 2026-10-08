@@ -198,7 +198,7 @@ async function startDocumentationRun(
 
   const scaffoldResult = ensureWikiPromptRuleScaffolds({ projectRoot: ctx.cwd });
   if (!allowRuleUpdates) assertPromptRulesValidForWikiRun(ctx.cwd);
-  const context = await createRunContext(ctx.cwd);
+  const context = await createRunContext(ctx.cwd, command);
   const snapshotBefore = await createWikiSnapshot(ctx.cwd);
   activeWikiRun = { command, cwd: ctx.cwd, snapshotBefore, allowRuleUpdates };
 
@@ -216,10 +216,10 @@ async function startDocumentationRun(
   }
 }
 
-async function createRunContext(cwd: string): Promise<RunContext> {
+async function createRunContext(cwd: string, command: "init" | "update"): Promise<RunContext> {
   const [lastUpdate, wikiBrief] = await Promise.all([
     readLastUpdate(cwd),
-    readWikiBrief(cwd),
+    command === "init" ? readWikiBrief(cwd) : Promise.resolve(null),
   ]);
   return { lastUpdate, wikiBrief };
 }
