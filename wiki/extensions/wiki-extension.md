@@ -43,13 +43,13 @@ Quickstart là task → system → page/heading route. Dùng grep giới hạn �
 
 ## Explicit rule-update mode
 
-`allowRuleUpdates` chỉ true khi command là update và `isExplicitRuleUpdateRequest(message)` khớp regex. Các cụm được nhận gồm `_rules.md`/`_rules`, Wiki rules, prompt rules, rule file(s), `quy tắc wiki`, `cập nhật rule`/`cập nhật các rule`.
+`allowRuleUpdates` chỉ true khi command là update và `isExplicitRuleUpdateRequest(message)` nhận yêu cầu sửa rule. Ngoài các cụm `_rules.md`/`_rules`, Wiki rules, prompt rules, rule file(s), `quy tắc wiki`, `cập nhật rule`/`cập nhật các rule`, detector nhận một số yêu cầu chính sách agent tự nhiên: kết hợp dấu hiệu lâu dài (`từ nay`, `khi viết/sửa code`, `from now on`...), chủ đề công việc coding agent và chỉ thị như `tôi không muốn`, `agent phải`, `do not`. Ví dụ `khi viết code tôi ko muốn viết unitest nữa` bật quyền sửa rule mà không cần nêu tên file. Nhánh tự nhiên loại yêu cầu có dấu hiệu tạm thời (`lần này`, `for this task`...) và yêu cầu mô tả/giải thích ở đầu câu; yêu cầu nêu rule rõ vẫn dùng nhánh opt-in cũ.
 
 ```txt
 /wiki-update Cập nhật wiki/**/_rules.md để phản ánh command surface mới
 ```
 
-Detector là heuristic theo từ khóa, không phải phê duyệt ngữ nghĩa hay subsystem proposal/approval. Init không bao giờ bật quyền này, kể cả message nhắc rules.
+Detector vẫn là heuristic bảo thủ, chuẩn hóa dấu tiếng Việt, không phải bộ phân loại ngữ nghĩa tổng quát hoặc subsystem proposal/approval. Cách diễn đạt chưa được nhận có thể cần yêu cầu lại rõ là cập nhật rule. Prompt update phân biệt: facts về dự án → normal Wiki; chính sách làm việc lâu dài → `_rules.md` thuộc domain; chỉ thị một lần → không lưu thành rule hay tài liệu. Khi intent/thời hạn/ownership mơ hồ thì hỏi trước khi sửa. Nếu chưa được bật quyền sửa rule, agent không được ghi chính sách vào normal Wiki để lách guard mà phải đề nghị yêu cầu sửa rule rõ ràng. Không suy diễn “không viết unit test mới” thành “không chạy test có sẵn”. Init không bao giờ bật quyền sửa rule, kể cả message nhắc rules.
 
 `tool_call` chặn built-in write/edit tới rules khi không opt-in; metadata luôn được bảo vệ, brief được bảo vệ trong active run cùng cwd. Bash guard dò path và những mutation phổ biến (redirect, rm/mv/cp, tee, truncate, sed/perl in-place). Không coi regex guard là sandbox cho mọi tool/script; chi tiết [safety](../operations/testing-and-safety.md#security-and-privacy).
 

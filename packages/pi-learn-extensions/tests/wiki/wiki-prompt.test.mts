@@ -104,6 +104,14 @@ test("rule updates are disabled unless the update request explicitly opts in", (
   assert.doesNotMatch(normal, /For a rule-only request/);
   assert.doesNotMatch(render("init", "Update wiki rules", true), /Explicit rule-update mode/);
   assert.doesNotMatch(optedIn, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
+  const policy = "khi viết code tôi ko muốn viết unitest nữa";
+  const policyPrompt = render("update", policy, isExplicitRuleUpdateRequest(policy));
+  assert.match(policyPrompt, /Explicit rule-update mode/);
+  assert.match(policyPrompt, /Lasting instructions.*owning _rules\.md/);
+  assert.match(policyPrompt, /do not put it in normal Wiki pages as a workaround/);
+  assert.match(policyPrompt, /A one-off instruction/);
+  assert.match(policyPrompt, /ask before editing/);
+  assert.match(policyPrompt, /does not mean "do not run existing tests"/);
 });
 
 test("explicit rule request detection is narrow and supports English and Vietnamese", () => {
@@ -114,10 +122,27 @@ test("explicit rule request detection is narrow and supports English and Vietnam
     "Update the rule files",
     "Cập nhật rule cho wiki",
     "Cập nhật quy tắc wiki",
+    "khi viết code tôi ko muốn viết unitest nữa",
+    "Khi viết code tôi không muốn viết unit test nữa",
+    "Từ nay tôi muốn agent chỉ viết unit test khi được yêu cầu",
+    "Từ nay bạn không được tự push code",
+    "Mỗi khi sửa code agent phải chạy test có sẵn",
+    "From now on do not write unit tests unless I ask",
+    "When editing code, always run existing tests",
   ]) {
     assert.equal(isExplicitRuleUpdateRequest(request), true, request);
   }
-  for (const request of ["", "Update documentation", "Explain business rules", "Refresh quickstart"]) {
+  for (const request of [
+    "", "Update documentation", "Explain business rules", "Refresh quickstart",
+    "Lần này đừng viết unit test",
+    "Từ nay tôi không muốn viết unit test, nhưng chỉ cho task này",
+    "For this task, do not write unit tests",
+    "Khi viết code có thể chạy unit test bằng npm test",
+    "Mô tả quy trình khi viết code agent phải chạy test",
+    "Document that developers always run unit tests",
+    "Từ nay hệ thống không cho phép người dùng push thông báo",
+    "Tôi không muốn viết unit test",
+  ]) {
     assert.equal(isExplicitRuleUpdateRequest(request), false, request);
   }
 });

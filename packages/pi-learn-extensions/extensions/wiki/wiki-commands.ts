@@ -78,7 +78,7 @@ export function registerWikiCommands(pi: ExtensionAPI) {
       if (isProtectedWikiMutationPath(ctx.cwd, candidate, { protectRules, protectWikiBrief })) {
         return {
           block: true,
-          reason: "Wiki metadata and the active run's wiki/INSTRUCTIONS.md are protected. _rules.md may be changed only by /wiki-update when its request explicitly asks for rule updates.",
+          reason: "Wiki metadata and the active run's wiki/INSTRUCTIONS.md are protected. _rules.md may be changed only by /wiki-update with an explicit rule request or a clear lasting coding-agent policy.",
         };
       }
     }
