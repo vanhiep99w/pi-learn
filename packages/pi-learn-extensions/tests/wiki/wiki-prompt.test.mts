@@ -124,7 +124,14 @@ test("update retains non-Git metadata and handles absent metadata", () => {
 
 test("the reusable bootstrap is compact and matches checked-in agent files", () => {
   const bootstrap = createWikiAgentInstructions();
-  assert.ok(bootstrap.length < 1000);
+  assert.ok(bootstrap.length < 2000);
+  assert.match(bootstrap, /Selective Wiki reading:/);
+  assert.match(bootstrap, /Do not preload the entire wiki/);
+  for (const mode of modes) {
+    const prompt = render(mode);
+    assert.equal(prompt.split("Selective Wiki reading:").length - 1, 1);
+    assert.ok(prompt.includes("```markdown\n" + bootstrap + "\n```"));
+  }
   assert.match(bootstrap, /read `wiki\/quickstart\.md` if it has not already been read/);
   assert.match(bootstrap, /For unrelated requests, do not read it/);
   assert.match(bootstrap, /Before editing a project component/);
