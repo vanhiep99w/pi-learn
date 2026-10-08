@@ -13,7 +13,7 @@ The Wiki extension uses the current Pi model and tools to create or update repos
 /wiki-update [extra instructions]
 ```
 
-`index.ts` is the entrypoint. `wiki-commands.ts` owns command registration, Git context, snapshots, no-op detection, protected files, final validation, and metadata. `wiki-prompt.ts` owns the documentation/update contract and generated AGENTS/CLAUDE block. JavaScript helpers own rule lint/scaffolds and internal link validation.
+`index.ts` is the entrypoint. `wiki-commands.ts` owns command registration, snapshots, no-op detection, protected files, final validation, and metadata. Git is used only internally for no-op detection and metadata, not injected into task prompts. `wiki-prompt.ts` owns the documentation/update contract and generated AGENTS/CLAUDE block. JavaScript helpers own rule lint/scaffolds and internal link validation.
 
 Rule mutation is opt-in: `/wiki-update` allows `_rules.md` edits only when its message explicitly requests `_rules.md`, Wiki/prompt rules, or rule files. Other runs block those mutations. See [Wiki capability](wiki-extension.md).
 

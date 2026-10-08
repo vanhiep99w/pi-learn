@@ -98,10 +98,26 @@ test("explicit rule request detection is narrow and supports English and Vietnam
   }
 });
 
-test("update includes previous metadata and git context", () => {
+test("both commands omit Git context and metadata Git fields in every rule mode", () => {
+  // Legacy/internal context fields must not leak into generated task prompts.
+  for (const mode of modes) {
+    for (const allowRuleUpdates of [false, true]) {
+      const prompt = render(mode, "REQUEST_SENTINEL", allowRuleUpdates);
+      assert.doesNotMatch(prompt, /GIT_CONTEXT_SENTINEL|PREVIOUS_HEAD_SENTINEL|gitHead/);
+      assert.doesNotMatch(prompt, /Working tree status|Current HEAD|Recent commits|Diff summary|Git context|Git change summary|Git discipline/i);
+      assert.doesNotMatch(prompt, /git status|git diff|inspect commits/i);
+    }
+  }
+  const source = readFileSync(new URL("../../extensions/wiki/wiki-commands.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /createGitSummary|gitSummary|Working tree status/);
+});
+
+test("update retains non-Git metadata and handles absent metadata", () => {
   const prompt = render("update");
-  assert.ok(prompt.includes(context.gitSummary));
-  assert.ok(prompt.includes(context.lastUpdate.gitHead));
+  assert.ok(prompt.includes(context.lastUpdate.updatedAt));
+  assert.ok(prompt.includes(context.lastUpdate.model));
+  const withoutMetadata = createWikiTaskPrompt("update", root, { lastUpdate: null, wikiBrief: null });
+  assert.match(withoutMetadata, /No previous Wiki update metadata was found/);
 });
 
 test("the reusable bootstrap is compact and matches checked-in agent files", () => {

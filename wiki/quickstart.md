@@ -50,7 +50,7 @@ If the edit scope expands, load the newly applicable file. Re-read a rule only a
 ```
 
 - `/wiki` initializes repository documentation.
-- `/wiki-update` performs a scoped maintenance update from source, Git, existing Wiki content, and the user request.
+- `/wiki-update` performs a scoped maintenance update from current source, existing Wiki content, and the user request. Neither command injects Git context into its prompt.
 - There is no Wiki question command. Ordinary project questions follow the conditional reading guidance above.
 
 See [Wiki capability](extensions/wiki-extension.md#commands-and-run-lifecycle).

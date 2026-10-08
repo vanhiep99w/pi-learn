@@ -55,7 +55,7 @@ Wiki dùng model, provider và filesystem tools hiện tại của Pi:
 ```
 
 - `/wiki` khởi tạo tài liệu dưới `wiki/`.
-- `/wiki-update` cập nhật tài liệu theo source, Git và yêu cầu cụ thể.
+- `/wiki-update` cập nhật tài liệu theo source hiện tại và yêu cầu cụ thể; prompt không chứa Git status, lịch sử commit hoặc diff.
 - `_rules.md` chỉ được phép sửa khi nội dung lệnh `/wiki-update` yêu cầu rõ việc cập nhật rule, ví dụ:
 
   ```txt

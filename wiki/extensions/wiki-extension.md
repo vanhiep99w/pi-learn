@@ -9,8 +9,9 @@ This page describes command behavior, selective reading, explicit rule updates, 
 /wiki-update [extra instructions]
 ```
 
-- `/wiki` initializes documentation from repository source, tests, existing docs, and relevant Git evidence.
-- `/wiki-update` performs a surgical maintenance update based on changes since `wiki/.last-update.json` plus its explicit message.
+- `/wiki` initializes documentation from repository source, tests, and existing docs.
+- `/wiki-update` performs a surgical maintenance update from current source, existing Wiki content, and its explicit message.
+- Neither command injects working-tree status, commit history, diffs, or metadata Git fields into its prompt. Git remains internal to no-op detection and metadata bookkeeping.
 - There is no ask/status/init alias. Ordinary project questions use the top-level `Project Wiki` agent instructions.
 
 Both commands require an idle agent. They create missing deterministic rule scaffolds, capture a Wiki snapshot, send a task through the current Pi provider/model/tools, and finalize after `agent_settled`. Shutdown marks a changed in-flight run interrupted so the next update retries.
@@ -20,7 +21,7 @@ Both commands require an idle agent. They create missing deterministic rule scaf
 | File | Responsibility |
 |---|---|
 | `wiki/index.ts` | Public extension entrypoint |
-| `wiki/wiki-commands.ts` | Commands, lifecycle, Git summary, protection, snapshots, metadata |
+| `wiki/wiki-commands.ts` | Commands, lifecycle, protection, snapshots, no-op detection, metadata |
 | `wiki/wiki-prompt.ts` | Task prompt, rule opt-in detector, AGENTS/CLAUDE bootstrap |
 | `wiki/wiki-rules.js` | Rule path classification, section discovery, scaffold creation, lint |
 | `wiki/wiki-links.js` | Relative Markdown file/anchor validation |

@@ -8,13 +8,11 @@ type WikiCommand = "init" | "update";
 type UpdateMetadata = {
   updatedAt: string;
   command: "init" | "update";
-  gitHead?: string;
   model: string;
 };
 
 type RunContext = {
   lastUpdate: UpdateMetadata | null;
-  gitSummary: string;
   wikiBrief: string | null;
 };
 
@@ -41,7 +39,11 @@ export function createWikiTaskPrompt(
 function formatLastUpdate(lastUpdate: UpdateMetadata | null): string {
   return lastUpdate === null
     ? "No previous Wiki update metadata was found."
-    : JSON.stringify(lastUpdate, null, 2);
+    : JSON.stringify({
+      updatedAt: lastUpdate.updatedAt,
+      command: lastUpdate.command,
+      model: lastUpdate.model,
+    }, null, 2);
 }
 
 function formatWikiBrief(wikiBrief: string | null): string {
@@ -111,7 +113,7 @@ Grounding and reading:
 - Read ${WIKI_DIR}/quickstart.md first when it exists and has not already been read in the current context.
 - Load a _rules.md file only immediately before editing the component or Wiki domain it governs. Do not load unrelated rule files.
 - Re-read an applicable rule only if its content is no longer present after compaction or the edit scope changes.
-- Ground important claims in inspected source, tests, manifests, existing docs, or useful git evidence. Do not invent files, behavior, contracts, or business rules.
+- Ground important claims in inspected source, tests, manifests, or existing docs. Do not invent files, behavior, contracts, or business rules.
 
 ${createRuleUpdateInstructions(allowRuleUpdates)}
 
@@ -132,7 +134,7 @@ Research and writing:
 - Trace representative control and data flows through callers, state owners, persistence, integrations, consumers, failures, and focused tests. Do not stop at directory names or a one-file inventory.
 - Research and write one coherent topic at a time. Choose page count from real repository complexity; do not impose a page quota.
 - Keep one canonical explanation per concept or contract and link to it instead of duplicating details.
-- Distinguish confirmed behavior from inference and unknowns. Include design rationale only when source, tests, docs, or history support it.
+- Distinguish confirmed behavior from inference and unknowns. Include design rationale only when source, tests, or docs support it.
 - Preserve accurate unaffected content during updates. Do not make formatting-only edits.
 
 ${createSelectiveReadingInstructions()}
@@ -142,12 +144,6 @@ Planning:
 - Follow discovery -> plan -> topic research/write -> coverage/navigation review.
 - Remove ${WIKI_DIR}/_plan.md before finishing.
 - During update, scope the plan from source changes and the explicit user request. Follow affected producer/consumer or shared-contract boundaries rather than limiting impact to changed file count.
-
-Git discipline:
-- Use git status and diff to account for local changes.
-- On init, inspect recent history only where it explains important current behavior.
-- On update, inspect commits since the recorded gitHead, falling back to updatedAt when necessary.
-- Do not add persistent commit-hash inventories unless a specific historical decision matters.
 
 Agent bootstrap:
 - Ensure existing top-level AGENTS.md and CLAUDE.md files contain exactly one semantically current Project Wiki section. If neither exists, create AGENTS.md with this section.
@@ -202,8 +198,8 @@ function createUserPrompt(
   userMessage: string | null,
 ): string {
   const base = command === "init"
-    ? `Initialize Wiki documentation for this repository.\n\nGit context:\n${context.gitSummary}`
-    : `Update the existing Wiki for this repository.\n\nLast update metadata:\n${formatLastUpdate(context.lastUpdate)}\n\nGit change summary:\n${context.gitSummary}`;
+    ? "Initialize Wiki documentation for this repository."
+    : `Update the existing Wiki for this repository.\n\nLast update metadata:\n${formatLastUpdate(context.lastUpdate)}`;
 
   return appendUserMessage(base, userMessage);
 }

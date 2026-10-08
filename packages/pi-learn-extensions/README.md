@@ -32,7 +32,7 @@ themes/
 ```
 
 - `/wiki` tạo Wiki ban đầu dưới `wiki/`.
-- `/wiki-update` dùng Git/source hiện tại để cập nhật có chọn lọc.
+- `/wiki-update` dùng source hiện tại để cập nhật có chọn lọc. Cả hai command không đưa Git status, commit hoặc diff vào prompt; Git chỉ dùng nội bộ cho no-op detection và metadata.
 - Wiki update chỉ được sửa `wiki/**/_rules.md` khi phần ghi chú yêu cầu rõ `_rules.md`, prompt rules, Wiki rules hoặc rule files.
 - Không có command hỏi Wiki riêng. Agent dùng block `Project Wiki` trong `AGENTS.md`/`CLAUDE.md`: chỉ đọc `wiki/quickstart.md` cho câu hỏi về project khi context chưa có, và chỉ đọc rule áp dụng ngay trước khi sửa component liên quan.
 - `wiki/INSTRUCTIONS.md` là brief do người dùng quản lý. `wiki/.last-update.json` do extension quản lý.

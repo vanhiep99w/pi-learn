@@ -40,7 +40,6 @@ type UpdateMetadata = {
 
 type RunContext = {
   lastUpdate: UpdateMetadata | null;
-  gitSummary: string;
   wikiBrief: string | null;
 };
 
@@ -199,7 +198,7 @@ async function startDocumentationRun(
 
   const scaffoldResult = ensureWikiPromptRuleScaffolds({ projectRoot: ctx.cwd });
   if (!allowRuleUpdates) assertPromptRulesValidForWikiRun(ctx.cwd);
-  const context = await createRunContext(command, ctx.cwd);
+  const context = await createRunContext(ctx.cwd);
   const snapshotBefore = await createWikiSnapshot(ctx.cwd);
   activeWikiRun = { command, cwd: ctx.cwd, snapshotBefore, allowRuleUpdates };
 
@@ -217,12 +216,12 @@ async function startDocumentationRun(
   }
 }
 
-async function createRunContext(command: WikiCommand, cwd: string): Promise<RunContext> {
+async function createRunContext(cwd: string): Promise<RunContext> {
   const [lastUpdate, wikiBrief] = await Promise.all([
     readLastUpdate(cwd),
     readWikiBrief(cwd),
   ]);
-  return { lastUpdate, gitSummary: await createGitSummary(command, cwd, lastUpdate), wikiBrief };
+  return { lastUpdate, wikiBrief };
 }
 
 async function readWikiBrief(cwd: string): Promise<string | null> {
@@ -240,33 +239,6 @@ async function readWikiBrief(cwd: string): Promise<string | null> {
     if (isFileNotFoundError(error)) return null;
     throw error;
   }
-}
-
-async function createGitSummary(
-  command: WikiCommand,
-  cwd: string,
-  lastUpdate: UpdateMetadata | null,
-): Promise<string> {
-  const lines: string[] = [];
-  lines.push("## Working tree status");
-  lines.push(await runGitOrFallback(cwd, ["status", "--short", "--untracked-files=all"]));
-  lines.push("\n## Current HEAD");
-  lines.push(await runGitOrFallback(cwd, ["rev-parse", "HEAD"]));
-
-  if (command === "update" && lastUpdate?.gitHead) {
-    lines.push(`\n## Changes since last wiki git head (${lastUpdate.gitHead})`);
-    lines.push(await runGitOrFallback(cwd, ["log", `${lastUpdate.gitHead}..HEAD`, "--name-status", "--oneline"]));
-  } else if (command === "update" && lastUpdate?.updatedAt) {
-    lines.push(`\n## Changes since last wiki timestamp (${lastUpdate.updatedAt})`);
-    lines.push(await runGitOrFallback(cwd, ["log", "--since", lastUpdate.updatedAt, "--name-status", "--oneline"]));
-  } else {
-    lines.push("\n## Recent commits");
-    lines.push(await runGitOrFallback(cwd, ["log", "--max-count=20", "--name-status", "--oneline"]));
-  }
-
-  lines.push("\n## Diff summary against HEAD");
-  lines.push(await runGitOrFallback(cwd, ["diff", "--name-status", "HEAD"]));
-  return lines.join("\n");
 }
 
 type UpdateNoopStatus = { shouldSkip: true } | { shouldSkip: false; reason: string };
