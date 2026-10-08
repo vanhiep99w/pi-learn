@@ -1,85 +1,79 @@
 # Pi Learn quickstart
 
-Pi Learn is a Pi Coding Agent package and Vietnamese learning repository. It publishes a repository Wiki extension, ChatGPT usage status, Aurora UI, and the `midnight-aurora` theme.
+Pi Learn là package Pi Coding Agent và repository học Pi bằng tiếng Việt. Public surface: Wiki repository, ChatGPT usage UI, Aurora UI và theme `midnight-aurora`. Không còn runtime session-observability/proposal/eval/apply, image-generation hoặc model-prompt tools.
 
-## When to read this page
+## Khi nào đọc trang này
 
-- For a request about this repository, read this page once when it is not already available in the current context.
-- Do not reload it when it is already available.
-- Do not read it for unrelated requests.
-- Use the routes below to open only the relevant page/heading; do not preload the whole Wiki.
+Request về project: đọc một lần nếu context hiện tại chưa có, không reload khi đã có. Request không liên quan: không cần đọc. Đây là entrypoint điều hướng, không preload toàn Wiki.
 
-## Project map
+## Setup tối thiểu
 
-```text
-pi-learn/
-├── package.json
-├── README.md
-├── docs/                                # Vietnamese Pi reference docs
-├── packages/pi-learn-extensions/
-│   ├── extensions/
-│   │   ├── wiki/                        # /wiki and /wiki-update
-│   │   ├── chatgpt-usage-status/
-│   │   └── aurora-ui.ts
-│   └── themes/midnight-aurora.json
-└── wiki/                                # repository knowledge + scoped rules
+Cần Pi CLI đã cài. Từ README:
+
+```bash
+pi install git:github.com/vanhiep99w/pi-learn@main
+# Scope project: thêm -l; thử không ghi settings:
+pi -e git:github.com/vanhiep99w/pi-learn@main
 ```
 
-The retired session-analysis/proposal runtime, image-generation extension, and model-prompt tool are not part of the package.
+Sau install/update/source change: restart Pi hoặc `/reload`. Chọn theme `midnight-aurora` trong settings nếu muốn dùng palette đi kèm. [Install/update và release](operations/development.md#install-and-reload) phân biệt bản Git đã cài với checkout local.
+
+## Bản đồ project
+
+| Vùng | Vai trò |
+|---|---|
+| `package.json` | Install target, expose resources của subpackage |
+| `packages/pi-learn-extensions/` | Public extensions, theme, Wiki tests và package README |
+| `docs/`, `PI_DOCUMENTATION.md` | Pi reference/hướng dẫn tiếng Việt; index `docs/README.md` |
+| `wiki/` | Change routes và contracts của repository này |
+| `.pi/` | Local/dev, không public package source; có thể chứa dữ liệu nhạy cảm |
+
+[Architecture](architecture/overview.md#package-boundaries) ghi rõ manifests, host peers và entrypoints; không có backend/database/frontend build riêng.
 
 ## Rule loading
 
-Load rules only when editing the component or documentation domain they govern. Read the root rule file plus only the applicable domain files immediately before the edit; do not load rules for read-only questions.
+Chỉ load rules **ngay trước sửa** component/domain áp dụng; không load cho read-only question hoặc unrelated work. Root rule + domain tương ứng, không đọc tất cả domain. Nếu scope mở rộng thì load rule mới; chỉ re-read khi content mất sau compaction hoặc scope thay đổi. Rule conflict thì dừng và báo.
 
-| Edit target | Rules to load |
+| Edit target | Rules |
 |---|---|
-| Any governed repository edit | [`wiki/_rules.md`](_rules.md) |
-| Manifests, package boundaries, architecture docs | [`wiki/architecture/_rules.md`](architecture/_rules.md) |
-| Extension/theme source or extension docs | [`wiki/extensions/_rules.md`](extensions/_rules.md) |
-| README, AGENTS/CLAUDE, docs, tests, lockfiles, release/operations | [`wiki/operations/_rules.md`](operations/_rules.md) |
+| Mọi governed repository edit, quickstart/plan Wiki | [Root](_rules.md) |
+| Manifests, package boundaries, architecture docs | [Architecture](architecture/_rules.md) |
+| Extension/theme source, subpackage manifest, extension docs | [Extensions](extensions/_rules.md) |
+| README, AGENTS/CLAUDE, docs, tests, manifests/lockfiles, CI/release/operations docs | [Operations](operations/_rules.md) |
 
-If the edit scope expands, load the newly applicable file. Re-read a rule only after compaction removes it from context or its governed scope changes.
-
-`/wiki-update` may change `_rules.md` only when its command message explicitly requests rule updates. Ordinary Wiki runs keep rule files protected.
+Target giao nhiều domain thì đọc các rule thực sự áp dụng. Wiki run thường không sửa `wiki/**/_rules.md`; chỉ `/wiki-update` với message yêu cầu rule changes rõ ràng mới opt-in. Extension có thể tạo deterministic scaffolds thiếu. Brief do người dùng giữ; metadata do extension finalize.
 
 ## Commands
 
-```txt
-/wiki [extra instructions]
-/wiki-update [extra instructions]
-```
+`/wiki [message]` khởi tạo; `/wiki-update [message]` cập nhật có chọn lọc. Dùng provider/model/tools hiện tại; prompt không inject Git context. Không có command hỏi Wiki riêng: project question theo bootstrap top-level.
 
-- `/wiki` initializes repository documentation.
-- `/wiki-update` performs a scoped maintenance update from current source, existing Wiki content, and the user request. Neither command injects Git context into its prompt.
-- There is no Wiki question command. Ordinary project questions follow the conditional reading guidance above.
-
-See [Wiki capability](extensions/wiki-extension.md#commands-and-run-lifecycle).
+Xem [lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle), [rule opt-in](extensions/wiki-extension.md#explicit-rule-update-mode), [no-op](extensions/wiki-extension.md#no-op-behavior). Command usage/account và theme ở [catalog](extensions/catalog.md).
 
 ## Task routing
 
-Use bounded `grep` to locate the target heading, then `read(offset, limit)` for that section. A `#heading` link does not automatically constrain a filesystem read. Expand only for unresolved dependencies, contracts, consumers, or workflows.
+Dùng bounded grep tìm heading, rồi ranged read. `#anchor` chỉ navigation hint, không tự giới hạn filesystem read. Mở rộng sang caller/consumer/shared contract/tests khi topic vượt boundary hoặc evidence thiếu; dừng khi đã grounded.
 
-| Change intent | Start here | Expand when |
+| Change intent | Bắt đầu | Mở rộng khi |
 |---|---|---|
-| Package manifests or public entrypoints | [Architecture — package boundaries](architecture/overview.md#package-boundaries) | Registration/resource discovery also changes. |
-| Wiki commands, prompts, rules, snapshots, links | [Wiki capability](extensions/wiki-extension.md) | Package wiring or operational checks change. |
-| ChatGPT usage status | [Catalog — ChatGPT usage](extensions/catalog.md#chatgpt-usage-status) | Auth storage or Aurora status integration changes. |
-| Aurora UI or theme | [Catalog — Aurora UI](extensions/catalog.md#aurora-ui) | Lifecycle cleanup, terminal behavior, or theme tokens change. |
-| Install, docs, release, or versions | [Development operations](operations/development.md) | Manifest/package boundaries change. |
-| Tests or privacy/safety | [Testing and safety](operations/testing-and-safety.md) | The owning extension contract needs source verification. |
+| Package/manifest/entrypoint | [Package boundaries](architecture/overview.md#package-boundaries) | Resource discovery/install/compatibility đổi |
+| Wiki commands/prompt/selective reading | [Wiki lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle) | Tool guard, metadata hoặc validation đổi |
+| Rules/snapshot/links | [Wiki validation](extensions/wiki-extension.md#link-and-rule-validation) | Opt-in, no-op hoặc settlement bị ảnh hưởng |
+| ChatGPT usage/OAuth/accounts | [Usage](extensions/catalog.md#chatgpt-usage-status) | Credential adapters hoặc shared object đổi |
+| Usage badge consumer | [Shared contract](extensions/catalog.md#contract-dùng-chung-với-aurora) | Producer, stale handling hoặc lifecycle đổi |
+| Aurora editor/footer/Git/theme | [Aurora](extensions/catalog.md#aurora-ui) | Host layout/API, cleanup hoặc tokens đổi |
+| Install/update/docs/release/CI | [Development operations](operations/development.md) | Package boundaries hoặc security boundary đổi |
+| Tests/privacy/path safety | [Testing and safety](operations/testing-and-safety.md) | Owning component contract cần kiểm chứng |
 
-## Change guidance
+## Vòng lặp thay đổi an toàn
 
-1. Public extension/theme source belongs under `packages/pi-learn-extensions/`; `.pi/` remains local/dev-only unless explicitly requested.
-2. Never read live auth, `.env`, private keys, payload logs, or raw session logs without exact authorization.
-3. Guard UI behavior with `ctx.hasUI` and clean up session state on shutdown/replacement.
-4. After extension/theme changes, run focused tests and `/reload` before interactive verification.
-5. Use current source/tests when this Wiki is stale, incomplete, or contradictory.
+1. Đọc source/focused tests khi Wiki cũ, thiếu hoặc mâu thuẫn; public source đặt dưới `packages/pi-learn-extensions/`.
+2. Không đọc auth/.env/keys/tokens/payload hoặc raw session logs. File path trong docs không phải quyền mở live data.
+3. Với UI: hasUI guard, cleanup session state, kiểm tra producer/consumer trước đổi fields.
+4. Chạy `npm --prefix packages/pi-learn-extensions run test:wiki`; source/theme changes cần reload và manual UI checks.
+5. Rà link/anchor/status/diff. Không tự sửa metadata, brief, rules trong normal Wiki run; xóa plan tạm, không auto-push.
 
-## Wiki sections
+## Backlog có evidence
 
-- [Architecture overview](architecture/overview.md)
-- [Extensions and theme catalog](extensions/catalog.md)
-- [Wiki capability](extensions/wiki-extension.md)
-- [Development operations](operations/development.md)
-- [Testing and safety](operations/testing-and-safety.md)
+- Có 27 automated Wiki tests, nhưng chưa test trực tiếp command lifecycle/no-op/tool guards hoặc OAuth/TUI. [Coverage và manual checks](operations/testing-and-safety.md#automated-tests).
+- Aurora theme command/shortcut hiện thiếu hasUI guard; usage shutdown không clear global/cache/pending và không cancel details timeouts. Cần focused lifecycle/headless tests trước khẳng định an toàn mọi mode. [Catalog](extensions/catalog.md#aurora-ui).
+- Không có declared Node/Pi compatibility matrix hoặc release/test CI pipeline; remote ChatGPT APIs và implementation external PR-review action chưa được xác minh trong Wiki run này. [Operations](operations/development.md#pr-review-workflow).

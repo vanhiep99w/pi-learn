@@ -1,12 +1,12 @@
 # Architecture overview
 
-This page explains Pi Learn's package boundaries and runtime-loading model. Read it when changing manifests, extension entrypoints, theme exposure, or repository documentation ownership.
+Phạm vi: package boundaries, public entrypoints và ownership tài liệu. Đọc khi đổi manifest/resource discovery hoặc contract tích hợp. Evidence: hai manifests, hai README, `docs/README.md` và các entrypoint dưới `packages/pi-learn-extensions/extensions/`.
 
 ## Package boundaries
 
 ### Root package
 
-The root `package.json` is the install target. Its Pi manifest exposes:
+`package.json` là install target Git trong README, name `pi-learn`, version 1.0.1, ESM, không private. Pi manifest expose:
 
 ```json
 {
@@ -17,59 +17,67 @@ The root `package.json` is the install target. Its Pi manifest exposes:
 }
 ```
 
-Pi supplies the `@earendil-works/*` host packages declared as peers. The root has no application server, database, or frontend build pipeline.
+Không có workspace declaration, root scripts, application server, database hoặc frontend build pipeline trong manifest. Không coi thư mục packages là bằng chứng về monorepo services. Host Pi cung cấp `@earendil-works/pi-ai`, `pi-coding-agent`, `pi-tui` qua optional peers `*`; manifest không pin compatibility range hoặc Node engines. Node built-ins phục vụ filesystem/network/process.
 
 ### Public extension and theme package
 
-`packages/pi-learn-extensions/` is the source of truth for executable package behavior. Its own manifest exposes `./extensions` and `./themes` and includes source, tests, themes, and its README in package files.
+`packages/pi-learn-extensions/package.json` name `pi-learn-extensions`, version 1.0.1, ESM; expose `./extensions`, `./themes`; files allowlist gồm extensions/tests/themes/README. Script `test:wiki` chạy Node test runner trên .mjs/.mts. Root không có files allowlist giống subpackage; kiểm tra packaging thật trước release, không suy ra artifact hai package giống nhau.
 
-Current public entrypoints are:
+Public entrypoints:
 
-- `extensions/wiki/index.ts`
-- `extensions/chatgpt-usage-status/index.ts`
-- `extensions/aurora-ui.ts`
+- `extensions/wiki/index.ts` → đăng ký commands và lifecycle Wiki.
+- `extensions/chatgpt-usage-status/index.ts` → account commands, usage producer.
+- `extensions/aurora-ui.ts` → editor/footer, usage consumer, theme picker.
+- Theme resource: `themes/midnight-aurora.json`.
 
-The bundled theme is `themes/midnight-aurora.json`.
+Các path trên tương đối với `packages/pi-learn-extensions/`. Helper Wiki không là standalone extension. Khi đổi manifest/path cần giữ root và subpackage cùng trỏ vào source thật; không import private/removed sibling runtimes.
 
 ### Documentation areas
 
-- `README.md` and `packages/pi-learn-extensions/README.md` describe installation and public commands.
-- `docs/` contains Vietnamese Pi learning/reference material, indexed by `docs/README.md`.
-- `PI_DOCUMENTATION.md` is a root-level long-form reference.
-- `wiki/` is the repository-specific routing and change guide.
-- `wiki/INSTRUCTIONS.md` is a user-owned brief consumed by `/wiki` and `/wiki-update`.
+| Vùng | Ownership và vai trò |
+|---|---|
+| `README.md`, package README | Install, commands và thao tác người dùng |
+| `docs/` | Hướng dẫn Pi tiếng Việt, index `docs/README.md`; không phải code implementation của Pi Learn |
+| `PI_DOCUMENTATION.md` | Tham khảo tổng hợp ở root |
+| `wiki/` | Repository-specific change routes, contracts và validation |
+| `wiki/INSTRUCTIONS.md` | Brief do người dùng giữ; extension chỉ đọc |
+| `wiki/**/_rules.md` | Scoped rules; thay đổi chỉ qua explicit rule-update |
+| `wiki/.last-update.json` | Metadata do extension finalize |
+
+Các hướng dẫn host trong docs không thay evidence source khi xác định hành vi extension. Không mirror docs vào Wiki; [operations](../operations/development.md#documentation-workflow) chỉ dẫn cập nhật đúng lớp.
 
 ## Runtime loading model
 
-Pi scans direct `.ts`/`.js` files and subdirectories containing `index.ts`/`index.js` from the manifest's extension directory.
+README package và `docs/PI_PACKAGES_GUIDE.md` mô tả Pi load direct TS/JS và subdirectory có index từ extension manifest. Source Wiki index import `wiki-commands.js` trong khi source là `.ts`: đây là host TS loader contract, không có compile-to-dist script ở repo. Tests .mts cũng dựa Node hỗ trợ thực thi TypeScript; version tối thiểu chưa được khai báo.
 
-- `wiki/index.ts` registers only `/wiki` and `/wiki-update` through `wiki-commands.ts`.
-- `wiki/wiki-prompt.ts` builds the documentation task and compact AGENTS/CLAUDE bootstrap.
-- `wiki/wiki-rules.js` owns rule path classification, scaffolding, and lint.
-- `wiki/wiki-links.js` validates relative links and heading anchors.
-- `chatgpt-usage-status/index.ts` manages provider-gated usage display and account commands.
-- `aurora-ui.ts` owns editor/footer/status customization and theme selection.
+Luồng chính:
 
-Extension code runs in the Pi process with the user's OS permissions. UI work must remain guarded and session-scoped resources must be cleaned up.
+| Producer / entry | State owner / xử lý | Consumer / output |
+|---|---|---|
+| `/wiki`, `/wiki-update` | commands giữ active run, prompt giao agent sửa docs | Wiki files → validators → extension metadata/status |
+| Pi session/model/agent events, usage commands | ChatGPT extension giữ OAuth/account stores, cache/pending | Global usage object → Aurora; details widget |
+| Session/tool events, Git porcelain | Aurora session timers/editor/footer | Terminal rails, badges, working messages |
+| Pi theme selection | Host theme registry đọc JSON | Aurora và các renderer host dùng color tokens |
+
+Chi tiết state/persistence/failure không lặp ở đây: [Wiki](../extensions/wiki-extension.md#commands-and-run-lifecycle), [usage contract](../extensions/catalog.md#contract-dùng-chung-với-aurora), [Aurora](../extensions/catalog.md#aurora-ui). Không có backend chung, inter-service protocol hoặc persisted usage history; shared usage object chỉ sống trong process. External consumers chưa được biết từ repo.
+
+Extension code chạy trong process Pi với quyền OS của user, không sandbox. UI hooks phần lớn hasUI-guarded nhưng theme command/shortcut hiện có gap; xem [catalog](../extensions/catalog.md#inputs-git-và-actions). Session cleanup và compatibility phải xác minh trên host thật.
 
 ## Reduced supported surface
 
-The repository intentionally excludes previously bundled session-observability/proposal/eval/apply behavior, image generation, and model-aware prompt management. Their source packages, tests, commands, and design docs are removed. Reintroduction is a new product decision, not an implicit compatibility requirement.
+Scope hiện hành là Wiki, ChatGPT usage, Aurora UI và theme. README và Git commit `5d753dd` ghi retirement session-observability/proposal/eval/apply, image generation và model-prompt tools; manifest/source inventory hiện không expose chúng. Không coi compatibility với subsystem đã bỏ là yêu cầu ngầm. Web tools cài riêng, không bundled.
 
 ## Source-of-truth table
 
-| Change | Primary source |
-|---|---|
-| Package resource exposure | `package.json`, `packages/pi-learn-extensions/package.json` |
-| Wiki command/lifecycle behavior | `packages/pi-learn-extensions/extensions/wiki/wiki-commands.ts` |
-| Wiki generation/update instructions | `packages/pi-learn-extensions/extensions/wiki/wiki-prompt.ts` |
-| Rule discovery and link validation | `packages/pi-learn-extensions/extensions/wiki/wiki-rules.js`, `wiki-links.js` |
-| ChatGPT usage | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts` |
-| Aurora TUI | `packages/pi-learn-extensions/extensions/aurora-ui.ts` |
-| Theme tokens | `packages/pi-learn-extensions/themes/midnight-aurora.json` |
-| Reviewed component guidance | `wiki/**/_rules.md` |
-| User-facing package docs | root and package READMEs |
+| Thay đổi | Source chính | Contract / validation |
+|---|---|---|
+| Package resources | hai package.json | Entrypoint discovery, install/reload |
+| Wiki command/prompt | `packages/pi-learn-extensions/extensions/wiki/wiki-commands.ts`, `wiki-prompt.ts` | [Wiki lifecycle](../extensions/wiki-extension.md), prompt tests |
+| Rule/link validators | cùng thư mục Wiki: `wiki-rules.js`, `wiki-links.js` | [Validation](../extensions/wiki-extension.md#link-and-rule-validation), focused tests |
+| ChatGPT/Aurora | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts`, `aurora-ui.ts` | [Catalog](../extensions/catalog.md), manual checks |
+| Theme tokens | `packages/pi-learn-extensions/themes/midnight-aurora.json` | JSON/schema/render checks |
+| Install/update/release | README, manifests, `.github/workflows/ocr-review.yml` | [Operations](../operations/development.md) |
 
 ## Local-only boundary
 
-`.pi/` contains local/development resources and may contain sensitive payload logs. It is not public package source. Public changes belong under `packages/pi-learn-extensions/` unless the user explicitly requests local-only behavior.
+`.pi/` là local/dev và có thể chứa dữ liệu nhạy cảm; không phải public package source. Không cần đọc auth, payload/session logs hoặc config local để hiểu package. `.gitignore` chỉ liệt kê `.pi/teams`, `.pi-subagents/`, `node_modules/`, không phải bảo đảm mọi secret đã được ignore. Thay đổi public đặt dưới `packages/pi-learn-extensions/`; [privacy và Git hygiene](../operations/testing-and-safety.md#git-hygiene) áp dụng trước share/commit.

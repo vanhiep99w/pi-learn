@@ -1,130 +1,106 @@
 # Wiki capability
 
-This page describes command behavior, selective reading, explicit rule updates, metadata, and verification for `packages/pi-learn-extensions/extensions/wiki/`.
+Phạm vi: command, prompt, đọc chọn lọc, rule opt-in, validation và metadata của `packages/pi-learn-extensions/extensions/wiki/`. Extension chạy trong Pi hiện tại; không tạo provider/model hay bộ filesystem tools riêng.
 
 ## Commands and run lifecycle
 
-```txt
-/wiki [extra instructions]
-/wiki-update [extra instructions]
-```
+Public commands chỉ có `/wiki [message]` (khởi tạo) và `/wiki-update [message]` (bảo trì có chọn lọc). Không có alias init/ask/status hay command hỏi Wiki riêng.
 
-- `/wiki` initializes documentation from repository source, tests, and existing docs.
-- `/wiki-update` performs a surgical maintenance update from current source, existing Wiki content, and its explicit message.
-- Neither command injects working-tree status, commit history, diffs, or metadata Git fields into its prompt. Git remains internal to no-op detection and metadata bookkeeping.
-- There is no ask/status/init alias. Ordinary project questions use the top-level `Project Wiki` agent instructions.
+Luồng trong `wiki-commands.ts`:
 
-Both commands require an idle agent. They create missing deterministic rule scaffolds, capture a Wiki snapshot, send a task through the current Pi provider/model/tools, and finalize after `agent_settled`. Shutdown marks a changed in-flight run interrupted so the next update retries.
+1. `registerWikiCommands()` nhận args và `ctx.cwd`; từ chối khi `ctx.isIdle()` false.
+2. Update không có message chạy kiểm tra [no-op](#no-op-behavior). Message rõ ràng bỏ qua shortcut này.
+3. `ensureWikiPromptRuleScaffolds()` tạo scaffold thiếu; kiểm tra lint rules trước run, trừ update có opt-in sửa rules.
+4. Đọc brief/metadata, hash Wiki trước run; lưu `activeWikiRun` gồm command, cwd, snapshot và quyền sửa rules.
+5. `createWikiTaskPrompt()` tạo yêu cầu, `pi.sendUserMessage()` đưa vào agent đang dùng provider/model/tools hiện tại. Status key `wiki` báo generating/updating khi có UI; không UI dùng console.
+6. `agent_end` ghi nhận stopReason aborted/error của assistant cuối. `agent_settled` lấy và xóa active run, tạo scaffold mới cần thiết, hash lại, kiểm tra link/rules, rồi [finalize metadata](#snapshot-and-metadata).
+7. `session_shutdown` xóa active run; nếu Wiki đổi thì ghi interrupted để lần sau retry. Status được dọn trong finally.
+
+Cả hai prompt không chứa Git status, commit history, diff hoặc Git fields của metadata. Git vẫn dùng nội bộ cho no-op và ghi `gitHead`; agent có thể tự đọc Git evidence cần thiết. Nếu gửi message lỗi, active run và status bị xóa; lỗi command/finalization được notify/log, không rollback tài liệu.
 
 ## Source ownership
 
-| File | Responsibility |
-|---|---|
-| `wiki/index.ts` | Public extension entrypoint |
-| `wiki/wiki-commands.ts` | Commands, lifecycle, protection, snapshots, no-op detection, metadata |
-| `wiki/wiki-prompt.ts` | Task prompt, rule opt-in detector, AGENTS/CLAUDE bootstrap |
-| `wiki/wiki-rules.js` | Rule path classification, section discovery, scaffold creation, lint |
-| `wiki/wiki-links.js` | Relative Markdown file/anchor validation |
+Các đường dẫn sau tương đối với `packages/pi-learn-extensions/extensions/`:
 
-All paths above are under `packages/pi-learn-extensions/extensions/`.
+| Source | Ownership |
+|---|---|
+| `wiki/index.ts` | Entrypoint duy nhất, gọi registerWikiCommands |
+| `wiki/wiki-commands.ts` | Lifecycle, tool guard, snapshot, no-op và metadata |
+| `wiki/wiki-prompt.ts` | Task contract, opt-in detector, bootstrap AGENTS/CLAUDE |
+| `wiki/wiki-rules.js` | Phân loại path, discovery, scaffold, rule lint |
+| `wiki/wiki-links.js` | Internal Markdown links và heading anchors |
+
+Thay command cần đồng bộ prompt, README, test và routes; thêm helper giữ trong thư mục Wiki để không thành public entrypoint độc lập.
 
 ## Conditional project reading
 
-The generated top-level AGENTS/CLAUDE block has two independent conditions:
+Bootstrap có hai điều kiện độc lập:
 
-1. When a request is about the repository, read `wiki/quickstart.md` only if it is not already present in current context. Do not read it for unrelated requests.
-2. Before editing a component, read only root/domain `_rules.md` files that govern that component. Read-only questions do not require rule loading.
+- Request về project: đọc `wiki/quickstart.md` một lần nếu context chưa có. Request không liên quan: không đọc.
+- Ngay trước sửa component/domain: chỉ đọc root và domain `_rules.md` áp dụng. Read-only question không cần load rules.
 
-Quickstart routes task intent to a page/heading and to applicable rules. The model should use bounded `grep` and ranged reads, expand only across relevant contracts/consumers/workflows, and stop once grounded. This is prompt guidance, not an enforced context sandbox.
+Quickstart là task → system → page/heading route. Dùng grep giới hạn để tìm heading rồi ranged read; `#anchor` không tự giới hạn phạm vi filesystem read. Chỉ mở thêm khi gặp dependency, producer/consumer, shared contract hoặc evidence chưa đủ. Đây là hướng dẫn prompt, không phải sandbox cưỡng chế context.
 
 ## Explicit rule-update mode
 
-Rule changes are allowed only through an explicitly opted-in `/wiki-update` message. `isExplicitRuleUpdateRequest()` recognizes direct references such as:
-
-- `_rules.md` or `_rules`
-- `Wiki rules` or `prompt rules`
-- `rule file(s)`
-- equivalent supported Vietnamese wording
-
-Example:
+`allowRuleUpdates` chỉ true khi command là update và `isExplicitRuleUpdateRequest(message)` khớp regex. Các cụm được nhận gồm `_rules.md`/`_rules`, Wiki rules, prompt rules, rule file(s), `quy tắc wiki`, `cập nhật rule`/`cập nhật các rule`.
 
 ```txt
 /wiki-update Cập nhật wiki/**/_rules.md để phản ánh command surface mới
 ```
 
-When opt-in is absent, write/edit and common shell mutation attempts against `_rules.md` are blocked. When present, the task prompt requires surgical rule edits, preservation of unrelated rules, unique stable rule IDs, and a valid root/final-section layout. No proposal or approval subsystem is involved.
+Detector là heuristic theo từ khóa, không phải phê duyệt ngữ nghĩa hay subsystem proposal/approval. Init không bao giờ bật quyền này, kể cả message nhắc rules.
 
-`wiki/.last-update.json` remains extension-owned in every mode. The active run's `wiki/INSTRUCTIONS.md` also remains protected.
+`tool_call` chặn built-in write/edit tới rules khi không opt-in; metadata luôn được bảo vệ, brief được bảo vệ trong active run cùng cwd. Bash guard dò path và những mutation phổ biến (redirect, rm/mv/cp, tee, truncate, sed/perl in-place). Không coi regex guard là sandbox cho mọi tool/script; chi tiết [safety](../operations/testing-and-safety.md#security-and-privacy).
+
+Khi opt-in, prompt yêu cầu sửa tối thiểu, giữ rule không liên quan và ID ổn định/duy nhất. Run có thể bắt đầu với rules invalid để sửa, nhưng finalization vẫn interrupted cho tới khi lint hợp lệ. Scaffold deterministic thiếu do extension tạo là ngoại lệ; agent của run thường không tự sửa rules.
 
 ## Agent bootstrap maintenance
 
-Init and update ensure top-level `AGENTS.md` and `CLAUDE.md`, when present, contain one compact `## Project Wiki` section. If neither exists, init/update may create `AGENTS.md` containing only that section.
+Prompt giao agent đảm bảo mỗi top-level `AGENTS.md`/`CLAUDE.md` hiện có chứa đúng một section `## Project Wiki`; nếu cả hai vắng thì tạo AGENTS. Giữ nội dung khác, không sửa agent instruction file lồng nhau. Không có code rewrite bootstrap trực tiếp trong lifecycle.
 
-The block must not copy detailed Wiki content. Its job is only to express conditional quickstart loading, component-scoped rule loading, and source verification when documentation is insufficient.
+Section chỉ chứa conditional quickstart loading, component-scoped rules và kiểm chứng source khi Wiki thiếu/cũ/mâu thuẫn. Test `wiki-prompt.test.mts` so sánh bootstrap sinh ra với hai file checked-in.
 
 ## Documentation workflow
 
-Documentation modes follow:
+`discovery → wiki/_plan.md tạm → research/write từng topic → coverage/navigation review`.
 
-```txt
-discovery -> temporary wiki/_plan.md -> topic research/write -> coverage/navigation review
-```
+Prompt yêu cầu inventory manifests/entrypoints/contracts/tests/operations, trace control/data flow và ownership, không đặt quota trang, không suy đoán từ tên thư mục. Update giữ nội dung đúng không bị ảnh hưởng và đi theo consumer/shared contract của thay đổi. Xóa plan trước khi kết thúc, kiểm tra links/anchors; generated docs chỉ ở Wiki, ngoại lệ duy nhất là bootstrap top-level.
 
-The prompt asks the agent to:
-
-- map manifests, public entrypoints, existing docs, systems, schemas, tests, and operations;
-- trace representative control/data flow, state, persistence, consumers, failures, and recovery;
-- keep one canonical explanation per concept or contract;
-- preserve accurate unaffected content during updates;
-- avoid page quotas, formatting-only churn, and speculative architecture;
-- remove `wiki/_plan.md` before completion;
-- verify changed internal links and heading anchors.
-
-`wiki/INSTRUCTIONS.md` supplies optional user-owned scope, priorities, language, exclusions, and audience. It cannot override privacy or protected metadata boundaries.
+`wiki/INSTRUCTIONS.md` là brief do người dùng quản lý: scope, ngôn ngữ, ưu tiên, exclusions, audience. `readWikiBrief()` chấp nhận regular file không symlink, tối đa 64 KiB; thiếu file là bình thường, loại file/size sai làm command báo lỗi. Brief không vượt safety boundaries hoặc applicable rules.
 
 ## Snapshot and metadata
 
-The Wiki snapshot includes:
+`createWikiSnapshot()` SHA-256 đường dẫn và byte content theo thứ tự ổn định, prefix `wiki-content-v2`. Bao gồm normal Markdown và `_rules.md`; bỏ symlink entries, brief, plan, hidden/temp paths, metadata, non-Markdown assets. Chỉ thay AGENTS/CLAUDE hay asset không làm snapshot đổi.
 
-- normal `wiki/**/*.md` documentation;
-- `wiki/**/_rules.md`.
+Metadata do extension ghi: `updatedAt` ISO, `command` init/update, `gitHead` nếu Git khả dụng, `model` dạng provider/id (fallback model.name hoặc `pi-current-model`), `status` complete/interrupted. JSON không parse được/thiếu fields cần thiết được coi như chưa có metadata; status không phải interrupted được đọc như complete.
 
-It excludes:
+| Điều kiện sau settled | Kết quả |
+|---|---|
+| Links/rules hợp lệ, không abort, Wiki đổi | Ghi complete |
+| Links/rules hợp lệ, không abort, previous interrupted | Ghi complete dù không đổi |
+| Links hoặc rules invalid | Ghi interrupted |
+| Agent abort/error và Wiki đổi | Ghi interrupted |
+| Abort/error không đổi, validation hợp lệ | Giữ metadata cũ |
+| Thành công không đổi, previous không interrupted | Giữ metadata cũ |
 
-- `wiki/INSTRUCTIONS.md`;
-- `wiki/_plan.md` and hidden/temp paths;
-- `wiki/.last-update.json`.
-
-After settlement, the extension creates any newly needed scaffolds, validates internal documentation links and the rule layout, then writes metadata:
-
-- `complete` when changed content is valid and the agent did not abort;
-- `interrupted` when links/rules are invalid or an aborted run changed Wiki content;
-- unchanged metadata for a successful no-op, except a valid retry may clear an earlier interrupted state.
-
-A rule-only update therefore participates in snapshot and metadata finalization just like a documentation update.
+Rule-only update cũng làm snapshot đổi. Finalization exception được báo riêng, có thể chưa ghi metadata; không có transaction/rollback. Shutdown chỉ ghi interrupted khi snapshot đổi. Sửa nguyên nhân rồi chạy lại `/wiki-update` với message cụ thể nếu cần.
 
 ## Link and rule validation
 
-Internal link validation scans normal Wiki documentation, ignoring images and external URLs. Relative links must remain inside `wiki/`; target files must exist and cannot be symlinks; heading anchors use GitHub-like slugging with duplicate suffixes.
+`validateWikiInternalLinks()` scan normal Wiki Markdown, bỏ reserved source paths, images và URL external. Link relative phải nằm trong Wiki; `/foo.md` được hiểu relative với Wiki root, không phải filesystem root. Target phải tồn tại, không symlink, realpath không thoát Wiki. Percent encoding sai, thiếu file/anchor hoặc traversal gây issue. Heading slug giữ chữ Unicode/dấu kết hợp, bỏ punctuation, lowercase, khoảng trắng thành hyphen; heading trùng thêm suffix `-1`, `-2`.
 
-Rule validation requires:
+Parser dùng regex inline link/heading, không phải Markdown AST: không kiểm chứng toàn bộ reference-style links hoặc code-fence semantics. Không dùng link Markdown ra source ngoài Wiki; ghi source path bằng inline code.
 
-- a real `wiki/` directory;
-- root `wiki/_rules.md`;
-- one `_rules.md` in each final Wiki section;
-- bounded UTF-8 files without NUL bytes;
-- valid, non-duplicated rule IDs inside each file;
-- no path or symlink escape.
+`discoverWikiPromptRules()` yêu cầu root real directory và root rule; mỗi thư mục chứa trang Markdown cuối cùng cần `_rules.md`. Bỏ hidden/underscore directories, assets và _tmp. Không yêu cầu rule cho từng source file. File rule tối đa 64 KiB, UTF-8, không NUL. Heading được nhận dạng có dạng `## ID — tiêu đề` hoặc `## ID - tiêu đề`, ID uppercase chữ/số/hyphen, 3–64 ký tự. ID trùng trong file là error; trùng khác file là warning. Dòng `Origin proposal:` nếu có phải dùng ID `P-` và ít nhất bốn chữ số; không hàm ý runtime proposal còn tồn tại. Scaffold không cần có substantive rules; lint không xác minh đúng nghĩa của nội dung.
 
-An explicitly requested rule repair can start with invalid rules so it can fix them, but finalization remains interrupted until the complete layout validates.
+Rule symlink chỉ được chấp nhận nếu resolve tới file trong project; link target symlink thì bị từ chối. Xem [path safety](../operations/testing-and-safety.md#wiki-path-safety).
 
 ## No-op behavior
 
-A no-argument `/wiki-update` runs when metadata is missing/interrupted, links or rules are invalid, the worktree has meaningful changes, source/configuration changed, or changed paths cannot be determined safely.
+Update không message có thể skip khi rules/layout/links hợp lệ, previous metadata complete có Git head, worktree sạch ngoài metadata, và các commit từ head đã lưu chỉ đổi normal Wiki docs/metadata. Rule diff luôn buộc run; source/config diff cũng vậy.
 
-It may skip when the previous run is complete, links/rules validate, the worktree is clean apart from metadata, and commits since the recorded head contain only already-accounted Wiki documentation/metadata changes.
-
-An explicit message always bypasses the no-op shortcut because it defines new requested scope.
+Thiếu head/metadata, previous interrupted, worktree có thay đổi, invalid links/rules, hoặc diff paths không xác định an toàn thì không skip. Một commit mới không có changed paths cũng không skip. Git status failure đi qua command error handler, không tự tuyên bố no-op. Explicit message luôn chạy.
 
 ## Verification
 
@@ -132,13 +108,4 @@ An explicit message always bypasses the no-op shortcut because it defines new re
 npm --prefix packages/pi-learn-extensions run test:wiki
 ```
 
-The suite covers prompt contracts, explicit rule opt-in detection, AGENTS/CLAUDE alignment, rule discovery/lint, path safety, and internal links.
-
-After source changes, run `/reload`, then verify:
-
-```txt
-/wiki-update
-/wiki-update Update wiki/**/_rules.md for the changed component policy
-```
-
-Confirm that `/wiki`, `/wiki-update` are present, retired aliases are absent, a normal update cannot edit rules, an explicit rule update can edit them, and invalid links/rules produce interrupted metadata.
+Ba bộ test kiểm tra prompt/no-Git context/opt-in/bootstrap, rule classification/discovery/lint/scaffold và file/anchor/path links. Chưa có test trực tiếp cho `wiki-commands.ts` lifecycle, bash guard, snapshot/no-op hoặc settlement. Sau thay source chạy `/reload` và theo [manual scenarios](../operations/testing-and-safety.md#wiki-scenarios), trong repo thử nghiệm; không thử sửa protected files ở repo thật.
