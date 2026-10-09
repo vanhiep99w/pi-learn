@@ -17,7 +17,7 @@ import {
   isWikiRulePath,
   relativeProjectPath,
 } from "./wiki-rules.js";
-import { createWikiTaskPrompt, isExplicitRuleUpdateRequest } from "./wiki-prompt.js";
+import { createWikiTaskPrompt } from "./wiki-prompt.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -47,7 +47,6 @@ type ActiveWikiRun = {
   command: WikiCommand;
   cwd: string;
   snapshotBefore?: string;
-  allowRuleUpdates: boolean;
   agentInterrupted?: boolean;
 };
 
@@ -62,7 +61,7 @@ export function registerWikiCommands(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("wiki-update", {
-    description: "Update repository Wiki docs from repository changes",
+    description: "Update repository Wiki docs and applicable rules with the current Pi agent",
     handler: async (args, ctx) => runWikiCommand(ctx, async () => {
       await startDocumentationRun(pi, ctx, "update", args);
     }),
@@ -72,13 +71,13 @@ export function registerWikiCommands(pi: ExtensionAPI) {
     const toolName = event.toolName;
     const currentRun = activeWikiRun?.cwd === ctx.cwd ? activeWikiRun : null;
     const protectWikiBrief = currentRun !== null;
-    const protectRules = currentRun === null || !currentRun.allowRuleUpdates;
+    const protectRules = currentRun?.command !== "update";
     if (toolName === "write" || toolName === "edit") {
       const candidate = (event.input as { path?: unknown })?.path;
       if (isProtectedWikiMutationPath(ctx.cwd, candidate, { protectRules, protectWikiBrief })) {
         return {
           block: true,
-          reason: "Wiki metadata and the active run's wiki/INSTRUCTIONS.md are protected. _rules.md may be changed only by /wiki-update with an explicit rule request or a clear lasting coding-agent policy.",
+          reason: "Wiki metadata and the active run's wiki/INSTRUCTIONS.md are protected. _rules.md may be changed only during an active /wiki-update run; the agent chooses the applicable rule file from the user's intent.",
         };
       }
     }
@@ -88,7 +87,7 @@ export function registerWikiCommands(pi: ExtensionAPI) {
       if (commandMutatesProtectedWikiPath(command, { protectRules, protectWikiBrief })) {
         return {
           block: true,
-          reason: "Wiki blocked a shell mutation of protected metadata, instructions, or non-opted-in rule files.",
+          reason: "Wiki blocked a shell mutation of protected metadata, instructions, or rule files outside an active /wiki-update run.",
         };
       }
     }
@@ -187,7 +186,6 @@ async function startDocumentationRun(
   }
 
   const userMessage = args.trim();
-  const allowRuleUpdates = command === "update" && isExplicitRuleUpdateRequest(userMessage);
   if (command === "update" && !userMessage) {
     const noop = await getUpdateNoopStatus(ctx.cwd);
     if (noop.shouldSkip) {
@@ -197,10 +195,10 @@ async function startDocumentationRun(
   }
 
   const scaffoldResult = ensureWikiPromptRuleScaffolds({ projectRoot: ctx.cwd });
-  if (!allowRuleUpdates) assertPromptRulesValidForWikiRun(ctx.cwd);
+  if (command === "init") assertPromptRulesValidForWikiRun(ctx.cwd);
   const context = await createRunContext(ctx.cwd, command);
   const snapshotBefore = await createWikiSnapshot(ctx.cwd);
-  activeWikiRun = { command, cwd: ctx.cwd, snapshotBefore, allowRuleUpdates };
+  activeWikiRun = { command, cwd: ctx.cwd, snapshotBefore };
 
   if (scaffoldResult.created.length) {
     notifyOrLog(ctx, `Created prompt-rule scaffold(s): ${scaffoldResult.created.join(", ")}.`, "info");
@@ -208,7 +206,7 @@ async function startDocumentationRun(
   setWikiStatus(ctx, command === "init" ? "Generating docs..." : "Updating docs...");
 
   try {
-    pi.sendUserMessage(createWikiTaskPrompt(command, ctx.cwd, context, userMessage || null, allowRuleUpdates));
+    pi.sendUserMessage(createWikiTaskPrompt(command, ctx.cwd, context, userMessage || null));
   } catch (error) {
     activeWikiRun = null;
     setWikiStatus(ctx, undefined);
@@ -362,7 +360,7 @@ function assertPromptRulesValidForWikiRun(cwd: string) {
   const report = discoverWikiPromptRules({ projectRoot: cwd });
   if (report.valid) return;
   const details = report.errors.slice(0, 5).map((item) => `${item.path}: ${item.message}`).join("; ");
-  throw new Error(`Wiki cannot run while rule lint is invalid. Fix wiki/**/_rules.md first, or use /wiki-update with an explicit _rules.md repair request. ${details}`);
+  throw new Error(`Wiki cannot initialize while rule lint is invalid. Use /wiki-update to repair the applicable rules. ${details}`);
 }
 
 type ProtectionOptions = { protectRules: boolean; protectWikiBrief: boolean };

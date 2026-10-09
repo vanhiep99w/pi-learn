@@ -4,7 +4,7 @@ Phạm vi: resources public trong `packages/pi-learn-extensions/`, ownership và
 
 ## Wiki
 
-Entrypoint `packages/pi-learn-extensions/extensions/wiki/index.ts` đăng ký `/wiki` và `/wiki-update`. Agent hiện tại thực hiện tác vụ; command layer quản lý snapshot/validation/metadata. Xem [lifecycle](wiki-extension.md#commands-and-run-lifecycle), [rule opt-in](wiki-extension.md#explicit-rule-update-mode) và [tests](../operations/testing-and-safety.md#automated-tests).
+Entrypoint `packages/pi-learn-extensions/extensions/wiki/index.ts` đăng ký `/wiki` và `/wiki-update`. Agent hiện tại thực hiện tác vụ; command layer quản lý snapshot/validation/metadata. Xem [lifecycle](wiki-extension.md#commands-and-run-lifecycle), [agent-directed rule updates](wiki-extension.md#agent-directed-rule-updates) và [tests](../operations/testing-and-safety.md#automated-tests).
 
 ## ChatGPT usage status
 

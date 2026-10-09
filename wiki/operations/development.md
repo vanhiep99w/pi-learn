@@ -47,7 +47,7 @@ Khi source đổi:
 1. Đi từ producer/owner tới consumer/shared contract và failure path; kiểm chứng focused tests.
 2. Sửa canonical topic trước; README command/path phải đồng bộ. Thêm/xóa indexed docs thì cập nhật `docs/README.md`.
 3. Chỉ đổi quickstart khi route/ownership/setup/backlog thay đổi. Nội dung detailed giữ ở topic page.
-4. Với Wiki run, dùng plan tạm, giữ brief/rules/metadata đúng owner; rules chỉ sửa qua explicit `/wiki-update` opt-in. Chi tiết [workflow](../extensions/wiki-extension.md#documentation-workflow).
+4. Với Wiki run, plan nếu cần chỉ là tạm, giữ brief/rules/metadata đúng owner; rules chỉ sửa trong active `/wiki-update`, agent chọn owner theo intent. Chi tiết [workflow](../extensions/wiki-extension.md#documentation-workflow).
 5. Kiểm tra link/anchor, rule layout, bootstrap và diff. Không sửa metadata bằng tay để giả completed.
 
 AGENTS/CLAUDE hiện có đúng một compact Project Wiki section khớp prompt test. Chúng chỉ điều hướng agent, không chứa toàn bộ docs hay yêu cầu read rules cho câu hỏi read-only.

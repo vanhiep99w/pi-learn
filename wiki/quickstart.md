@@ -41,13 +41,15 @@ Chỉ load rules **ngay trước sửa** component/domain áp dụng; không loa
 | Extension/theme source, subpackage manifest, extension docs | [Extensions](extensions/_rules.md) |
 | README, AGENTS/CLAUDE, docs, tests, manifests/lockfiles, CI/release/operations docs | [Operations](operations/_rules.md) |
 
-Target giao nhiều domain thì đọc các rule thực sự áp dụng. Wiki run thường không sửa `wiki/**/_rules.md`; chỉ `/wiki-update` với message yêu cầu rule changes rõ ràng mới opt-in. Extension có thể tạo deterministic scaffolds thiếu. Brief do người dùng giữ; metadata do extension finalize.
+Target giao nhiều domain thì đọc các rule thực sự áp dụng. Source hiện cho active `/wiki-update` sửa `wiki/**/_rules.md` theo intent: agent tự phân loại chính sách lâu dài và chọn domain, không cần tên file hay từ khóa; ngoài update rules vẫn protected. Extension có thể tạo deterministic scaffolds thiếu. Brief do người dùng giữ; metadata do extension finalize.
+
+Migration còn lại: `GLOBAL-RULE-001` và `EXT-WIKI-RULE-001` trong các file rule checked-in vẫn mô tả opt-in cũ. Chúng chưa được sửa vì lượt source maintenance này không phải `/wiki-update`; cần cập nhật hai rule qua lệnh đó sau khi reload source mới để contract không mâu thuẫn.
 
 ## Commands
 
 `/wiki [message]` khởi tạo; `/wiki-update [message]` cập nhật có chọn lọc. Dùng provider/model/tools hiện tại; prompt không inject Git context. Không có command hỏi Wiki riêng: project question theo bootstrap top-level.
 
-Xem [lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle), [rule opt-in](extensions/wiki-extension.md#explicit-rule-update-mode), [no-op](extensions/wiki-extension.md#no-op-behavior). Command usage/account và theme ở [catalog](extensions/catalog.md).
+Xem [lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle), [agent-directed rule updates](extensions/wiki-extension.md#agent-directed-rule-updates), [no-op](extensions/wiki-extension.md#no-op-behavior). Command usage/account và theme ở [catalog](extensions/catalog.md).
 
 ## Task routing
 
@@ -57,7 +59,7 @@ Dùng bounded grep tìm heading, rồi ranged read. `#anchor` chỉ navigation h
 |---|---|---|
 | Package/manifest/entrypoint | [Package boundaries](architecture/overview.md#package-boundaries) | Resource discovery/install/compatibility đổi |
 | Wiki commands/prompt/selective reading | [Wiki lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle) | Tool guard, metadata hoặc validation đổi |
-| Rules/snapshot/links | [Wiki validation](extensions/wiki-extension.md#link-and-rule-validation) | Opt-in, no-op hoặc settlement bị ảnh hưởng |
+| Rules/snapshot/links | [Wiki validation](extensions/wiki-extension.md#link-and-rule-validation) | Rule permissions, no-op hoặc settlement bị ảnh hưởng |
 | ChatGPT usage/OAuth/accounts | [Usage](extensions/catalog.md#chatgpt-usage-status) | Credential adapters hoặc shared object đổi |
 | Usage badge consumer | [Shared contract](extensions/catalog.md#contract-dùng-chung-với-aurora) | Producer, stale handling hoặc lifecycle đổi |
 | Aurora editor/footer/Git/theme | [Aurora](extensions/catalog.md#aurora-ui) | Host layout/API, cleanup hoặc tokens đổi |
@@ -74,6 +76,6 @@ Dùng bounded grep tìm heading, rồi ranged read. `#anchor` chỉ navigation h
 
 ## Backlog có evidence
 
-- Có 27 automated Wiki tests, nhưng chưa test trực tiếp command lifecycle/no-op/tool guards hoặc OAuth/TUI. [Coverage và manual checks](operations/testing-and-safety.md#automated-tests).
+- Có 39 automated Wiki tests, gồm command guards và permission lifecycle. Chưa kiểm đầy đủ snapshot/no-op/interrupted metadata, semantic classification bằng model thật hoặc OAuth/TUI. [Coverage và manual checks](operations/testing-and-safety.md#automated-tests).
 - Aurora theme command/shortcut hiện thiếu hasUI guard; usage shutdown không clear global/cache/pending và không cancel details timeouts. Cần focused lifecycle/headless tests trước khẳng định an toàn mọi mode. [Catalog](extensions/catalog.md#aurora-ui).
 - Không có declared Node/Pi compatibility matrix hoặc release/test CI pipeline; remote ChatGPT APIs và implementation external PR-review action chưa được xác minh trong Wiki run này. [Operations](operations/development.md#pr-review-workflow).

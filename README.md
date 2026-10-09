@@ -56,11 +56,13 @@ Wiki dùng model, provider và filesystem tools hiện tại của Pi:
 
 - `/wiki` khởi tạo tài liệu dưới `wiki/`.
 - `/wiki-update` cập nhật tài liệu theo source hiện tại và yêu cầu cụ thể; prompt không chứa Git status, lịch sử commit hoặc diff.
-- `_rules.md` chỉ được phép sửa khi nội dung lệnh `/wiki-update` yêu cầu rõ việc cập nhật rule, ví dụ:
+- Trong `/wiki-update`, agent tự phân biệt facts, chính sách lâu dài và chỉ thị một lần, rồi chọn trang Wiki hoặc `_rules.md` thuộc domain phù hợp. Không cần nêu tên file hay từ khóa đặc biệt, ví dụ:
 
   ```txt
-  /wiki-update Cập nhật wiki/**/_rules.md cho command surface mới
+  /wiki-update Khi viết code tôi không muốn tự thêm unit test nữa
   ```
+
+  Chỉ thị một lần không được lưu thành rule; yêu cầu mơ hồ thì agent hỏi lại. Ngoài lượt `/wiki-update`, rule vẫn được bảo vệ.
 
 - Không có command hỏi Wiki riêng. Với câu hỏi về project, agent đọc `wiki/quickstart.md` một lần khi context hiện tại chưa có; câu hỏi không liên quan project thì không cần đọc.
 - Rule chỉ được load ngay trước khi agent cần sửa component/domain mà rule đó quản lý. Read-only question không bắt buộc load rule.

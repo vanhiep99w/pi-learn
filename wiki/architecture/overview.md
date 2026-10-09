@@ -41,7 +41,7 @@ Các path trên tương đối với `packages/pi-learn-extensions/`. Helper Wik
 | `PI_DOCUMENTATION.md` | Tham khảo tổng hợp ở root |
 | `wiki/` | Repository-specific change routes, contracts và validation |
 | `wiki/INSTRUCTIONS.md` | Brief do người dùng giữ; extension chỉ đọc |
-| `wiki/**/_rules.md` | Scoped rules; thay đổi chỉ qua explicit rule-update |
+| `wiki/**/_rules.md` | Scoped rules; agent chọn owner theo intent trong active `/wiki-update` |
 | `wiki/.last-update.json` | Metadata do extension finalize |
 
 Các hướng dẫn host trong docs không thay evidence source khi xác định hành vi extension. Không mirror docs vào Wiki; [operations](../operations/development.md#documentation-workflow) chỉ dẫn cập nhật đúng lớp.

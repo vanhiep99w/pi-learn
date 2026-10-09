@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   createWikiAgentInstructions,
   createWikiTaskPrompt,
-  isExplicitRuleUpdateRequest,
 } from "../../extensions/wiki/wiki-prompt.ts";
 
 type Mode = Parameters<typeof createWikiTaskPrompt>[0];
@@ -21,8 +20,8 @@ const context = {
 };
 const root = "/fixture/project with spaces";
 
-function render(mode: Mode, request = "REQUEST_SENTINEL", allowRuleUpdates = false) {
-  return createWikiTaskPrompt(mode, root, context, request, allowRuleUpdates);
+function render(mode: Mode, request = "REQUEST_SENTINEL") {
+  return createWikiTaskPrompt(mode, root, context, request);
 }
 
 for (const mode of modes) {
@@ -79,11 +78,9 @@ for (const mode of modes) {
 
 test("init and update omit command reference while keeping the public command surface", () => {
   for (const mode of modes) {
-    for (const allowRuleUpdates of [false, true]) {
-      const prompt = render(mode, "REQUEST_SENTINEL", allowRuleUpdates);
-      assert.doesNotMatch(prompt, /Command reference:|\/wiki \[message\]|\/wiki-update \[message\]|There is no Wiki question command/);
-      assert.doesNotMatch(prompt, /\/wiki-ask|\/wiki-init/i);
-    }
+    const prompt = render(mode);
+    assert.doesNotMatch(prompt, /Command reference:|\/wiki \[message\]|\/wiki-update \[message\]|There is no Wiki question command/);
+    assert.doesNotMatch(prompt, /\/wiki-ask|\/wiki-init/i);
   }
 
   const source = readFileSync(new URL("../../extensions/wiki/wiki-commands.ts", import.meta.url), "utf8");
@@ -91,71 +88,49 @@ test("init and update omit command reference while keeping the public command su
   assert.deepEqual(commands, ["wiki", "wiki-update"]);
 });
 
-test("rule updates are disabled unless the update request explicitly opts in", () => {
-  const normal = render("update", "Refresh extension docs.", false);
-  const optedIn = render("update", "Update wiki/**/_rules.md for the new command names.", true);
-
-  assert.match(normal, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
-  assert.match(normal, /only by \/wiki-update when its command request explicitly asks/);
-  assert.match(optedIn, /Explicit rule-update mode/);
-  assert.match(optedIn, /do not require a proposal or approval workflow/i);
-  assert.match(optedIn, /For a rule-only request, inspect the target rules and relevant component evidence/);
-  assert.match(optedIn, /Do not rewrite documentation or bootstrap files unless the request requires it/);
-  assert.doesNotMatch(normal, /For a rule-only request/);
-  assert.doesNotMatch(render("init", "Update wiki rules", true), /Explicit rule-update mode/);
-  assert.doesNotMatch(optedIn, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
-  const policy = "khi viết code tôi ko muốn viết unitest nữa";
-  const policyPrompt = render("update", policy, isExplicitRuleUpdateRequest(policy));
-  assert.match(policyPrompt, /Explicit rule-update mode/);
-  assert.match(policyPrompt, /Lasting instructions.*owning _rules\.md/);
-  assert.match(policyPrompt, /do not put it in normal Wiki pages as a workaround/);
-  assert.match(policyPrompt, /A one-off instruction/);
-  assert.match(policyPrompt, /ask before editing/);
-  assert.match(policyPrompt, /does not mean "do not run existing tests"/);
-});
-
-test("explicit rule request detection is narrow and supports English and Vietnamese", () => {
+test("update delegates intent classification and rule ownership to the agent without keywords", () => {
   for (const request of [
-    "Update wiki/_rules.md",
-    "Update _rule file",
-    "Refresh prompt rules for extensions",
-    "Update the rule files",
-    "Cập nhật rule cho wiki",
-    "Cập nhật quy tắc wiki",
     "khi viết code tôi ko muốn viết unitest nữa",
-    "Khi viết code tôi không muốn viết unit test nữa",
-    "Từ nay tôi muốn agent chỉ viết unit test khi được yêu cầu",
-    "Từ nay bạn không được tự push code",
-    "Mỗi khi sửa code agent phải chạy test có sẵn",
-    "From now on do not write unit tests unless I ask",
-    "When editing code, always run existing tests",
-  ]) {
-    assert.equal(isExplicitRuleUpdateRequest(request), true, request);
-  }
-  for (const request of [
-    "", "Update documentation", "Explain business rules", "Refresh quickstart",
+    "Trước khi bàn giao hãy kiểm tra các liên kết đã thay đổi",
+    "Update wiki/**/_rules.md for the new command names.",
+    "Refresh extension docs.",
     "Lần này đừng viết unit test",
-    "Từ nay tôi không muốn viết unit test, nhưng chỉ cho task này",
-    "For this task, do not write unit tests",
-    "Khi viết code có thể chạy unit test bằng npm test",
-    "Mô tả quy trình khi viết code agent phải chạy test",
-    "Document that developers always run unit tests",
-    "Từ nay hệ thống không cho phép người dùng push thông báo",
-    "Tôi không muốn viết unit test",
   ]) {
-    assert.equal(isExplicitRuleUpdateRequest(request), false, request);
+    const prompt = render("update", request);
+    assert.match(prompt, /Agent-directed rule updates/);
+    assert.match(prompt, /Permission does not depend on keywords or a named file/);
+    assert.match(prompt, /Classify the user's intent and choose the owning rule file yourself/);
+    assert.match(prompt, /do not ask the user to supply a rule filename/);
+    assert.match(prompt, /Select the narrowest owning domain/);
+    assert.match(prompt, /root _rules\.md only for repository-wide policies/);
+    assert.match(prompt, /Do not invent policies or change them for a documentation-only request/);
+    assert.match(prompt, /Lasting instructions.*owning _rules\.md/);
+    assert.match(prompt, /A one-off instruction/);
+    assert.match(prompt, /do not persist it in either rules or documentation/);
+    assert.match(prompt, /ask before editing/);
+    assert.match(prompt, /Ask about the policy or its scope, not permission keywords or filenames/);
+    assert.match(prompt, /does not mean "do not run existing tests"/);
+    assert.match(prompt, /do not require a proposal or approval workflow/i);
+    assert.match(prompt, /For a rule-only request, inspect the target rules and relevant component evidence/);
+    assert.match(prompt, /Do not rewrite documentation or bootstrap files unless the request requires it/);
+    assert.doesNotMatch(prompt, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
   }
 });
 
-test("both commands omit Git context and metadata Git fields in every rule mode", () => {
+test("init never permits rule updates even when the request names rules", () => {
+  const prompt = render("init", "Update wiki/_rules.md");
+  assert.match(prompt, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
+  assert.match(prompt, /only during an active \/wiki-update run/);
+  assert.doesNotMatch(prompt, /Agent-directed rule updates/);
+});
+
+test("both commands omit Git context and metadata Git fields", () => {
   // Legacy/internal context fields must not leak into generated task prompts.
   for (const mode of modes) {
-    for (const allowRuleUpdates of [false, true]) {
-      const prompt = render(mode, "REQUEST_SENTINEL", allowRuleUpdates);
-      assert.doesNotMatch(prompt, /GIT_CONTEXT_SENTINEL|PREVIOUS_HEAD_SENTINEL|gitHead/);
-      assert.doesNotMatch(prompt, /Working tree status|Current HEAD|Recent commits|Diff summary|Git context|Git change summary|Git discipline/i);
-      assert.doesNotMatch(prompt, /git status|git diff|inspect commits/i);
-    }
+    const prompt = render(mode);
+    assert.doesNotMatch(prompt, /GIT_CONTEXT_SENTINEL|PREVIOUS_HEAD_SENTINEL|gitHead/);
+    assert.doesNotMatch(prompt, /Working tree status|Current HEAD|Recent commits|Diff summary|Git context|Git change summary|Git discipline/i);
+    assert.doesNotMatch(prompt, /git status|git diff|inspect commits/i);
   }
   const source = readFileSync(new URL("../../extensions/wiki/wiki-commands.ts", import.meta.url), "utf8");
   assert.doesNotMatch(source, /createGitSummary|gitSummary|Working tree status/);

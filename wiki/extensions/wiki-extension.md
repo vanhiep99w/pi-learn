@@ -1,6 +1,6 @@
 # Wiki capability
 
-Phạm vi: command, prompt, đọc chọn lọc, rule opt-in, validation và metadata của `packages/pi-learn-extensions/extensions/wiki/`. Extension chạy trong Pi hiện tại; không tạo provider/model hay bộ filesystem tools riêng.
+Phạm vi: command, prompt, đọc chọn lọc, agent-directed rule updates, validation và metadata của `packages/pi-learn-extensions/extensions/wiki/`. Extension chạy trong Pi hiện tại; không tạo provider/model hay bộ filesystem tools riêng.
 
 ## Commands and run lifecycle
 
@@ -10,8 +10,8 @@ Luồng trong `wiki-commands.ts`:
 
 1. `registerWikiCommands()` nhận args và `ctx.cwd`; từ chối khi `ctx.isIdle()` false.
 2. Update không có message chạy kiểm tra [no-op](#no-op-behavior). Message rõ ràng bỏ qua shortcut này.
-3. `ensureWikiPromptRuleScaffolds()` tạo scaffold thiếu; kiểm tra lint rules trước run, trừ update có opt-in sửa rules.
-4. Đọc brief/metadata, hash Wiki trước run; lưu `activeWikiRun` gồm command, cwd, snapshot và quyền sửa rules.
+3. `ensureWikiPromptRuleScaffolds()` tạo scaffold thiếu; init kiểm tra lint rules trước run, update được bắt đầu để sửa lint invalid.
+4. Đọc brief/metadata, hash Wiki trước run; lưu `activeWikiRun` gồm command, cwd và snapshot. Quyền sửa rules phụ thuộc command của active run, không phụ thuộc từ khóa trong message.
 5. `createWikiTaskPrompt()` tạo yêu cầu, `pi.sendUserMessage()` đưa vào agent đang dùng provider/model/tools hiện tại. Status key `wiki` báo generating/updating khi có UI; không UI dùng console.
 6. `agent_end` ghi nhận stopReason aborted/error của assistant cuối. `agent_settled` lấy và xóa active run, tạo scaffold mới cần thiết, hash lại, kiểm tra link/rules, rồi [finalize metadata](#snapshot-and-metadata).
 7. `session_shutdown` xóa active run; nếu Wiki đổi thì ghi interrupted để lần sau retry. Status được dọn trong finally.
@@ -26,7 +26,7 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 |---|---|
 | `wiki/index.ts` | Entrypoint duy nhất, gọi registerWikiCommands |
 | `wiki/wiki-commands.ts` | Lifecycle, tool guard, snapshot, no-op và metadata |
-| `wiki/wiki-prompt.ts` | Task contract, opt-in detector, bootstrap AGENTS/CLAUDE |
+| `wiki/wiki-prompt.ts` | Task contract, phân loại intent/ownership bằng agent, bootstrap AGENTS/CLAUDE |
 | `wiki/wiki-rules.js` | Phân loại path, discovery, scaffold, rule lint |
 | `wiki/wiki-links.js` | Internal Markdown links và heading anchors |
 
@@ -41,19 +41,19 @@ Bootstrap có hai điều kiện độc lập:
 
 Quickstart là task → system → page/heading route. Dùng grep giới hạn để tìm heading rồi ranged read; `#anchor` không tự giới hạn phạm vi filesystem read. Chỉ mở thêm khi gặp dependency, producer/consumer, shared contract hoặc evidence chưa đủ. Đây là hướng dẫn prompt, không phải sandbox cưỡng chế context.
 
-## Explicit rule-update mode
+## Agent-directed rule updates
 
-`allowRuleUpdates` chỉ true khi command là update và `isExplicitRuleUpdateRequest(message)` nhận yêu cầu sửa rule. Ngoài các cụm `_rules.md`/`_rules`, Wiki rules, prompt rules, rule file(s), `quy tắc wiki`, `cập nhật rule`/`cập nhật các rule`, detector nhận một số yêu cầu chính sách agent tự nhiên: kết hợp dấu hiệu lâu dài (`từ nay`, `khi viết/sửa code`, `from now on`...), chủ đề công việc coding agent và chỉ thị như `tôi không muốn`, `agent phải`, `do not`. Ví dụ `khi viết code tôi ko muốn viết unitest nữa` bật quyền sửa rule mà không cần nêu tên file. Nhánh tự nhiên loại yêu cầu có dấu hiệu tạm thời (`lần này`, `for this task`...) và yêu cầu mô tả/giải thích ở đầu câu; yêu cầu nêu rule rõ vẫn dùng nhánh opt-in cũ.
+Mọi active `/wiki-update` run cùng cwd được phép sửa rule khi intent yêu cầu. Không còn detector regex hoặc flag quyền riêng: guard dùng `currentRun?.command !== "update"`. Agent tự phân loại message và chọn file; người dùng không cần nêu `_rules.md`, domain hay từ khóa đặc biệt.
 
 ```txt
-/wiki-update Cập nhật wiki/**/_rules.md để phản ánh command surface mới
+/wiki-update Khi viết code tôi không muốn tự thêm unit test nữa
 ```
 
-Detector vẫn là heuristic bảo thủ, chuẩn hóa dấu tiếng Việt, không phải bộ phân loại ngữ nghĩa tổng quát hoặc subsystem proposal/approval. Cách diễn đạt chưa được nhận có thể cần yêu cầu lại rõ là cập nhật rule. Prompt update phân biệt: facts về dự án → normal Wiki; chính sách làm việc lâu dài → `_rules.md` thuộc domain; chỉ thị một lần → không lưu thành rule hay tài liệu. Khi intent/thời hạn/ownership mơ hồ thì hỏi trước khi sửa. Nếu chưa được bật quyền sửa rule, agent không được ghi chính sách vào normal Wiki để lách guard mà phải đề nghị yêu cầu sửa rule rõ ràng. Không suy diễn “không viết unit test mới” thành “không chạy test có sẵn”. Init không bao giờ bật quyền sửa rule, kể cả message nhắc rules.
+Prompt phân biệt facts về dự án → normal Wiki; chính sách làm việc lâu dài → `_rules.md` thuộc domain hẹp nhất; chỉ thị một lần → không lưu thành rule hay tài liệu. Root rule chỉ dành cho chính sách repository-wide. Agent đọc routes/rules/evidence để chọn owner, không hỏi người dùng tên file hoặc từ khóa cấp quyền. Chỉ hỏi lại nếu intent/thời hạn/ownership vẫn mơ hồ sau kiểm tra evidence. Không tự đổi chính sách cho yêu cầu docs-only hoặc update không có yêu cầu chính sách cụ thể; không suy diễn “không viết unit test mới” thành “không chạy test có sẵn”. Đây là phân loại bằng model theo prompt, không phải validator ngữ nghĩa deterministic.
 
-`tool_call` chặn built-in write/edit tới rules khi không opt-in; metadata luôn được bảo vệ, brief được bảo vệ trong active run cùng cwd. Bash guard dò path và những mutation phổ biến (redirect, rm/mv/cp, tee, truncate, sed/perl in-place). Không coi regex guard là sandbox cho mọi tool/script; chi tiết [safety](../operations/testing-and-safety.md#security-and-privacy).
+`tool_call` vẫn chặn built-in write/edit tới rules ngoài active update, trong init hoặc khi cwd khác. Metadata luôn được bảo vệ, brief được bảo vệ trong active run cùng cwd. Bash guard dò path và mutation phổ biến (redirect, rm/mv/cp, tee, truncate, sed/perl in-place). Không coi regex guard là sandbox cho mọi tool/script; chi tiết [safety](../operations/testing-and-safety.md#security-and-privacy).
 
-Khi opt-in, prompt yêu cầu sửa tối thiểu, giữ rule không liên quan và ID ổn định/duy nhất. Run có thể bắt đầu với rules invalid để sửa, nhưng finalization vẫn interrupted cho tới khi lint hợp lệ. Scaffold deterministic thiếu do extension tạo là ngoại lệ; agent của run thường không tự sửa rules.
+Prompt yêu cầu sửa tối thiểu, giữ rule không liên quan và ID ổn định/duy nhất. Update có thể bắt đầu với rules invalid để sửa, nhưng finalization vẫn interrupted cho tới khi lint hợp lệ. Scaffold deterministic thiếu do extension tạo là ngoại lệ. Khi settled/shutdown hoặc gửi message thất bại, active run bị xóa và rule lại được bảo vệ.
 
 ## Agent bootstrap maintenance
 
@@ -67,7 +67,7 @@ Section chứa conditional quickstart loading, component-scoped rules, kiểm ch
 
 - `/wiki`: khảo sát manifests/entrypoints/contracts/tests/operations, trace control/data flow và ownership; `discovery → wiki/_plan.md tạm → research/write từng topic → coverage/navigation review`. Không đặt quota trang, không suy đoán từ tên thư mục; chèn mẫu bootstrap và contract tài liệu đầy đủ.
 - `/wiki-update`: dùng `createUpdateInstructions()` riêng, không chèn inventory, mẫu bootstrap hoặc contract khởi tạo đầy đủ. Yêu cầu người dùng xác định scope; agent tạo impact map ngắn trong context, đọc quickstart khi cần định tuyến và chỉ đọc pages/source/tests/rules liên quan. Không bắt buộc plan file. Chỉ mở rộng sang producer/consumer/shared contract khi cần kiểm chứng; giữ nội dung đúng không bị ảnh hưởng, báo no-op khi không có impact.
-- Update rule có opt-in: đọc target rules và evidence component liên quan rồi sửa các rules trong scope; không viết lại tài liệu/bootstrap nếu yêu cầu không cần. Guard và validation toàn Wiki của extension vẫn giữ nguyên, prompt tập trung không có nghĩa bỏ kiểm tra finalization.
+- Update rule theo intent: agent tự chọn owner, đọc target rules và evidence component liên quan rồi sửa các rules trong scope; không viết lại tài liệu/bootstrap nếu yêu cầu không cần. Guard và validation toàn Wiki của extension vẫn giữ nguyên, prompt tập trung không có nghĩa bỏ kiểm tra finalization.
 
 Generated docs chỉ ở Wiki, ngoại lệ là section bootstrap top-level theo quyền của từng mode. Nếu dùng plan tạm thì xóa trước khi kết thúc; kiểm tra links/anchors và validation liên quan.
 
@@ -112,4 +112,4 @@ Thiếu head/metadata, previous interrupted, worktree có thay đổi, invalid l
 npm --prefix packages/pi-learn-extensions run test:wiki
 ```
 
-Ba bộ test kiểm tra prompt/no-Git context/opt-in/bootstrap, rule classification/discovery/lint/scaffold và file/anchor/path links. Chưa có test trực tiếp cho `wiki-commands.ts` lifecycle, bash guard, snapshot/no-op hoặc settlement. Sau thay source chạy `/reload` và theo [manual scenarios](../operations/testing-and-safety.md#wiki-scenarios), trong repo thử nghiệm; không thử sửa protected files ở repo thật.
+Bốn bộ test kiểm tra prompt/no-Git context/intent/ownership/bootstrap, rule classification/discovery/lint/scaffold, file/anchor/path links và command guards/lifecycle. Command fixtures kiểm permission theo active command/cwd, init, update không từ khóa/không args, lint invalid, metadata/brief, settled/shutdown, busy và lỗi gửi message. Chưa test đầy đủ snapshot/no-op, interrupted metadata hoặc semantic classification bằng model thật. Sau thay source chạy `/reload` và theo [manual scenarios](../operations/testing-and-safety.md#wiki-scenarios), trong repo thử nghiệm; không thử sửa protected files ở repo thật.
