@@ -5,12 +5,23 @@ import test from "node:test";
 // Run the extension without installing Pi peers or accessing user settings.
 // These small host doubles do not replace manual checks against Pi's real TUI.
 const host = `
+export class Theme {
+  constructor(fg, bg, _mode, options = {}) {
+    this.name = options.name;
+    this.appearance = options.appearance || "dark";
+    this.colors = { ...fg, ...bg, selectedBg: bg.selectedBg || "#0b1020" };
+  }
+  fg(_token, text) { return text; }
+  bold(text) { return text; }
+}
 export class CustomEditor {
   constructor(tui) { this.tui = tui; }
   render() { return ["────", "input", "────"]; }
 }
 `;
 const tui = `
+export const getTerminalColorMode = () => "truecolor";
+export const colorToHex = (c) => c;
 const strip = (s) => s.replace(/\\x1b\\[[0-9;]*m/g, "");
 const columns = (c) => /[\\u3400-\\u9fff]|\\p{Extended_Pictographic}/u.test(c) ? 2 : 1;
 export const visibleWidth = (s) => [...strip(s)].reduce((n, c) => n + columns(c), 0);
@@ -60,9 +71,10 @@ function fixture(t, initialTheme = makeTheme("system")) {
     setFooter: (factory) => { ui.footer = factory; },
     getAllThemes: () => ["system", "midnight-aurora", "light"].map((name) => ({ name })),
     select: async () => undefined,
-    setTheme: (name) => {
-      themeChanges.push(name);
-      ui.theme = makeTheme(name);
+    getTheme: () => initialTheme,
+    setTheme: (value) => {
+      themeChanges.push(value);
+      ui.theme = typeof value === "string" ? makeTheme(value) : value;
       return { success: true };
     },
     notify: (...args) => notifications.push(args),
@@ -160,4 +172,82 @@ test("editor borders use live theme tokens without replacing input", async (t) =
   assert.ok(lines[0].includes("\x1b[33m"));
   assert.ok(!lines[0].includes("\x1b[36m"));
   assert.ok(lines.includes("input"));
+});
+
+const settle = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
+
+test("TUI adapter polls selected Aurora, updates its badge, and cleans up on footer disposal", async (t) => {
+  const f = fixture(t, makeTheme("midnight-aurora"));
+  f.ctx.mode = "tui";
+  await f.events.get("session_start")({}, f.ctx);
+  let background = { r: 11, g: 16, b: 32 }, queries = 0;
+  const tui = {
+    mode: "regular", requestRender() {},
+    queryTerminalColors: async () => { queries++; return { background }; },
+  };
+  const footerData = {
+    onBranchChange: () => () => {}, getGitBranch: () => null,
+    getExtensionStatuses: () => new Map(),
+  };
+  const footer = f.ui.footer(tui, f.ui.theme, footerData);
+  await settle();
+  assert.equal(f.ui.theme.auroraAdaptive.appearance, "dark");
+  const editor = f.ui.editor(tui, f.ui.theme, {});
+  assert.match(editor.render(100)[0], /auto:dark/);
+  background = { r: 255, g: 255, b: 255 };
+  t.mock.timers.tick(3000);
+  await settle();
+  assert.equal(f.ui.theme.auroraAdaptive.appearance, "light");
+  assert.match(editor.render(100)[0], /auto:light/);
+  await f.commands.get("aurora-adapt")("status", f.ctx);
+  assert.match(f.notifications.at(-1)[0], /#ffffff/);
+  await f.commands.get("aurora-adapt")("off", f.ctx);
+  assert.equal(f.ui.theme.name, "midnight-aurora");
+  assert.equal(f.ui.theme.auroraAdaptive, undefined);
+  await f.commands.get("aurora-adapt")("auto", f.ctx);
+  assert.equal(f.ui.theme.auroraAdaptive.appearance, "light");
+  const count = queries;
+  footer.dispose();
+  t.mock.timers.tick(10000);
+  await settle();
+  assert.equal(queries, count);
+  assert.equal(f.widgets.get("aurora-banner"), undefined);
+});
+
+test("adaptive command is terminal-only and RPC startup installs no TUI components", async (t) => {
+  const f = fixture(t);
+  f.ctx.mode = "rpc";
+  await f.events.get("session_start")({}, f.ctx);
+  assert.equal(f.ui.footer, undefined);
+  assert.equal(f.ui.editor, undefined);
+  const output = t.mock.method(console, "log", () => {});
+  await f.commands.get("aurora-adapt")("auto", f.ctx);
+  await f.commands.get("aurora-adapt")("auto", { hasUI: false });
+  assert.equal(output.mock.callCount(), 2);
+  assert.deepEqual(f.themeChanges, []);
+});
+
+test("session replacement disposes old adaptive state before installing the new banner", async (t) => {
+  const f = fixture(t, makeTheme("midnight-aurora"));
+  f.ctx.mode = "tui";
+  let footer;
+  const tui = { requestRender() {}, queryTerminalColors: async () => ({ background: { r: 11, g: 16, b: 32 } }) };
+  const data = { onBranchChange: () => () => {}, getGitBranch: () => null };
+  f.ui.setFooter = (factory) => {
+    footer?.dispose();
+    footer = factory(tui, f.ui.theme, data);
+  };
+  await f.events.get("session_start")({}, f.ctx);
+  await settle();
+  await f.events.get("session_start")({}, f.ctx);
+  await settle();
+  assert.equal(typeof f.widgets.get("aurora-banner"), "function");
+  assert.ok(f.ui.theme.auroraAdaptive);
+  await f.commands.get("aurora-adapt")("status", f.ctx);
+  assert.match(f.notifications.at(-1)[0], /bật/);
+  t.mock.timers.tick(4999);
+  assert.equal(typeof f.widgets.get("aurora-banner"), "function");
+  t.mock.timers.tick(1);
+  assert.equal(f.widgets.get("aurora-banner"), undefined);
+  footer.dispose();
 });

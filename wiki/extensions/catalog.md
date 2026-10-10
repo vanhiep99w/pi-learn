@@ -79,7 +79,7 @@ Ownership `packages/pi-learn-extensions/extensions/aurora-ui.ts`: editor/footer,
 
 ### Lifecycle và rendering
 
-`session_start` có hasUI guard: banner ẩn sau 5 giây, render tên/màu theme hiện tại qua component factory (không cache ANSI, cắt theo visible width), cleanup session cũng xóa banner; cài AuroraEditor (extends CustomEditor), footer, fetch Git status ngay và mỗi 2,5 giây. Footer subscribe branch change để refresh/render. `session_shutdown` chạy cleanup callbacks; footer dispose dọn timers/subscription, unregister cleanup; disposed flag ngăn render muộn. `refreshingGitStats` ngăn fetch overlap; không abort git request đang chạy.
+`session_start` có hasUI guard và bỏ qua RPC: banner ẩn sau 5 giây, render tên/màu theme hiện tại qua component factory (không cache ANSI, cắt theo visible width), cleanup session cũng xóa banner; cài AuroraEditor (extends CustomEditor), footer, fetch Git status ngay và mỗi 2,5 giây. Footer subscribe branch change để refresh/render. `session_shutdown` chạy cleanup callbacks; footer dispose dọn timers/subscription, unregister cleanup; disposed flag ngăn render muộn. `refreshingGitStats` ngăn fetch overlap; không abort git request đang chạy.
 
 Editor giữ content/autocomplete từ super.render(), thay viền trên/dưới, không viền dọc/góc, tối thiểu ba dòng content. Terminal fullscreen chuyển viền dưới sang hàng footer đã dành sẵn; mode khác vẽ dưới editor. Footer chỉ hiển thị extension statuses (bao gồm Wiki status). Width dùng visibleWidth để fit badges; width <20 chỉ còn rail, ưu tiên bỏ cwd khi chật; usage badge quá dài bị ẩn toàn bộ.
 
@@ -91,15 +91,20 @@ Editor giữ content/autocomplete từ super.render(), thay viền trên/dưới
 - Git dùng `pi.exec("git", ["-C", cwd, "status", "--porcelain=v1"], timeout 3000)`. Đếm added/modified/deleted/renamed/untracked/conflicted, không đọc file content hoặc log. Lỗi/non-repo trả null, bỏ badge; sạch hiển thị ✓. Badge stats gắn cùng branch nếu branch có sẵn.
 - Viền dưới đọc [global contract](#contract-dùng-chung-với-aurora), không tự fetch auth/network. Màu theo remaining ≤5 error, ≤25 warning; stale thêm cached.
 - `agent_start`/tool events đặt working message tiếng Việt; model_select notify provider/id; tool error notify thất bại. Các hooks có hasUI guard.
-- `/aurora-themes` và `ctrl+shift+t` dùng getAllThemes/select/setTheme và có hasUI guard. Command không có UI in hướng dẫn chọn theme; shortcut không có UI bỏ qua. Picker không tự ghi settings trong extension và không đổi theme khi cancel.
+- `/aurora-themes` và `ctrl+shift+t` dùng getAllThemes/select/setTheme và có hasUI guard. Command không có UI in hướng dẫn chọn theme; shortcut không có UI bỏ qua. Extension không trực tiếp ghi settings; host Pi có thể lưu lựa chọn qua setTheme(name). Cancel không đổi theme.
+- `/aurora-adapt [auto|off|status]` chỉ chạy TUI; không có TUI in hướng dẫn. Auto bật mặc định mỗi session/reload, không tự chọn theme. Khi `midnight-aurora` active, sinh theme in-memory giữ tên đó; off phục hồi theme JSON đã đăng ký. Banner/editor có nhãn auto:dark/light.
 
-Điểm mở rộng: tool label map, badge layout, footer statuses và theme tokens. Giữ cleanup, width bounds, autocomplete và [usage contract](#contract-dùng-chung-với-aurora) khi thay editor. `tests/aurora/aurora-ui.test.mjs` kiểm banner, live theme tokens, width, cleanup và headless picker với host giả lập; vẫn cần thử terminal hẹp/fullscreen thủ công.
+Điểm mở rộng: tool label map, badge layout, footer statuses và theme tokens. Giữ cleanup, width bounds, autocomplete và [usage contract](#contract-dùng-chung-với-aurora) khi thay editor. `tests/aurora/aurora-ui.test.mjs` kiểm banner, live theme tokens, width, cleanup, headless/RPC và adapter polling với host giả lập; controller có focused ownership/late reply tests; vẫn cần thử terminal hẹp/fullscreen thủ công.
 
 ## Midnight Aurora theme
 
 Source `packages/pi-learn-extensions/themes/midnight-aurora.json`, public name `midnight-aurora`, schema URL của Pi. `vars` cung cấp palette; `colors` map accent/border/status, message/tool panels, Markdown/syntax/thinking và bashMode; `export` map page/card/info backgrounds. Không có runtime state hoặc credential trong theme.
 
-Aurora lấy tokens từ theme đang active và banner hiển thị tên thực tế. Khuyến nghị `system` để dùng cơ chế sinh màu/tự thích nghi của Pi; extension không tự đổi theme người dùng. `theme: "midnight-aurora"` giữ palette riêng, khai báo appearance dark và dự kiến nền terminal gần `#0b1020` (không đổi nền terminal). Chữ phụ/status được tăng độ sáng theo hướng giữ hue/chroma, vùng chọn tối hơn để chữ dễ đọc. `tests/theme/midnight-aurora.test.mjs` kiểm WCAG ≥4.5:1 cho các cặp chữ/nền khai báo và phân cấp dim/muted/text; không bảo đảm trên nền terminal bất kỳ hoặc xấp xỉ 256 màu. Khi thêm token/đổi tên phải kiểm tra host schema, extension consumers và ví dụ settings; reload rồi thử picker và rendering. JSON parse/contrast tests không thay schema/visual validation.
+JSON là palette gốc và fallback tối cố định, appearance dark, nền dự kiến `#0b1020`. Trong TUI, `extensions/aurora/palette.ts` sinh panel rồi foreground từ palette đó theo nền terminal: OKLCH giữ hue, giới hạn chroma/gamut và tìm lightness theo WCAG; không sao chép thuật toán đa thức/OKHSL của Pi. `adaptive-controller.ts` quản lý ownership, off/auto, cached background và reply đến muộn; adapter trong `aurora-ui.ts` tạo Theme và gọi ctx.ui.setTheme(instance), không ghi settings. Chỉ can thiệp khi tên theme active là midnight-aurora; system và các theme khác được giữ nguyên.
+
+Adapter đọc nền qua TUI.queryTerminalColors (timeout 100 ms), kiểm tra mỗi 3 giây. Query không trả nền thì dùng nền đã biết hoặc default/guess của Pi và ngừng query lặp tới khi auto thử lại; late reply vẫn có thể áp dụng. Session shutdown/footer dispose dọn timer và controller, chặn reply muộn. Không chiếm global onThemeChange hoặc cờ thông báo terminal. Dùng tên theme đơn, không kết hợp cặp light/dark của Pi vì setTheme(instance) chuyển host sang chế độ in-memory. HTML export và non-TUI vẫn dùng JSON cố định.
+
+`tests/theme/midnight-aurora.test.mjs` kiểm JSON cố định; `aurora-adaptive.test.mjs` kiểm nguồn palette không bị sửa, hue/chroma (có dung sai lượng tử và ngoại lệ hue ở gần đen/trắng), WCAG ≥4.5:1 trên nền tối/sáng/tinted/dải xám và hierarchy. Không bảo đảm wallpaper/transparency hoặc xấp xỉ 256 màu. Khi thêm token/đổi tên phải kiểm tra host schema, extension consumers và ví dụ settings; reload rồi thử picker và rendering. JSON parse/contrast tests không thay schema/visual validation.
 
 ## External web search
 
