@@ -95,13 +95,17 @@ Aurora UI cung cấp startup banner, editor/footer/status tùy biến, thông ti
 /aurora-themes
 ```
 
-Bật theme đi kèm trong Pi settings:
+Aurora dùng màu của theme đang active, không tự đổi lựa chọn của bạn. Để hòa hợp với bảng màu terminal và tự thích nghi sáng/tối, chọn **`system`** trong `/settings → Theme`. Đây là theme mặc định của Pi khi chưa cấu hình theme.
+
+Nếu thích phong cách Aurora cố định trên nền tối, chọn **`midnight-aurora`**:
 
 ```json
 {
   "theme": "midnight-aurora"
 }
 ```
+
+Banner hiển thị tên theme đang active. Theme `midnight-aurora` có contrast tests cho chữ trên panel/vùng chọn; nền terminal nên tối, gần `#0b1020`. Theme này không tự đổi nền terminal; dùng `system` nếu muốn theo nền terminal bất kỳ.
 
 ## Web search
 
@@ -120,11 +124,13 @@ pi install git:github.com/nicobailon/pi-web-access
 
 ## Kiểm thử và bảo trì
 
-Chạy test Wiki:
+Chạy toàn bộ tests (Wiki, Aurora UI và theme):
 
 ```bash
-npm --prefix packages/pi-learn-extensions run test:wiki
+npm --prefix packages/pi-learn-extensions test
 ```
+
+Chạy riêng bằng `run test:wiki`, `run test:aurora` hoặc `run test:theme`. Tests Aurora dùng host giả lập; contrast tests kiểm màu sRGB đã khai báo, không thay kiểm tra trực quan trong terminal.
 
 Sau thay đổi extension/theme:
 

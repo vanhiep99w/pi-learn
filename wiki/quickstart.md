@@ -77,5 +77,5 @@ Dùng bounded grep tìm heading, rồi ranged read. `#anchor` chỉ navigation h
 ## Backlog có evidence
 
 - Có 39 automated Wiki tests, gồm command guards và permission lifecycle. Chưa kiểm đầy đủ snapshot/no-op/interrupted metadata, semantic classification bằng model thật hoặc OAuth/TUI. [Coverage và manual checks](operations/testing-and-safety.md#automated-tests).
-- Aurora theme command/shortcut hiện thiếu hasUI guard; usage shutdown không clear global/cache/pending và không cancel details timeouts. Cần focused lifecycle/headless tests trước khẳng định an toàn mọi mode. [Catalog](extensions/catalog.md#aurora-ui).
+- Aurora có host-mocked UI/headless tests và Midnight Aurora có contrast tests; chưa có integration tests trên TUI thật. Usage shutdown vẫn không clear global/cache/pending hoặc cancel details timeouts; cần focused lifecycle tests trước khẳng định an toàn mọi mode. [Catalog](extensions/catalog.md#aurora-ui).
 - Không có declared Node/Pi compatibility matrix hoặc release/test CI pipeline; remote ChatGPT APIs và implementation external PR-review action chưa được xác minh trong Wiki run này. [Operations](operations/development.md#pr-review-workflow).

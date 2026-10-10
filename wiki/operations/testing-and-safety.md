@@ -7,11 +7,12 @@ Phạm vi: focused verification, failure/recovery checks và privacy cho Wiki/us
 Root không có test script. Chạy từ root:
 
 ```bash
-npm --prefix packages/pi-learn-extensions run test:wiki
+npm --prefix packages/pi-learn-extensions test
+# Focused: run test:wiki, run test:aurora, run test:theme
 node -e 'JSON.parse(require("node:fs").readFileSync("packages/pi-learn-extensions/themes/midnight-aurora.json", "utf8")); console.log("Theme JSON OK")'
 ```
 
-Suite hiện có 39 test pass trên Node v24.21.0. Đây không phải minimum supported Node; manifest không khai báo engines. File .mts import TypeScript source nên runner phải hỗ trợ strip types; command tests dùng `node:module.registerHooks` để ánh xạ riêng import `wiki-prompt.js` sang source `.ts`, tương tự loader jiti của Pi.
+Suite Wiki có 39 test pass trên Node v24.21.0. Đây không phải minimum supported Node; manifest không khai báo engines. File .mts import TypeScript source nên runner phải hỗ trợ strip types; command tests dùng `node:module.registerHooks` để ánh xạ riêng import `wiki-prompt.js` sang source `.ts`, tương tự loader jiti của Pi.
 
 | Test source (trong `packages/pi-learn-extensions/tests/wiki/`) | Evidence được kiểm tra |
 |---|---|
@@ -20,7 +21,9 @@ Suite hiện có 39 test pass trên Node v24.21.0. Đây không phải minimum s
 | `wiki-rules.test.mjs` | Path classification, outside-root rejection, discovery/missing sections, IDs/origin lint, scaffold idempotency, symlink escape |
 | `wiki-links.test.mjs` | Checked-in Wiki links, file/Unicode/duplicate anchors, punctuation, traversal/encoding, reserved sources, symlink target/root |
 
-Gaps: chưa kiểm đầy đủ Wiki snapshot/no-op/interrupted metadata, semantic classification bằng model thật, OAuth/account/network, Aurora editor/render/cleanup hoặc theme schema. JSON parse chỉ kiểm syntax. Suite không chứng minh mọi rule được viết đúng nghĩa, mọi generated claim chính xác, hoặc mọi host Pi version tương thích. Không có test CI job trong workflow PR review đã inspect.
+Ngoài Wiki, `tests/aurora/aurora-ui.test.mjs` kiểm banner/theme changes/width/cleanup, headless picker và editor tokens bằng host giả lập; `tests/theme/midnight-aurora.test.mjs` kiểm variable resolution, dark appearance, WCAG ≥4.5:1 cho các cặp chữ/nền khai báo và phân cấp dim/muted/text. Contrast audit chỉ áp dụng màu sRGB cụ thể, với `vars.bg` là nền terminal dự kiến; không bảo đảm nền terminal khác hoặc 256 màu.
+
+Gaps: chưa kiểm đầy đủ Wiki snapshot/no-op/interrupted metadata, semantic classification bằng model thật, OAuth/account/network, Aurora trên host TUI thật hoặc theme schema. JSON parse chỉ kiểm syntax. Suite không chứng minh mọi rule được viết đúng nghĩa, mọi generated claim chính xác, hoặc mọi host Pi version tương thích. Không có test CI job trong workflow PR review đã inspect.
 
 Muốn kiểm tra validators không ghi/scaffold files, từ root:
 
@@ -68,9 +71,9 @@ Chỉ hai command Wiki được register. Kiểm tra guards bằng fixtures tron
 - Login/list/switch/delete-one/delete-active/delete-all/cancel; kiểm tra fallback OpenCode có thể khiến usage xuất hiện lại sau delete. Không đọc credential thật trong Wiki run.
 - Aurora: startup banner tự ẩn, ít nhất ba dòng editor, autocomplete còn nguyên, footer statuses không trùng usage; thử terminal hẹp/rộng và fullscreen/non-fullscreen.
 - Git: repo sạch/modified/untracked/conflict và non-repo; Git lỗi phải mất badge thay vì crash.
-- Theme picker/shortcut/cancel và theme đang active; JSON/schema/render. Banner không chứng minh active theme.
+- Theme picker/shortcut/cancel và theme đang active; JSON/schema/render. Banner phải phản ánh tên/màu mới ngay cả khi đổi theme trong 5 giây đầu. Thử `system` trên nền sáng/tối và `midnight-aurora` trên nền tối; extension không tự đổi lựa chọn.
 - Shutdown/reload/session replacement: timers/subscriptions/status/widget cleanup; kiểm tra global/cache/pending và timeout details còn sống như [lifecycle gaps](../extensions/catalog.md#contract-dùng-chung-với-aurora).
-- Print/JSON/headless không crash vì UI thiếu. Riêng theme command/shortcut hiện chưa hasUI guard, nên đây là regression target, không phải verified guarantee.
+- Print/JSON/headless không crash vì UI thiếu. Theme command/shortcut có hasUI guard và regression tests với host giả lập; vẫn cần kiểm tra các mode trên host thật.
 
 ## Security and privacy
 

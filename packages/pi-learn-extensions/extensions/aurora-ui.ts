@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Aurora UI Extension — Horizontal Borders + Custom Footer
@@ -56,6 +56,7 @@ export default function (pi: ExtensionAPI) {
       disposed = true;
       if (bannerTimer) clearTimeout(bannerTimer);
       if (gitStatsTimer) clearInterval(gitStatsTimer);
+      try { ctx.ui.setWidget("aurora-banner", undefined); } catch { /* ctx may already be disposed */ }
     });
 
     // ── Startup Banner ──────────────────────────────────────────
@@ -171,6 +172,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("aurora-themes", {
     description: "Chọn theme nhanh",
     handler: async (_args, ctx) => {
+      if (!ctx.hasUI) {
+        console.log("Chọn theme trong Pi TUI: /settings → Theme → system hoặc midnight-aurora.");
+        return;
+      }
       const names = ctx.ui.getAllThemes().map((t: any) => t.name);
       const chosen = await ctx.ui.select("🎨  Chọn theme:", names);
       if (!chosen) return;
@@ -182,6 +187,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerShortcut("ctrl+shift+t", {
     description: "Chọn theme nhanh",
     handler: async (_key, ctx) => {
+      if (!ctx.hasUI) return;
       const names = ctx.ui.getAllThemes().map((t: any) => t.name);
       const chosen = await ctx.ui.select("🎨  Chọn theme:", names);
       if (!chosen) return;
@@ -575,21 +581,32 @@ function getSafeTheme(ctx?: any) {
 }
 
 function showBanner(ctx: any) {
-  const t = getSafeTheme(ctx);
   const time = new Date().toLocaleString("vi-VN", {
     weekday: "short", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit",
   });
-  const w = 44;
-  const pad = (s: string, n: number) => s + " ".repeat(Math.max(0, n - s.length));
-  const lines = [
-    t.fg("borderAccent", "╭" + "─".repeat(w) + "╮"),
-    t.fg("borderAccent", "│") + "  " + t.fg("accent", t.bold(" ◈  Pi Coding Agent")) + " ".repeat(w - 21) + t.fg("borderAccent", "│"),
-    t.fg("borderAccent", "│") + "  " + t.fg("text", pad("  " + time, w - 2)) + t.fg("borderAccent", "│"),
-    t.fg("borderAccent", "│") + "  " + t.fg("muted", pad("  midnight-aurora theme", w - 2)) + t.fg("borderAccent", "│"),
-    t.fg("borderAccent", "╰" + "─".repeat(w) + "╯"),
-  ];
-  ctx.ui.setWidget("aurora-banner", lines);
+  // Rebuild on every render: system colors and the active theme can change
+  // while the startup banner is still visible. Never cache ANSI-styled lines.
+  ctx.ui.setWidget("aurora-banner", () => ({
+    invalidate() {},
+    render(availableWidth: number): string[] {
+      const w = Math.min(44, Math.max(0, Math.floor(availableWidth) - 2));
+      if (w === 0) return [];
+      const t = getSafeTheme(ctx);
+      const row = (text: string, color: string, bold = false) => {
+        const clipped = truncateToWidth("  " + text, w);
+        const padded = clipped + " ".repeat(Math.max(0, w - visibleWidth(clipped)));
+        return t.fg("borderAccent", "│") + t.fg(color, bold ? t.bold(padded) : padded) + t.fg("borderAccent", "│");
+      };
+      return [
+        t.fg("borderAccent", "╭" + "─".repeat(w) + "╮"),
+        row("◈  Pi Coding Agent", "accent", true),
+        row(time, "text"),
+        row(`Theme: ${t.name || "unknown"}`, "muted"),
+        t.fg("borderAccent", "╰" + "─".repeat(w) + "╯"),
+      ];
+    },
+  }));
 }
 
 function shortModel(id: string): string {

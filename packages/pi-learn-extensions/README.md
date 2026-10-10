@@ -66,19 +66,28 @@ Aurora UI cung cấp startup banner, editor chỉ có viền ngang, footer tối
 /aurora-themes
 ```
 
-Theme đi kèm:
+Aurora dùng semantic tokens của theme đang active, không tự bật theme đi kèm hoặc ghi settings. Banner đọc tên/màu theme ở mỗi lần render; picker và shortcut có `hasUI` guard.
 
-```txt
-midnight-aurora
-```
-
-Bật trong settings:
+- **`system`** (khuyến nghị): chọn trong `/settings → Theme` để theo bảng màu/nền sáng tối của terminal. Pi tự sinh màu; Pi Learn không triển khai bộ sinh màu riêng.
+- **`midnight-aurora`**: palette Aurora cố định cho nền tối, chọn trong settings:
 
 ```json
 {
   "theme": "midnight-aurora"
 }
 ```
+
+`midnight-aurora` không đổi màu nền terminal. Nền tối gần `#0b1020` là nền dự kiến; chọn `system` khi cần thích nghi với nền khác. Các cặp chữ/nền trong contrast tests phải đạt WCAG 4.5:1, bao gồm chữ phụ, trạng thái, panel, vùng chọn, Markdown/syntax và HTML export. Kiểm tra này không bảo đảm kết quả trên mọi terminal hoặc khi màu bị xấp xỉ sang 256 màu.
+
+Kiểm thử:
+
+```bash
+npm --prefix packages/pi-learn-extensions test
+npm --prefix packages/pi-learn-extensions run test:aurora
+npm --prefix packages/pi-learn-extensions run test:theme
+```
+
+Aurora tests dùng host giả lập, kiểm banner/theme change/width/cleanup, headless picker và editor tokens. Sau `/reload`, thử thêm `system` trên nền sáng/tối, `midnight-aurora`, terminal hẹp và fullscreen/regular.
 
 ## Package manifest
 

@@ -4,7 +4,10 @@
   "description": "Pi Coding Agent extensions: repository Wiki, ChatGPT usage status, Aurora UI, and Midnight Aurora theme.",
   "type": "module",
   "scripts": {
-    "test:wiki": "node --test tests/wiki/*.test.mjs tests/wiki/*.test.mts"
+    "test": "npm run test:wiki && npm run test:aurora && npm run test:theme",
+    "test:wiki": "node --test tests/wiki/*.test.mjs tests/wiki/*.test.mts",
+    "test:aurora": "node --test tests/aurora/*.test.mjs",
+    "test:theme": "node --test tests/theme/*.test.mjs"
   },
   "keywords": [
     "pi-package",
