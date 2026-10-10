@@ -95,12 +95,9 @@ Aurora UI cung cấp startup banner, editor/footer/status tùy biến, thông ti
 /aurora-themes
 ```
 
-Aurora không tự chọn theme thay bạn. Có hai hướng trong `/settings → Theme`:
+Aurora dùng màu của theme đang active, không tự đổi lựa chọn của bạn. Để hòa hợp với bảng màu terminal và tự thích nghi sáng/tối, chọn **`system`** trong `/settings → Theme`. Đây là theme mặc định của Pi khi chưa cấu hình theme.
 
-- **`midnight-aurora`**: giữ palette tím/xanh Aurora, tự sinh độ sáng chữ/panel theo nền terminal trong TUI. Không cần chuyển sang `system`.
-- **`system`**: dùng bảng màu terminal và bộ sinh theme có sẵn của Pi; Aurora không can thiệp.
-
-Chọn Midnight Aurora trong settings:
+Nếu thích phong cách Aurora cố định trên nền tối, chọn **`midnight-aurora`**:
 
 ```json
 {
@@ -108,15 +105,7 @@ Chọn Midnight Aurora trong settings:
 }
 ```
 
-Sau `/reload`, khi dùng `midnight-aurora`, editor có nhãn **`auto:dark`** hoặc **`auto:light`**. Theme giữ tên cũ, không đổi nền terminal hoặc ghi palette sinh ra vào file.
-
-```txt
-/aurora-adapt status   # xem nền đã đọc, appearance và trạng thái
-/aurora-adapt off      # trở lại palette tối cố định
-/aurora-adapt auto     # bật lại và đọc lại nền terminal
-```
-
-Chế độ tự thích nghi bật mặc định mỗi session/reload, kiểm nền mỗi 3 giây khi Aurora được chọn. Terminal không trả màu nền thì giữ nền đã đọc hoặc dùng màu dự đoán của Pi và ngừng query lặp; dùng `auto` để thử lại. Contrast tests kiểm màu sRGB; transparency/wallpaper và terminal 256 màu có thể làm kết quả khác. HTML export vẫn dùng theme JSON cố định. Chi tiết ở [package README](packages/pi-learn-extensions/README.md#aurora-ui).
+Banner hiển thị tên theme đang active. Theme `midnight-aurora` có contrast tests cho chữ trên panel/vùng chọn; nền terminal nên tối, gần `#0b1020`. Theme này không tự đổi nền terminal; dùng `system` nếu muốn theo nền terminal bất kỳ.
 
 ## Web search
 

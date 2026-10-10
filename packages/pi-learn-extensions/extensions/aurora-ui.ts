@@ -1,9 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { CustomEditor, Theme } from "@earendil-works/pi-coding-agent";
-import { colorToHex, getTerminalColorMode, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { readFileSync } from "node:fs";
-import { createAdaptiveController, type AdaptiveController } from "./aurora/adaptive-controller.ts";
-import { BACKGROUND_TOKENS, type AuroraSource } from "./aurora/palette.ts";
+import { CustomEditor } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Aurora UI Extension — Horizontal Borders + Custom Footer
@@ -29,7 +26,6 @@ export default function (pi: ExtensionAPI) {
   let gitBranch: string | null = null;
   let gitStats: GitWorkingTreeStats | null = null;
   let refreshingGitStats = false;
-  let adaptive: AdaptiveController | undefined;
   const sessionCleanups = new Set<() => void>();
 
   const addSessionCleanup = (cleanup: () => void) => {
@@ -37,42 +33,31 @@ export default function (pi: ExtensionAPI) {
     return () => sessionCleanups.delete(cleanup);
   };
 
-  const cleanupSessions = () => {
+  pi.on("session_shutdown", async () => {
     for (const cleanup of sessionCleanups) {
       try { cleanup(); } catch { /* best-effort cleanup */ }
     }
     sessionCleanups.clear();
-  };
-  pi.on("session_shutdown", async () => { cleanupSessions(); });
+  });
 
   // ╔══════════════════════════════════════════════════════════════╗
   // ║  SESSION START                                               ║
   // ╚══════════════════════════════════════════════════════════════╝
   pi.on("session_start", async (_event, ctx) => {
-    // Release the old session before installing a new banner/footer. Host
-    // footer replacement may dispose the old footer after the new banner exists.
-    cleanupSessions();
-    if (!ctx.hasUI || ctx.mode === "rpc") return;
+    if (!ctx.hasUI) return;
 
     const cwd = ctx.cwd;
     let disposed = false;
     let gitStatsTimer: ReturnType<typeof setInterval> | undefined;
     let bannerTimer: ReturnType<typeof setTimeout> | undefined;
     let currentEditor: AuroraEditor | null = null;
-    let adaptiveTimer: ReturnType<typeof setInterval> | undefined;
-    let sessionAdaptive: AdaptiveController | undefined;
 
-    const cleanup = () => {
-      if (disposed) return;
+    const unregisterCleanup = addSessionCleanup(() => {
       disposed = true;
       if (bannerTimer) clearTimeout(bannerTimer);
       if (gitStatsTimer) clearInterval(gitStatsTimer);
-      if (adaptiveTimer) clearInterval(adaptiveTimer);
-      sessionAdaptive?.dispose();
-      if (adaptive === sessionAdaptive) adaptive = undefined;
       try { ctx.ui.setWidget("aurora-banner", undefined); } catch { /* ctx may already be disposed */ }
-    };
-    const unregisterCleanup = addSessionCleanup(cleanup);
+    });
 
     // ── Startup Banner ──────────────────────────────────────────
     showBanner(ctx);
@@ -105,19 +90,6 @@ export default function (pi: ExtensionAPI) {
 
     // ── Minimal Footer (chỉ extension statuses) ────────────────
     ctx.ui.setFooter((tui, _theme, footerData) => {
-      // Only actual TUI sessions may query terminal colors or set a live theme.
-      if (ctx.mode === "tui") {
-        try {
-          sessionAdaptive?.dispose();
-          if (adaptiveTimer) clearInterval(adaptiveTimer);
-          sessionAdaptive = startAdaptiveAurora(ctx, tui);
-          adaptive = sessionAdaptive;
-          void sessionAdaptive.refresh();
-          adaptiveTimer = setInterval(() => { void sessionAdaptive?.refresh(); }, 3000);
-        } catch (error) {
-          ctx.ui.notify(`Aurora adaptive chưa khả dụng: ${error instanceof Error ? error.message : String(error)}`, "warning");
-        }
-      }
       requestRender = () => {
         tui.requestRender();
       };
@@ -130,7 +102,9 @@ export default function (pi: ExtensionAPI) {
 
       return {
         dispose: () => {
-          cleanup();
+          disposed = true;
+          if (bannerTimer) clearTimeout(bannerTimer);
+          if (gitStatsTimer) clearInterval(gitStatsTimer);
           branchDispose();
           unregisterCleanup();
         },
@@ -195,29 +169,6 @@ export default function (pi: ExtensionAPI) {
   // ║  COMMANDS & SHORTCUTS                                        ║
   // ╚══════════════════════════════════════════════════════════════╝
 
-  pi.registerCommand("aurora-adapt", {
-    description: "Midnight Aurora tự thích nghi: auto | off | status",
-    handler: async (args, ctx) => {
-      if (!ctx.hasUI || ctx.mode !== "tui") {
-        console.log("Aurora adaptive chỉ chạy trong Pi TUI với theme midnight-aurora.");
-        return;
-      }
-      const action = args.trim().toLowerCase() || "auto";
-      if (!["auto", "off", "status"].includes(action)) {
-        ctx.ui.notify("Dùng /aurora-adapt [auto|off|status]", "warning");
-        return;
-      }
-      if (!adaptive) {
-        ctx.ui.notify("Aurora adaptive chưa khởi tạo. Thử /reload.", "warning");
-        return;
-      }
-      const controller = adaptive;
-      if (action === "off") controller.disable();
-      else if (action === "auto") await controller.enable();
-      if (adaptive === controller) ctx.ui.notify(controller.status(), "info");
-    },
-  });
-
   pi.registerCommand("aurora-themes", {
     description: "Chọn theme nhanh",
     handler: async (_args, ctx) => {
@@ -229,7 +180,6 @@ export default function (pi: ExtensionAPI) {
       const chosen = await ctx.ui.select("🎨  Chọn theme:", names);
       if (!chosen) return;
       const r = ctx.ui.setTheme(chosen);
-      if (r.success) void adaptive?.refresh();
       ctx.ui.notify(r.success ? `✓ Theme: ${chosen}` : `✗ ${r.error}`, r.success ? "info" : "error");
     },
   });
@@ -242,7 +192,6 @@ export default function (pi: ExtensionAPI) {
       const chosen = await ctx.ui.select("🎨  Chọn theme:", names);
       if (!chosen) return;
       const r = ctx.ui.setTheme(chosen);
-      if (r.success) void adaptive?.refresh();
       if (r.success) ctx.ui.notify(`✓ ${chosen}`, "info");
     },
   });
@@ -394,10 +343,6 @@ class AuroraEditor extends CustomEditor {
       const name = shortModel(m.id);
       rParts.push({ raw: name, styled: t.fg("accent", name) });
     }
-    if (t.auroraAdaptive) {
-      const raw = `◈ auto:${t.auroraAdaptive.appearance}`;
-      rParts.push({ raw, styled: t.fg("muted", raw) });
-    }
 
     let lv: string | undefined;
     try { lv = this.piRef.getThinkingLevel(); } catch { /* extension api may be stale during session replacement */ }
@@ -406,7 +351,7 @@ class AuroraEditor extends CustomEditor {
         minimal: "◌", low: "◔", medium: "◑", high: "◕", xhigh: "●",
       };
       const colors: Record<string, string> = {
-        minimal: "dim", low: "muted", medium: "thinkingMedium", high: "thinkingHigh", xhigh: "thinkingXhigh",
+        minimal: "dim", low: "muted", medium: "border", high: "accent", xhigh: "error",
       };
       const badge = `${dots[lv] ?? "?"} ${lv}`;
       rParts.push({ raw: badge, styled: t.fg(colors[lv] ?? "muted", badge) });
@@ -476,51 +421,6 @@ class AuroraEditor extends CustomEditor {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
-
-function startAdaptiveAurora(ctx: any, tui: any): AdaptiveController {
-  const source: AuroraSource = JSON.parse(readFileSync(new URL("../themes/midnight-aurora.json", import.meta.url), "utf8"));
-  const split = (colors: Record<string, string>) => {
-    const foregrounds: Record<string, string> = {}, backgrounds: Record<string, string> = {};
-    for (const [token, value] of Object.entries(colors)) {
-      (BACKGROUND_TOKENS.has(token) ? backgrounds : foregrounds)[token] = value;
-    }
-    return [foregrounds, backgrounds] as [ConstructorParameters<typeof Theme>[0], ConstructorParameters<typeof Theme>[1]];
-  };
-  const [defaultFg, defaultBg] = split(Object.fromEntries(Object.keys(source.colors).map((token) => [token, ""])));
-  // "" uses Pi's reported terminal default colors, or Pi's light/dark guess.
-  // This probe has no fixed colors, so appearance follows the terminal too.
-  const defaults = new Theme(defaultFg, defaultBg, getTerminalColorMode());
-  return createAdaptiveController({
-    source,
-    active: () => ctx.ui.theme,
-    fallbackBackground: () => colorToHex(defaults.colors.selectedBg),
-    queryBackground: typeof tui.queryTerminalColors === "function" ? async (onLate) => {
-      const colors = await tui.queryTerminalColors({
-        timeoutMs: 100,
-        onLateReply: (reply: any) => {
-          if (reply.background) onLate(rgbHex(reply.background));
-        },
-      });
-      return colors.background ? rgbHex(colors.background) : undefined;
-    } : undefined,
-    apply: (generated, reported) => {
-      const [fg, bg] = split(generated.colors);
-      const next = Object.assign(new Theme(fg, bg, getTerminalColorMode(), {
-        name: source.name,
-        appearance: generated.appearance,
-      }), { auroraAdaptive: { background: generated.background, appearance: generated.appearance, reported } });
-      return ctx.ui.setTheme(next).success ? next : undefined;
-    },
-    restore: () => {
-      const original = ctx.ui.getTheme(source.name);
-      if (original) ctx.ui.setTheme(original);
-    },
-  });
-}
-
-function rgbHex(rgb: { r: number; g: number; b: number }): string {
-  return "#" + [rgb.r, rgb.g, rgb.b].map((c) => Math.round(c).toString(16).padStart(2, "0")).join("");
-}
 
 function isFullscreenTui(tui: any): boolean {
   try {
@@ -702,7 +602,7 @@ function showBanner(ctx: any) {
         t.fg("borderAccent", "╭" + "─".repeat(w) + "╮"),
         row("◈  Pi Coding Agent", "accent", true),
         row(time, "text"),
-        row(`Theme: ${t.name || "unknown"}${t.auroraAdaptive ? ` · auto:${t.auroraAdaptive.appearance}` : ""}`, "muted"),
+        row(`Theme: ${t.name || "unknown"}`, "muted"),
         t.fg("borderAccent", "╰" + "─".repeat(w) + "╯"),
       ];
     },

@@ -21,14 +21,7 @@ Suite Wiki có 39 test pass trên Node v24.21.0. Đây không phải minimum sup
 | `wiki-rules.test.mjs` | Path classification, outside-root rejection, discovery/missing sections, IDs/origin lint, scaffold idempotency, symlink escape |
 | `wiki-links.test.mjs` | Checked-in Wiki links, file/Unicode/duplicate anchors, punctuation, traversal/encoding, reserved sources, symlink target/root |
 
-Ngoài Wiki:
-
-- `tests/aurora/aurora-ui.test.mjs`: host-mocked banner/theme changes/width/cleanup, headless/RPC, editor tokens, adaptive adapter polling/off/auto/status.
-- `tests/aurora/adaptive-controller.test.mjs`: theme ownership, query dedup/unsupported/rejection, cached/fallback background, off/auto, dispose và late replies.
-- `tests/theme/midnight-aurora.test.mjs`: static variable resolution, dark appearance, WCAG ≥4.5:1 và hierarchy với `vars.bg` là nền terminal dự kiến.
-- `tests/theme/aurora-adaptive.test.mjs`: palette bất biến, đầu ra tối/sáng/tinted/dải xám, hue/chroma và WCAG ≥4.5:1 trên nền được cung cấp; lượng tử 8-bit có dung sai, hue gần đen/trắng không được so sánh.
-
-Contrast audit chỉ áp dụng sRGB cụ thể, không gồm wallpaper/transparency hoặc xấp xỉ 256 màu. Engine adaptive không thay HTML export; export vẫn lấy theme JSON.
+Ngoài Wiki, `tests/aurora/aurora-ui.test.mjs` kiểm banner/theme changes/width/cleanup, headless picker và editor tokens bằng host giả lập; `tests/theme/midnight-aurora.test.mjs` kiểm variable resolution, dark appearance, WCAG ≥4.5:1 cho các cặp chữ/nền khai báo và phân cấp dim/muted/text. Contrast audit chỉ áp dụng màu sRGB cụ thể, với `vars.bg` là nền terminal dự kiến; không bảo đảm nền terminal khác hoặc 256 màu.
 
 Gaps: chưa kiểm đầy đủ Wiki snapshot/no-op/interrupted metadata, semantic classification bằng model thật, OAuth/account/network, Aurora trên host TUI thật hoặc theme schema. JSON parse chỉ kiểm syntax. Suite không chứng minh mọi rule được viết đúng nghĩa, mọi generated claim chính xác, hoặc mọi host Pi version tương thích. Không có test CI job trong workflow PR review đã inspect.
 
@@ -78,7 +71,7 @@ Chỉ hai command Wiki được register. Kiểm tra guards bằng fixtures tron
 - Login/list/switch/delete-one/delete-active/delete-all/cancel; kiểm tra fallback OpenCode có thể khiến usage xuất hiện lại sau delete. Không đọc credential thật trong Wiki run.
 - Aurora: startup banner tự ẩn, ít nhất ba dòng editor, autocomplete còn nguyên, footer statuses không trùng usage; thử terminal hẹp/rộng và fullscreen/non-fullscreen.
 - Git: repo sạch/modified/untracked/conflict và non-repo; Git lỗi phải mất badge thay vì crash.
-- Theme picker/shortcut/cancel và theme đang active; JSON/schema/render. Banner phải phản ánh tên/màu mới ngay cả khi đổi theme trong 5 giây đầu. Thử `system` (không bị adaptive can thiệp) và `midnight-aurora` trên nền tối/sáng; extension không tự chọn theme. Kiểm nhãn auto:dark/light, `/aurora-adapt status`, off/auto, đổi nền và chờ 3 giây. Query không trả nền phải báo nền dự đoán/giữ nền cũ và không query lặp vô hạn.
+- Theme picker/shortcut/cancel và theme đang active; JSON/schema/render. Banner phải phản ánh tên/màu mới ngay cả khi đổi theme trong 5 giây đầu. Thử `system` trên nền sáng/tối và `midnight-aurora` trên nền tối; extension không tự đổi lựa chọn.
 - Shutdown/reload/session replacement: timers/subscriptions/status/widget cleanup; kiểm tra global/cache/pending và timeout details còn sống như [lifecycle gaps](../extensions/catalog.md#contract-dùng-chung-với-aurora).
 - Print/JSON/headless không crash vì UI thiếu. Theme command/shortcut có hasUI guard và regression tests với host giả lập; vẫn cần kiểm tra các mode trên host thật.
 
