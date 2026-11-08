@@ -75,7 +75,7 @@ Khi sửa auth adapter, kiểm tra legacy/runtime path và account switch thật
 
 ## Aurora UI
 
-Ownership `packages/pi-learn-extensions/extensions/aurora-ui.ts`: editor/footer, banner, badge context/model/thinking/session/cwd/Git, working message và theme picker. Theme resource riêng, không được bật tự động bởi banner.
+Ownership `packages/pi-learn-extensions/extensions/aurora-ui.ts`: editor/footer, banner, badge context/model/thinking/session/cwd/Git, working message, theme picker, **sidebar và `/tree-v2`**. Helpers ở `extensions/aurora/`, không có index/manifest và không auto-load riêng; Aurora đăng ký một lần. Theme resource riêng, không được bật tự động bởi banner.
 
 ### Lifecycle và rendering
 
@@ -92,6 +92,14 @@ Editor giữ content/autocomplete từ super.render(), thay viền trên/dưới
 - Viền dưới đọc [global contract](#contract-dùng-chung-với-aurora), không tự fetch auth/network. Màu theo remaining ≤5 error, ≤25 warning; stale thêm cached.
 - `agent_start`/tool events đặt working message tiếng Việt; model_select notify provider/id; tool error notify thất bại. Các hooks có hasUI guard.
 - `/aurora-themes` và `ctrl+shift+t` dùng getAllThemes/select/setTheme và có hasUI guard. Command không có UI in hướng dẫn chọn theme; shortcut không có UI bỏ qua. Picker không tự ghi settings trong extension và không đổi theme khi cancel.
+
+### Sidebar và cây phiên v2
+
+- `/sidebar` hoặc nút ≡ trên editor bật list câu hỏi rộng 33 cột trái/phải. Click chỉ cuộn transcript, không đổi leaf/gửi prompt. Mặc định đóng; fullscreen mới có mouse, dưới 84 cột tự ẩn. Compositor giữ editor/footer gốc, dọn widget/timer/output shim khi shutdown/reload.
+- `/tree-v2` lấy cây thật từ session trong bộ nhớ, thu toàn bộ xử lý user cũ nhưng giữ câu hỏi và nhánh. Chỉ user cuối ancestry của leaf mở sẵn. Assistant một dòng ngay trên header; tool call/result chỉ tiêu đề, thinking gom thu sẵn; các sự kiện lùi thêm 2 cột. Không timestamp/tool output/số lỗi.
+- **Enter điều hướng thật qua `ctx.navigateTree()`**, gồm từ kết quả tìm. User khôi phục text vào editor nếu trống, non-user tiếp tục sau entry. Space/click chỉ đọc/thu bung. `/tree` gốc giữ nguyên. Hộp summary có no-summary mặc định; tóm tắt chủ động có thể gọi model/ghi branch summary theo host. Hủy quay lại selection, leaf hiện tại no-op; sample không chuyển session thật.
+- Nền panel/selection dùng `customMessageBg`/`selectedBg`, chữ/rail/thinking/tool/error dùng tokens active, không palette RGB riêng; đổi theme đọc lại mỗi render, giữ default/256 semantics.
+- Private Pi 1.5.0 layout/UserMessage và workaround VTE 0.84.x là compatibility boundary, không patch core/settings. Chi tiết ở `packages/pi-learn-extensions/extensions/aurora/README.md`. `test:navigation` cần Pi đã cài; `test:navigation:pty` thêm pexpect, chỉ fixture/HOME tạm offline.
 
 Điểm mở rộng: tool label map, badge layout, footer statuses và theme tokens. Giữ cleanup, width bounds, autocomplete và [usage contract](#contract-dùng-chung-với-aurora) khi thay editor. `tests/aurora/aurora-ui.test.mjs` kiểm banner, live theme tokens, width, cleanup và headless picker với host giả lập; vẫn cần thử terminal hẹp/fullscreen thủ công.
 

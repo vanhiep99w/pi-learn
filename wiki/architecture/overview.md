@@ -27,7 +27,7 @@ Public entrypoints:
 
 - `extensions/wiki/index.ts` → đăng ký commands và lifecycle Wiki.
 - `extensions/chatgpt-usage-status/index.ts` → account commands, usage producer.
-- `extensions/aurora-ui.ts` → editor/footer, usage consumer, theme picker.
+- `extensions/aurora-ui.ts` → editor/footer, usage consumer, theme picker, sidebar và `/tree-v2`; helpers nội bộ ở `extensions/aurora/` không có index/manifest nên không auto-load riêng.
 - Theme resource: `themes/midnight-aurora.json`.
 
 Các path trên tương đối với `packages/pi-learn-extensions/`. Helper Wiki không là standalone extension. Khi đổi manifest/path cần giữ root và subpackage cùng trỏ vào source thật; không import private/removed sibling runtimes.

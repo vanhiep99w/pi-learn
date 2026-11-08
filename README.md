@@ -9,7 +9,8 @@ packages/pi-learn-extensions/
 ├── extensions/
 │   ├── wiki/                    # /wiki và /wiki-update
 │   ├── chatgpt-usage-status/    # trạng thái usage ChatGPT
-│   └── aurora-ui.ts             # editor/footer/status tùy biến
+│   ├── aurora-ui.ts             # editor/footer/status + sidebar + /tree-v2
+│   └── aurora/                  # helper nội bộ, không auto-load riêng
 └── themes/
     └── midnight-aurora.json
 
@@ -89,11 +90,18 @@ Credential được lưu local bởi Pi/extension, không nằm trong repository
 
 ## Aurora UI và theme
 
-Aurora UI cung cấp startup banner, editor/footer/status tùy biến, thông tin cwd/git và command:
+Aurora UI cung cấp startup banner, editor/footer/status tùy biến, thông tin cwd/git, sidebar danh sách câu hỏi và cây phiên gọn:
 
 ```txt
 /aurora-themes
+/sidebar
+/tree-v2
 ```
+
+- Nút **≡** trên ô nhập bật/tắt sidebar; click câu hỏi chỉ cuộn transcript, không đổi nhánh.
+- `/tree-v2`: câu cũ chỉ hiện nội dung user, câu hiện tại mở xử lý lùi 2 cột; assistant chỉ một dòng `assistant: đoạn trích…`, tools chỉ tiêu đề.
+- **Enter chuyển vị trí thật như `/tree`**, Space/click mới bung/thu chi tiết. `/tree` gốc giữ nguyên. Có lựa chọn tóm tắt nhánh trước khi chuyển.
+- Hai tính năng đã nằm trong Aurora, **không cần nạp `.pi/demos/sidebar-demo` bằng `-e`**. Không nạp đồng thời demo cũ để tránh trùng sidebar. Chi tiết/phím/giới hạn: [Aurora navigation](packages/pi-learn-extensions/extensions/aurora/README.md).
 
 Aurora dùng màu của theme đang active, không tự đổi lựa chọn của bạn. Để hòa hợp với bảng màu terminal và tự thích nghi sáng/tối, chọn **`system`** trong `/settings → Theme`. Đây là theme mặc định của Pi khi chưa cấu hình theme.
 
@@ -131,6 +139,13 @@ npm --prefix packages/pi-learn-extensions test
 ```
 
 Chạy riêng bằng `run test:wiki`, `run test:aurora` hoặc `run test:theme`. Tests Aurora dùng host giả lập; contrast tests kiểm màu sRGB đã khai báo, không thay kiểm tra trực quan trong terminal.
+
+Kiểm thêm sidebar/tree trên Pi đã cài (PTY cần Python `pexpect`):
+
+```bash
+npm --prefix packages/pi-learn-extensions run test:navigation
+npm --prefix packages/pi-learn-extensions run test:navigation:pty
+```
 
 Sau thay đổi extension/theme:
 

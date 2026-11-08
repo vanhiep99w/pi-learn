@@ -11,6 +11,17 @@ export class CustomEditor {
 }
 `;
 const tui = `
+// Navigation has its own real-pi-tui suite; these doubles only host registration.
+export class Container { children = []; addChild(child) { this.children.push(child); } }
+export class Box extends Container {}
+export class HStack extends Container {}
+export class ScrollView extends Container {}
+export class MouseRegion { constructor(component, handler) { this.component = component; this.handler = handler; } }
+export class Input {}
+export const isViewportTUI = () => false;
+export const matchesKey = () => false;
+export const stripTerminalSequences = (text) => strip(text);
+export const wrapTextWithAnsi = (text) => [text];
 const strip = (s) => s.replace(/\\x1b\\[[0-9;]*m/g, "");
 const columns = (c) => /[\\u3400-\\u9fff]|\\p{Extended_Pictographic}/u.test(c) ? 2 : 1;
 export const visibleWidth = (s) => [...strip(s)].reduce((n, c) => n + columns(c), 0);
@@ -69,7 +80,10 @@ function fixture(t, initialTheme = makeTheme("system")) {
   };
   const ctx = { hasUI: true, ui, cwd: "/fixture/project", getContextUsage: () => null };
   const pi = {
-    on: (name, handler) => events.set(name, handler),
+    on: (name, handler) => {
+      const previous = events.get(name);
+      events.set(name, previous ? async (...args) => { await previous(...args); await handler(...args); } : handler);
+    },
     registerCommand: (name, options) => commands.set(name, options.handler),
     registerShortcut: (name, options) => shortcuts.set(name, options.handler),
     exec: async () => ({ code: 1, stdout: "" }),
@@ -160,4 +174,14 @@ test("editor borders use live theme tokens without replacing input", async (t) =
   assert.ok(lines[0].includes("\x1b[33m"));
   assert.ok(!lines[0].includes("\x1b[36m"));
   assert.ok(lines.includes("input"));
+});
+
+test("Aurora registers the two promoted navigation features once without registering legacy/native tree commands",async(t)=>{
+  const f=fixture(t);
+  assert.deepEqual([...f.commands.keys()].sort(),["aurora-themes","sidebar","tree-v2"]);
+  assert(!f.commands.has("tree"));assert(!f.commands.has("tree-demo"));
+  const ctx={hasUI:false,mode:"print",get ui(){throw Error("headless navigation must not read UI");}};
+  const output=t.mock.method(console,"log",()=>{});
+  await f.commands.get("sidebar")("",ctx);await f.commands.get("tree-v2")("",ctx);
+  assert.equal(output.mock.callCount(),2);
 });

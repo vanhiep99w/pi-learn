@@ -1,6 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import registerSidebar from "./aurora/sidebar.ts";
+import registerSessionTree from "./aurora/tree-command.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Aurora UI Extension — Horizontal Borders + Custom Footer
@@ -11,6 +13,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 //  • Minimal footer: chỉ hiển thị extension statuses
 //  • Custom working messages cho tool execution
 //  • /aurora-themes, Ctrl+Shift+T
+//  • Theme-aware prompt sidebar + /tree-v2 native session navigation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 type GitWorkingTreeStats = {
@@ -23,6 +26,8 @@ type GitWorkingTreeStats = {
 };
 
 export default function (pi: ExtensionAPI) {
+  registerSidebar(pi);
+  registerSessionTree(pi);
   let gitBranch: string | null = null;
   let gitStats: GitWorkingTreeStats | null = null;
   let refreshingGitStats = false;
