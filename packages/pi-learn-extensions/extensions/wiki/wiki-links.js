@@ -1,15 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isWikiDocumentationPath } from "./wiki-rules.js";
+import { wikiHeadings } from "./wiki-headings.js";
 
 const MARKDOWN_LINK_PATTERN = /\[([^\]]*)\]\(([^)]+)\)/gu;
-const HEADING_PATTERN = /^(#{1,6})\s+(.+?)\s*#*\s*$/u;
 
 /**
  * Validate relative Markdown links between files under the Wiki root.
  * External links and images are intentionally ignored.
+ * @param {{projectRoot: string, wikiDir?: string, includePath?: (path: string, directory: boolean) => boolean, includeTarget?: (path: string, directory: boolean, hasAnchor: boolean) => boolean, readContent?: (absolutePath: string) => string}} options
  */
-export function validateWikiInternalLinks({ projectRoot, wikiDir = "wiki" }) {
+export function validateWikiInternalLinks({ projectRoot, wikiDir = "wiki", includePath, includeTarget, readContent }) {
   const normalizedWikiDir = normalizeRepositoryPath(wikiDir);
   const wikiRoot = path.resolve(projectRoot, normalizedWikiDir);
   const report = {
@@ -28,13 +29,13 @@ export function validateWikiInternalLinks({ projectRoot, wikiDir = "wiki" }) {
   if (!isPathInside(projectRootReal, wikiRootReal)) {
     throw new Error(`${normalizedWikiDir}/ resolves outside the project root.`);
   }
-  const sourcePaths = collectDocumentationFiles(wikiRoot, normalizedWikiDir);
+  const sourcePaths = collectDocumentationFiles(wikiRoot, normalizedWikiDir, includePath);
   const headingCache = new Map();
 
   for (const sourcePath of sourcePaths) {
     report.filesScanned += 1;
     const sourceAbsolutePath = path.resolve(projectRoot, sourcePath);
-    const content = fs.readFileSync(sourceAbsolutePath, "utf8");
+    const content = readContent ? readContent(sourceAbsolutePath) : fs.readFileSync(sourceAbsolutePath, "utf8");
     const sourceAnchors = getHeadingAnchors(sourceAbsolutePath, content, headingCache);
 
     for (const link of extractMarkdownLinks(content)) {
@@ -48,6 +49,9 @@ export function validateWikiInternalLinks({ projectRoot, wikiDir = "wiki" }) {
         wikiDir: normalizedWikiDir,
         wikiRootReal,
         headingCache,
+        includePath,
+        includeTarget,
+        readContent,
       });
       if (issue) report.issues.push(issue);
     }
@@ -75,6 +79,9 @@ function validateLink({
   wikiDir,
   wikiRootReal,
   headingCache,
+  includePath,
+  includeTarget,
+  readContent,
 }) {
   const href = stripOptionalLinkTitle(rawHref.trim());
   if (!href || isExternalHref(href)) return null;
@@ -107,6 +114,12 @@ function validateLink({
     return createIssue(sourcePath, line, rawHref, "points outside the wiki root");
   }
 
+  const allowedTarget = includeTarget
+    ? includeTarget(candidate, linkPath.endsWith("/"), Boolean(anchor))
+    : !includePath || includePath(candidate, linkPath.endsWith("/"));
+  if (!allowedTarget) {
+    return createIssue(sourcePath, line, rawHref, "targets a reserved or excluded Wiki path");
+  }
   const targetAbsolutePath = path.resolve(projectRoot, candidate);
   let targetInfo;
   try {
@@ -137,7 +150,7 @@ function validateLink({
   }
   if (!anchor) return null;
 
-  const targetAnchors = getHeadingAnchors(targetAbsolutePath, undefined, headingCache);
+  const targetAnchors = getHeadingAnchors(targetAbsolutePath, undefined, headingCache, readContent);
   if (targetAnchors.has(anchor)) return null;
   return createIssue(
     sourcePath,
@@ -147,14 +160,15 @@ function validateLink({
   );
 }
 
-function collectDocumentationFiles(absoluteDirectory, repositoryDirectory) {
+function collectDocumentationFiles(absoluteDirectory, repositoryDirectory, includePath) {
   const files = [];
   for (const entry of fs.readdirSync(absoluteDirectory, { withFileTypes: true })) {
     if (entry.isSymbolicLink() || entry.name.startsWith(".")) continue;
     const repositoryPath = path.posix.join(repositoryDirectory, entry.name);
     const absolutePath = path.join(absoluteDirectory, entry.name);
+    if (includePath && !includePath(repositoryPath, entry.isDirectory())) continue;
     if (entry.isDirectory()) {
-      files.push(...collectDocumentationFiles(absolutePath, repositoryPath));
+      files.push(...collectDocumentationFiles(absolutePath, repositoryPath, includePath));
     } else if (entry.isFile() && isWikiDocumentationPath(repositoryPath)) {
       files.push(repositoryPath);
     }
@@ -174,31 +188,13 @@ function extractMarkdownLinks(content) {
   return links;
 }
 
-function getHeadingAnchors(absolutePath, knownContent, cache) {
+function getHeadingAnchors(absolutePath, knownContent, cache, readContent) {
   const cached = cache.get(absolutePath);
   if (cached) return cached;
-  const content = knownContent ?? fs.readFileSync(absolutePath, "utf8");
-  const counts = new Map();
-  const anchors = new Set();
-  for (const line of content.split(/\r?\n/u)) {
-    const match = HEADING_PATTERN.exec(line);
-    if (!match) continue;
-    const base = slugifyHeading(match[2]);
-    if (!base) continue;
-    const count = counts.get(base) ?? 0;
-    counts.set(base, count + 1);
-    anchors.add(count === 0 ? base : `${base}-${count}`);
-  }
+  const content = knownContent ?? (readContent ? readContent(absolutePath) : fs.readFileSync(absolutePath, "utf8"));
+  const anchors = new Set(wikiHeadings(content).map((heading) => heading.anchor));
   cache.set(absolutePath, anchors);
   return anchors;
-}
-
-function slugifyHeading(value) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, "")
-    .replace(/\s/gu, "-");
 }
 
 function stripOptionalLinkTitle(href) {

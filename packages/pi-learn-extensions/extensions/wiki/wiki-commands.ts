@@ -14,10 +14,13 @@ import {
   isWikiDocumentationPath,
   isWikiInstructionsPath,
   isWikiMetadataPath,
-  isWikiRulePath,
+  isWikiPolicyPath,
+  isWikiDomainsPath,
   relativeProjectPath,
 } from "./wiki-rules.js";
 import { createWikiTaskPrompt } from "./wiki-prompt.js";
+import { WikiModelError, WikiReadModel, type WikiDiagnostic } from "./wiki-model.ts";
+import { readPolicyConfigText, WikiPolicyError } from "./wiki-policy.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -50,26 +53,32 @@ type ActiveWikiRun = {
   agentInterrupted?: boolean;
 };
 
-let activeWikiRun: ActiveWikiRun | null = null;
+type WikiRunState = { active: ActiveWikiRun | null };
 
-export function registerWikiCommands(pi: ExtensionAPI) {
+export interface WikiWriteAccess {
+  capture(cwd: string): () => void;
+}
+
+export function registerWikiCommands(pi: ExtensionAPI): WikiWriteAccess {
+  const state: WikiRunState = { active: null };
+  pi.on("session_start", () => { state.active = null; });
   pi.registerCommand("wiki", {
     description: "Generate initial repository Wiki docs with the current Pi agent",
     handler: async (args, ctx) => runWikiCommand(ctx, async () => {
-      await startDocumentationRun(pi, ctx, "init", args);
+      await startDocumentationRun(pi, ctx, "init", args, state);
     }),
   });
 
   pi.registerCommand("wiki-update", {
     description: "Update repository Wiki docs and applicable rules with the current Pi agent",
     handler: async (args, ctx) => runWikiCommand(ctx, async () => {
-      await startDocumentationRun(pi, ctx, "update", args);
+      await startDocumentationRun(pi, ctx, "update", args, state);
     }),
   });
 
   pi.on("tool_call", async (event, ctx) => {
     const toolName = event.toolName;
-    const currentRun = activeWikiRun?.cwd === ctx.cwd ? activeWikiRun : null;
+    const currentRun = state.active?.cwd === ctx.cwd ? state.active : null;
     const protectWikiBrief = currentRun !== null;
     const protectRules = currentRun?.command !== "update";
     if (toolName === "write" || toolName === "edit") {
@@ -77,7 +86,7 @@ export function registerWikiCommands(pi: ExtensionAPI) {
       if (isProtectedWikiMutationPath(ctx.cwd, candidate, { protectRules, protectWikiBrief })) {
         return {
           block: true,
-          reason: "Wiki metadata and the active run's wiki/INSTRUCTIONS.md are protected. _rules.md may be changed only during an active /wiki-update run; the agent chooses the applicable rule file from the user's intent.",
+          reason: "Wiki metadata and the active run's wiki/INSTRUCTIONS.md are protected. _rules.md and wiki/_domains.json may be changed only during an active /wiki-update run; the agent chooses the applicable policy from the user's intent.",
         };
       }
     }
@@ -94,7 +103,7 @@ export function registerWikiCommands(pi: ExtensionAPI) {
   });
 
   pi.on("agent_end", async (event, ctx) => {
-    const run = activeWikiRun;
+    const run = state.active;
     if (!run || run.cwd !== ctx.cwd) return;
     const finalAssistant = [...event.messages]
       .reverse()
@@ -103,10 +112,10 @@ export function registerWikiCommands(pi: ExtensionAPI) {
       && (finalAssistant.stopReason === "aborted" || finalAssistant.stopReason === "error");
   });
 
-  pi.on("agent_settled", async (_event, ctx) => {
-    const run = activeWikiRun;
+  pi.on("agent_settled", async (event, ctx) => {
+    const run = state.active;
     if (!run || run.cwd !== ctx.cwd) return;
-    activeWikiRun = null;
+    state.active = null;
 
     setWikiStatus(ctx, "Finalizing...");
     try {
@@ -117,37 +126,43 @@ export function registerWikiCommands(pi: ExtensionAPI) {
       const linksValid = linkReport.issues.length === 0;
       const ruleReport = discoverWikiPromptRules({ projectRoot: run.cwd });
       const rulesValid = ruleReport.valid;
-      const agentInterrupted = run.agentInterrupted === true;
+      const graphReport = validateWikiGraphForRun(run.cwd);
+      const valid = linksValid && rulesValid && graphReport.valid;
+      const agentInterrupted = event.aborted === true || run.agentInterrupted === true;
       const previousUpdate = await readLastUpdate(run.cwd);
       const clearInterruptedStatus = previousUpdate?.status === "interrupted";
-      if (linksValid && rulesValid && !agentInterrupted && (wikiChanged || clearInterruptedStatus)) {
+      if (valid && !agentInterrupted && (wikiChanged || clearInterruptedStatus)) {
         await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx), "complete");
-      } else if (!linksValid || !rulesValid || (agentInterrupted && wikiChanged)) {
+      } else if (!valid || (agentInterrupted && wikiChanged)) {
         await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx), "interrupted");
       }
 
       const parts = [
-        agentInterrupted
-          ? wikiChanged
-            ? `Wiki ${run.command} was aborted or failed after changing Wiki files; the run was marked interrupted.`
-            : `Wiki ${run.command} was aborted or failed with no Wiki changes; existing metadata was preserved.`
-          : wikiChanged
-            ? linksValid && rulesValid
+        !valid
+          ? `Wiki ${run.command} was marked interrupted because validation failed${wikiChanged ? " after changing files" : " with no Wiki changes"}.`
+          : agentInterrupted
+            ? wikiChanged
+              ? `Wiki ${run.command} was aborted or failed after changing Wiki files; the run was marked interrupted.`
+              : `Wiki ${run.command} was aborted or failed with no Wiki changes; existing metadata was preserved.`
+            : wikiChanged
               ? `Wiki ${run.command} completed; metadata updated.`
-              : `Wiki ${run.command} changed files but was marked interrupted because validation failed.`
-            : clearInterruptedStatus && linksValid && rulesValid
-              ? `Wiki ${run.command} completed with no changes; interrupted metadata cleared.`
-              : `Wiki ${run.command} completed with no changes.`,
+              : clearInterruptedStatus
+                ? `Wiki ${run.command} completed with no changes; interrupted metadata cleared.`
+                : `Wiki ${run.command} completed with no changes.`,
       ];
       if (scaffoldResult.created.length) {
         parts.push(`Created prompt-rule scaffold(s): ${scaffoldResult.created.join(", ")}.`);
       }
       if (!linksValid) parts.push(formatWikiLinkIssues(linkReport));
       if (!rulesValid) {
-        const details = ruleReport.errors.slice(0, 5).map((item) => `${item.path}: ${item.message}`).join("; ");
+        const details = ruleReport.errors.slice(0, 5).map((item: { path: string; message: string }) => `${item.path}: ${item.message}`).join("; ");
         parts.push(`Rule validation failed: ${details}`);
       }
-      notifyOrLog(ctx, parts.join(" "), linksValid && rulesValid && !agentInterrupted ? "info" : "warning");
+      if (!graphReport.valid) parts.push(formatGraphDiagnostics(graphReport.diagnostics, "error"));
+      if (graphReport.diagnostics.some((item) => item.severity === "warning")) {
+        parts.push(formatGraphDiagnostics(graphReport.diagnostics, "warning"));
+      }
+      notifyOrLog(ctx, parts.join(" "), valid && !agentInterrupted ? "info" : "warning");
     } catch (error) {
       notifyOrLog(ctx, `Wiki finalization failed: ${formatError(error)}`, "error");
     } finally {
@@ -156,8 +171,8 @@ export function registerWikiCommands(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
-    const run = activeWikiRun;
-    activeWikiRun = null;
+    const run = state.active;
+    state.active = null;
     try {
       if (run && run.cwd === ctx.cwd) {
         const snapshotAfter = await createWikiSnapshot(run.cwd);
@@ -172,6 +187,18 @@ export function registerWikiCommands(pi: ExtensionAPI) {
       setWikiStatus(ctx, undefined);
     }
   });
+  return {
+    capture(cwd) {
+      const run = state.active;
+      const check = () => {
+        if (!run || run.cwd !== cwd || state.active !== run) {
+          throw new WikiModelError("write_not_authorized", "Spec tools require the same active /wiki or /wiki-update run and cwd; authorization expires when that run ends.");
+        }
+      };
+      check();
+      return check;
+    },
+  };
 }
 
 async function startDocumentationRun(
@@ -179,6 +206,7 @@ async function startDocumentationRun(
   ctx: ExtensionCommandContext,
   command: "init" | "update",
   args: string,
+  state: WikiRunState,
 ) {
   if (!ctx.isIdle()) {
     notifyOrLog(ctx, "Agent is busy. Try again after the current run settles.", "warning");
@@ -198,7 +226,7 @@ async function startDocumentationRun(
   if (command === "init") assertPromptRulesValidForWikiRun(ctx.cwd);
   const context = await createRunContext(ctx.cwd, command);
   const snapshotBefore = await createWikiSnapshot(ctx.cwd);
-  activeWikiRun = { command, cwd: ctx.cwd, snapshotBefore };
+  state.active = { command, cwd: ctx.cwd, snapshotBefore };
 
   if (scaffoldResult.created.length) {
     notifyOrLog(ctx, `Created prompt-rule scaffold(s): ${scaffoldResult.created.join(", ")}.`, "info");
@@ -208,7 +236,7 @@ async function startDocumentationRun(
   try {
     pi.sendUserMessage(createWikiTaskPrompt(command, ctx.cwd, context, userMessage || null));
   } catch (error) {
-    activeWikiRun = null;
+    state.active = null;
     setWikiStatus(ctx, undefined);
     throw error;
   }
@@ -252,6 +280,10 @@ async function getUpdateNoopStatus(cwd: string): Promise<UpdateNoopStatus> {
     return { shouldSkip: false, reason: "internal Wiki links are invalid" };
   }
 
+  if (!validateWikiGraphForRun(cwd).valid) {
+    return { shouldSkip: false, reason: "Wiki schema or graph is invalid" };
+  }
+
   const lastUpdate = await readLastUpdate(cwd);
   if (!lastUpdate?.gitHead) return { shouldSkip: false, reason: "missing previous update git head" };
   if (lastUpdate.status === "interrupted") {
@@ -273,7 +305,7 @@ async function getUpdateNoopStatus(cwd: string): Promise<UpdateNoopStatus> {
   if (head !== lastUpdate.gitHead) {
     const changedPaths = await getChangedPathsSince(cwd, lastUpdate.gitHead);
     if (changedPaths.length === 0) return { shouldSkip: false, reason: "git head changed but changed paths are unavailable" };
-    if (changedPaths.some(isWikiRulePath)) return { shouldSkip: false, reason: "prompt rules changed" };
+    if (changedPaths.some(isWikiPolicyPath)) return { shouldSkip: false, reason: "prompt rules or domain configuration changed" };
     if (changedPaths.some((changedPath) => !isWikiDocumentationPath(changedPath) && !isWikiMetadataPath(changedPath))) {
       return { shouldSkip: false, reason: "source or configuration changed" };
     }
@@ -350,16 +382,39 @@ async function addWikiContentToSnapshot(
   }
 
   const repositoryPath = `${WIKI_DIR}/${relativePath}`;
-  if (!info.isFile() || (!isWikiDocumentationPath(repositoryPath) && !isWikiRulePath(repositoryPath))) return;
+  if (!info.isFile() || (!isWikiDocumentationPath(repositoryPath) && !isWikiPolicyPath(repositoryPath))) return;
   hash.update(`file:${repositoryPath}\0`);
-  hash.update(await readFile(absolutePath));
+  if (isWikiDomainsPath(repositoryPath)) {
+    try { hash.update(readPolicyConfigText(path.resolve(absolutePath, "../..")) ?? "missing-policy-config"); }
+    catch (error) { hash.update(`invalid-policy-config:${error instanceof WikiPolicyError ? error.code : "read_failed"}`); }
+  } else hash.update(await readFile(absolutePath));
   hash.update("\0");
+}
+
+function validateWikiGraphForRun(cwd: string): { valid: boolean; diagnostics: WikiDiagnostic[] } {
+  try {
+    // Per-check derived state: no session cache survives finalization/no-op checks.
+    return new WikiReadModel(cwd).validate();
+  } catch {
+    return { valid: false, diagnostics: [{
+      path: "wiki", code: "graph_validation_failed", severity: "error",
+      message: "Cannot safely complete Wiki schema/graph validation.",
+    }] };
+  }
+}
+
+function formatGraphDiagnostics(diagnostics: WikiDiagnostic[], severity: "error" | "warning"): string {
+  const selected = diagnostics.filter((item) => item.severity === severity);
+  // Paths/codes only: untrusted IDs or parser text must not overflow notifications.
+  const shown = selected.slice(0, 5).map((item) => `${item.path.slice(0, 180)} [${item.code}]`).join("; ");
+  const remaining = selected.length > 5 ? `; ${selected.length - 5} more` : "";
+  return `Wiki schema/graph ${severity === "error" ? "validation failed" : "warnings"}: ${shown}${remaining}. Run wiki_validate with scope graph for details. Structural completion is not review approval.`;
 }
 
 function assertPromptRulesValidForWikiRun(cwd: string) {
   const report = discoverWikiPromptRules({ projectRoot: cwd });
   if (report.valid) return;
-  const details = report.errors.slice(0, 5).map((item) => `${item.path}: ${item.message}`).join("; ");
+  const details = report.errors.slice(0, 5).map((item: { path: string; message: string }) => `${item.path}: ${item.message}`).join("; ");
   throw new Error(`Wiki cannot initialize while rule lint is invalid. Use /wiki-update to repair the applicable rules. ${details}`);
 }
 
@@ -369,7 +424,7 @@ function isProtectedWikiMutationPath(cwd: string, value: unknown, options: Prote
   if (typeof value !== "string") return false;
   const relative = relativeProjectPath(cwd, value);
   return relative !== undefined && (
-    (options.protectRules && isWikiRulePath(relative))
+    (options.protectRules && isWikiPolicyPath(relative))
     || isWikiMetadataPath(relative)
     || (options.protectWikiBrief && isWikiInstructionsPath(relative))
   );
@@ -377,7 +432,7 @@ function isProtectedWikiMutationPath(cwd: string, value: unknown, options: Prote
 
 function commandMutatesProtectedWikiPath(command: string, options: ProtectionOptions): boolean {
   const normalized = command.replace(/\\/g, "/");
-  const mentionsRules = options.protectRules && /wiki\/(?:[^\s'";&|>]+\/)*_rules\.md\b/.test(normalized);
+  const mentionsRules = options.protectRules && (/wiki\/(?:[^\s'";&|>]+\/)*_rules\.md\b/.test(normalized) || /wiki\/_domains\.json\b/i.test(normalized));
   const mentionsMetadata = /wiki\/\.last-update\.json\b/.test(normalized);
   const mentionsWikiBrief = options.protectWikiBrief && /wiki\/INSTRUCTIONS\.md\b/.test(normalized);
   if (!mentionsRules && !mentionsMetadata && !mentionsWikiBrief) return false;
@@ -401,7 +456,8 @@ async function getChangedPathsSince(cwd: string, ref: string): Promise<string[]>
 
 async function runGit(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync("git", args, { cwd, maxBuffer: 1024 * 1024 });
-  return stdout.trim();
+  // Preserve leading status columns: isMetadataStatusLine relies on Git's XY prefix.
+  return stdout.trimEnd();
 }
 
 async function runGitOrFallback(cwd: string, args: string[], fallback = "(unavailable)"): Promise<string> {

@@ -12,18 +12,26 @@ npm --prefix packages/pi-learn-extensions test
 node -e 'JSON.parse(require("node:fs").readFileSync("packages/pi-learn-extensions/themes/midnight-aurora.json", "utf8")); console.log("Theme JSON OK")'
 ```
 
-Suite Wiki có 39 test pass trên Node v24.21.0. Đây không phải minimum supported Node; manifest không khai báo engines. File .mts import TypeScript source nên runner phải hỗ trợ strip types; command tests dùng `node:module.registerHooks` để ánh xạ riêng import `wiki-prompt.js` sang source `.ts`, tương tự loader jiti của Pi.
+Suite Wiki có 148 test pass trên Node v26.9.0 sau khi thêm read model và read tools; 39 tests baseline cũng pass trên phiên bản này. Đây không phải minimum supported Node; manifest không khai báo engines. File .mts import TypeScript source nên runner phải hỗ trợ strip types; command tests dùng `node:module.registerHooks` để ánh xạ riêng import `wiki-prompt.js` sang source `.ts`, tương tự loader jiti của Pi.
 
 | Test source (trong `packages/pi-learn-extensions/tests/wiki/`) | Evidence được kiểm tra |
 |---|---|
-| `wiki-prompt.test.mts` | Hai command, message/brief, selective reading, plan/navigation contract, agent-directed intent/ownership, no injected Git context, bootstrap khớp AGENTS/CLAUDE |
-| `wiki-commands.test.mjs` | Guard theo command/cwd, init, update không từ khóa/không args, lint invalid, metadata/brief, thu hồi quyền sau settled/shutdown/lỗi gửi message, busy |
+| `wiki-prompt.test.mts` | Init khảo sát có thứ tự, working model trong context, không tool/runtime manuals, optional plan/brief, bootstrap setup riêng và khớp AGENTS/CLAUDE; update giữ lookup/fallback, scope/intent/ownership; cả hai giữ safety, evidence/review/no-migration và không inject Git |
+| `wiki-commands.test.mjs` | Guards/lifecycle hiện có; schema/graph trước no-op/finalization, clean-Git metadata-only status, invalid/no-change, warnings, interrupted repair, abort/error/retry/shutdown và giữ metadata khi không đổi |
 | `wiki-rules.test.mjs` | Path classification, outside-root rejection, discovery/missing sections, IDs/origin lint, scaffold idempotency, symlink escape |
 | `wiki-links.test.mjs` | Checked-in Wiki links, file/Unicode/duplicate anchors, punctuation, traversal/encoding, reserved sources, symlink target/root |
+| `wiki-model.test.mts` | Wiki-only index, guides/specs, metadata lookup, filtered search/pagination, typed/reverse graph, schema diagnostics, duplicate IDs, external/same-size edits, root isolation, symlinks/escapes, UTF-8/size limits và provenance |
+| `wiki-tools.test.mjs` | Sáu read tools/hai metadata tools/hai commands, active-run permits, cross-instance isolation, no legacy conversion, headless, scopes, safe rule lint, link targets không đọc protected text, JSON output budget/revision pagination, session/cwd replacement, sanitized YAML warnings và không mở quyền ghi; TypeBox host double |
+
+`wiki-routing.test.mjs` kiểm section Unicode/BOM/CRLF/fences/duplicate anchors, bounded heading lists, exact/prefix source scopes, nhiều owners và invalid schema, source không bị mở, domain selectors/ancestor union, opt-in legacy compatibility, config lỗi/symlinks và không leak policy text. Tool fixtures kiểm pagination section lớn/stale output; command fixtures kiểm config-only snapshot và invalid-config no-op/finalization/repair. Config không được tạo trong repo thật; chỉ fixture tests.
+
+`wiki-spec-writer.test.mts` kiểm source-paths create/add/remove qua YAML AST, comments/CRLF/body preservation và reject malformed scopes, ngoài exclusive create, strict authoring, duplicate/edge/cycle guards, revision conflicts, body/BOM/CRLF/comments/nested-field preservation, symlink/hardlink protection, cross-path create races, queued cancellation/run expiry và editor changes. Đây là filesystem fixtures, không chứng minh an toàn trước mọi external process race hoặc OS sandbox.
+
+Tests core ThinkRail nguyên bản được giữ trong `extensions/wiki/vendor/thinkrail-spec-graph/core/core.test.ts`. Chạy riêng bằng `npm --prefix packages/pi-learn-extensions run test:wiki:upstream` (cần Bun); tại Bun v1.3.14 có 55 pass và 2 skips cho Windows/case-folding không có trên host này. Node suite không tự chạy Bun. `npm --prefix packages/pi-learn-extensions run test:wiki:host` là 1 smoke test riêng dùng Pi v1.5.0 loader + TypeBox thật trên fixture cwd/agentDir, kiểm discovery một entrypoint, schemas, headless tools, command handler/finalization (transport giả lập), create/update qua real Pi file queue và factory replacement. Dùng `PI_TEST_BIN` khi Pi không trên PATH; `PI_TEST_WIKI_EXTENSION` có thể trỏ tới entrypoint trong artifact cài tạm. Không tạo LLM/provider/session hoặc đọc user auth/settings. Chưa kiểm TUI `/reload` thật, model behavior, mọi host version hoặc migration. Graph/schema đã được nối vào no-op/finalization; full snapshot/Git failure/concurrency cases vẫn chưa được kiểm hết.
 
 Ngoài Wiki, `tests/aurora/aurora-ui.test.mjs` kiểm banner/theme changes/width/cleanup, headless picker và editor tokens bằng host giả lập; `tests/theme/midnight-aurora.test.mjs` kiểm variable resolution, dark appearance, WCAG ≥4.5:1 cho các cặp chữ/nền khai báo và phân cấp dim/muted/text. Contrast audit chỉ áp dụng màu sRGB cụ thể, với `vars.bg` là nền terminal dự kiến; không bảo đảm nền terminal khác hoặc 256 màu.
 
-Gaps: chưa kiểm đầy đủ Wiki snapshot/no-op/interrupted metadata, semantic classification bằng model thật, OAuth/account/network, Aurora trên host TUI thật hoặc theme schema. JSON parse chỉ kiểm syntax. Suite không chứng minh mọi rule được viết đúng nghĩa, mọi generated claim chính xác, hoặc mọi host Pi version tương thích. Không có test CI job trong workflow PR review đã inspect.
+Gaps: chưa kiểm hết Wiki snapshot/Git failure/concurrency và interrupted-recovery cases ngoài fixtures đã nêu, semantic classification bằng model thật, OAuth/account/network, Aurora trên host TUI thật hoặc theme schema. JSON parse chỉ kiểm syntax. Suite không chứng minh mọi rule được viết đúng nghĩa, mọi generated claim chính xác, hoặc mọi host Pi version tương thích. Không có test CI job trong workflow PR review đã inspect.
 
 Muốn kiểm tra validators không ghi/scaffold files, từ root:
 

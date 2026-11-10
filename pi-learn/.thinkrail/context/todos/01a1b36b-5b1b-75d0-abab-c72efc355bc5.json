@@ -1,0 +1,51 @@
+{
+  "version": 6,
+  "todos": [],
+  "groups": [
+    {
+      "id": "g_98d13eb316d6",
+      "title": "Tài liệu kế hoạch nâng cấp Wiki sang Spec Graph",
+      "todos": [
+        {
+          "id": "t_6c174773b891",
+          "title": "Chốt baseline và nguồn tham chiếu cho thiết kế nâng cấp",
+          "status": "done",
+          "origin": "agent",
+          "createdAt": "2026-11-07T03:12:16.613Z",
+          "updatedAt": "2026-11-07T03:14:08.340Z",
+          "summary": "Đã kiểm tra prompt/lifecycle Wiki hiện tại và schema package, xác nhận bộ specs thử nghiệm đã được xóa. Đã kiểm tra nguồn ThinkRail tại commit cố định `519286befe0f15cc2dd270e251ecd8cdb9d0a01c`; tài liệu sẽ phân biệt rõ baseline, hướng đã thống nhất và API/thiết kế còn cần quyết định."
+        },
+        {
+          "id": "t_5bbf79fa5796",
+          "title": "Ghi đầy đủ thiết kế, migration và tiêu chí nghiệm thu",
+          "status": "done",
+          "origin": "agent",
+          "createdAt": "2026-11-07T03:12:16.613Z",
+          "updatedAt": "2026-11-07T03:32:52.630Z",
+          "note": "Bổ sung thiết kế _rules.md vừa thống nhất: policy domains, đọc có chọn lọc, migration và kiểm thử; chỉ sửa tài liệu đề xuất.",
+          "summary": "Tài liệu `docs/WIKI_SPEC_GRAPH_UPGRADE_PLAN.md` đã bao phủ thiết kế, migration, acceptance và 16 nhóm tham chiếu ThinkRail; bổ sung rõ thiết kế `_rules.md` theo yêu cầu mới.\n- Specs theo module; rules theo policy domains, không tự nhân bản theo folder mirror.\n- Rules chỉ được đọc trước edits theo source scope; tách khỏi normal spec index/search/get, dừng khi policy conflict.\n- Giữ ownership/guards, migration không đổi quyền ngầm; đồng bộ quyết định đã thống nhất, tests, acceptance và decision backlog.\n- Chỉ cập nhật tài liệu đề xuất, không sửa runtime hoặc các rule files thật.",
+          "verification": "- read docs/WIKI_SPEC_GRAPH_UPGRADE_PLAN.md (mục 15.1) → nội dung rules đầy đủ, vẫn ghi rõ chưa implement\n- grep rules decisions/tests/acceptance docs/WIKI_SPEC_GRAPH_UPGRADE_PLAN.md → 5 vị trí liên quan nhất quán\n- Automated tests → không chạy; chỉ đổi tài liệu, cwd cũ vẫn đã bị xóa",
+          "commitSubject": "Clarify policy-domain rules in the Wiki upgrade plan"
+        },
+        {
+          "id": "t_e856f74c6c0b",
+          "title": "Đưa tài liệu vào index và rà tính nhất quán của đề xuất",
+          "status": "done",
+          "origin": "agent",
+          "createdAt": "2026-11-07T03:12:16.613Z",
+          "updatedAt": "2026-11-07T03:23:03.290Z",
+          "summary": "Đã thêm tài liệu vào mục kế hoạch nội bộ của `docs/README.md`, ghi rõ chưa triển khai.\n- Làm rõ adapter bổ sung cho guides và quyền sửa normal specs ngoài active Wiki run.\n- Rà lại code fences, links baseline và permalink ThinkRail pin commit.\n- Review độc lập không phát hiện vấn đề material; reviewer không xác minh độc lập toàn bộ permalink upstream.\n- Không sửa runtime, rules, bootstrap, metadata hay phục hồi repo lồng đã xóa.",
+          "verification": "- read docs/README.md (mục kế hoạch nội bộ) → link tới tài liệu mới, có cảnh báo proposal\n- grep links/fences docs/WIKI_SPEC_GRAPH_UPGRADE_PLAN.md → fences theo cặp, source references dùng commit cố định\n- reviewer Agent → approve, không có material findings\n- Automated tests/git status/git diff → không chạy được vì cwd cũ đã bị xóa",
+          "commitSubject": "Index and review the Wiki Spec Graph upgrade plan",
+          "artifacts": [
+            {
+              "kind": "change",
+              "path": "docs/README.md"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": "## Summary\nTạo implementation brief bằng tiếng Việt cho việc nâng cấp extension Wiki sang hệ tri thức dựa trên Spec Graph, phục vụ triển khai sau này. Tài liệu phân biệt baseline hiện tại, hướng đã thống nhất, API đề xuất và quyết định còn mở; không thay behavior runtime. Đã bổ sung rõ vai trò và vòng đời `_rules.md` theo yêu cầu tiếp theo của người dùng.\n\n## Changes\n- Thêm `docs/WIKI_SPEC_GRAPH_UPGRADE_PLAN.md` với 21 phần: mục tiêu, content bar, module layout trong Wiki, schema/edges/source mapping, index, tools, selective reading, init/update, permissions/guards, rules hierarchy, migration, implementation map, tests, phases và acceptance.\n- Thêm 16 nhóm tham chiếu source ThinkRail pin tại commit `519286befe0f15cc2dd270e251ecd8cdb9d0a01c` để tra cứu reproducible khi implement.\n- Đưa tài liệu vào mục kế hoạch nội bộ của `docs/README.md`, ghi rõ chưa triển khai.\n- Làm rõ upstream core chỉ index specs, section-get/guide search/source mapping là phần mở rộng cần thiết kế; normal-doc editing ngoài active Wiki run không được vô tình bị đổi quyền.\n- Bổ sung mục 15.1: specs theo module, rules theo phạm vi chính sách; conditional loading theo source scope trước edits, không mirror mọi folder, không cho child policy override ngầm, không đưa reserved rules vào normal spec index/search/get.\n- Đồng bộ hướng rules đã thống nhất với tests, acceptance và decision backlog; yêu cầu migration giữ policy/IDs/guards, reconcile mâu thuẫn keyword opt-in hiện hành bằng quyền hợp lệ.\n- Không sửa source, protected rules, brief, metadata hoặc bootstrap; không phục hồi specs thử nghiệm hoặc repo lồng đã bị xóa.\n\n## Testing\n- Read/grep nội dung, headings, links baseline và fences → kiểm tra thủ công cấu trúc và tính nhất quán của tài liệu.\n- Đọc source Wiki hiện tại và fetch các tài liệu ThinkRail chính tại pinned commit → baseline và reference responsibilities được đối chiếu.\n- Review độc lập của bản ban đầu → approve, không có material issues; reviewer không xác minh độc lập toàn bộ permalink upstream.\n- Read mục 15.1 và grep năm vị trí rules decisions/tests/acceptance sau bổ sung → nhất quán, ghi rõ chưa implement.\n- Automated tests và git status/diff → chưa chạy được vì cwd của phiên `/home/hieptran/Desktop/pi-learn/pi-learn` đã bị xóa; dùng đường dẫn tuyệt đối để tạo và đọc hai file ở repo cha. Không có kết quả test runtime mới."
+}

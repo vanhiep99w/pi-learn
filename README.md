@@ -48,7 +48,7 @@ Sau khi cài hoặc cập nhật extension/theme, restart Pi hoặc chạy:
 
 ## Wiki repository
 
-Wiki dùng model, provider và filesystem tools hiện tại của Pi:
+Wiki dùng model/provider hiện tại của Pi, bổ sung tools tra cứu và metadata spec có kiểm soát; prose vẫn được sửa bằng filesystem tools hiện tại:
 
 ```txt
 /wiki [ghi chú thêm]
@@ -68,9 +68,11 @@ Wiki dùng model, provider và filesystem tools hiện tại của Pi:
 - Không có command hỏi Wiki riêng. Với câu hỏi về project, agent đọc `wiki/quickstart.md` một lần khi context hiện tại chưa có; câu hỏi không liên quan project thì không cần đọc.
 - Rule chỉ được load ngay trước khi agent cần sửa component/domain mà rule đó quản lý. Read-only question không bắt buộc load rule.
 - `wiki/INSTRUCTIONS.md` là brief tùy chọn để định hướng scope, ưu tiên và ngôn ngữ.
-- Extension tự kiểm tra internal Markdown links, rule layout và cập nhật `wiki/.last-update.json` sau khi run kết thúc.
+- Extension kiểm tra internal links, rule layout và schema/graph trước khi cập nhật `wiki/.last-update.json`. Graph lỗi chặn no-op và đánh dấu run `interrupted`, kể cả khi Wiki không đổi; hoàn tất không đồng nghĩa specs đã được review.
 
-Chi tiết: [`wiki/extensions/wiki-extension.md`](wiki/extensions/wiki-extension.md).
+Agent có sáu tools đọc: `wiki_search` (specs + guides), `wiki_get` (metadata mặc định, section khi chọn heading), `wiki_locate` (source path → declared spec owners), `wiki_rules` (rule paths theo opt-in `wiki/_domains.json`), `wiki_graph` (quan hệ có giới hạn) và `wiki_validate` (graph mặc định; links/rules/all khi chọn rõ). Không config thì giữ routing/scaffolding cũ; không tự chuyển đổi Wiki hoặc policy files. Hai tools `wiki_spec_create`/`wiki_spec_update` chỉ hoạt động trong active Wiki run cùng cwd: tạo draft mới hoặc sửa metadata với document revision, không sửa prose/ID và không ghi protected files. Wiki cũ giữ nguyên, không migration; vẫn search/get theo path được nhưng chưa có graph nodes. Sau update cần `/reload` đúng package đang dùng.
+
+Chi tiết và pagination: [`Wiki read tools`](wiki/extensions/wiki-extension.md#read-only-wiki-tools).
 
 ## ChatGPT usage status
 
@@ -132,9 +134,10 @@ pi install git:github.com/nicobailon/pi-web-access
 
 ## Kiểm thử và bảo trì
 
-Chạy toàn bộ tests (Wiki, Aurora UI và theme):
+Chạy toàn bộ tests từ source (Wiki, Aurora UI và theme); cài dependency runtime `yaml`, không cài bản sao Pi peers:
 
 ```bash
+npm install --ignore-scripts --omit=peer
 npm --prefix packages/pi-learn-extensions test
 ```
 

@@ -1,0 +1,166 @@
+--- a/core/index.ts
++++ b/core/index.ts
+@@ -1,3 +1,4 @@
++// Modified by Pi Learn: exports opt-in read-policy hooks; see ../README.md and ../pi-learn.patch.
+ export {
+ 	buildGraph,
+ 	LINK_KINDS,
+@@ -49,10 +50,12 @@
+ 	type SpecFilters,
+ } from "./query.ts";
+ export {
++	type DocumentFileRecord,
+ 	resolveSpecPath,
+ 	SPEC_FILE_EXTENSION,
+ 	type SpecFileRecord,
+ 	SpecIndex,
++	type SpecIndexOptions,
+ 	type SpecPathResolution,
+ } from "./store.ts";
+ export {
+--- a/core/store.ts
++++ b/core/store.ts
+@@ -1,3 +1,4 @@
++// Modified by Pi Learn: read-policy hooks, guide records and diagnostics; see ../pi-learn.patch.
+ import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+ import { isAbsolute, join, normalize, relative, sep, win32 } from "node:path";
+ import { buildGraph, type SpecGraph } from "./graph.ts";
+@@ -189,13 +190,32 @@
+ 	return relative(root, abs).split(sep).join("/");
+ }
+ 
++// Pi Learn patch: opt-in read policy hooks; default behavior remains upstream-compatible.
++export interface SpecIndexOptions {
++	includePath?: (relativePath: string, directory: boolean) => boolean;
++	readContent?: (absolutePath: string) => string;
++	onError?: (relativePath: string, operation: "list" | "stat" | "read", error: unknown) => void;
++	verifyContent?: boolean;
++	retainNonSpecs?: boolean;
++}
++
++export interface DocumentFileRecord {
++	abs: string;
++	rel: string;
++	content: string;
++	frontmatter: Frontmatter | null;
++}
++
+ export class SpecIndex {
+ 	private readonly root: string;
+ 	private readonly cache = new Map<string, CacheEntry>();
+ 	private graphCache: SpecGraph | null = null;
+-
+-	constructor(root: string) {
++	private documents: DocumentFileRecord[] = [];
++	private readonly options: SpecIndexOptions;
++
++	constructor(root: string, options: SpecIndexOptions = {}) {
+ 		this.root = root;
++		this.options = options;
+ 	}
+ 
+ 	absPath(rel: string): string {
+@@ -206,11 +226,13 @@
+ 		let dirents: import("node:fs").Dirent[];
+ 		try {
+ 			dirents = readdirSync(dir, { withFileTypes: true }) as import("node:fs").Dirent[];
+-		} catch {
++		} catch (error) {
++			this.options.onError?.(toRel(this.root, dir), "list", error);
+ 			return;
+ 		}
+ 		const candidates: WalkEntry[] = [];
+ 		for (const dirent of dirents) {
++			if (this.options.includePath && !this.options.includePath(toRel(this.root, join(dir, dirent.name)), dirent.isDirectory())) continue;
+ 			if (dirent.isDirectory()) {
+ 				if (!IGNORED_DIRS.has(dirent.name)) candidates.push(toWalkEntry(dirent.name, true));
+ 			} else if (dirent.isFile() && dirent.name.endsWith(SPEC_FILE_EXTENSION)) {
+@@ -228,6 +250,7 @@
+ 	private scan(): SpecFileRecord[] {
+ 		const seen = new Set<string>();
+ 		const specs: SpecFileRecord[] = [];
++		this.documents = [];
+ 		let changed = false;
+ 
+ 		for (const abs of this.walk(this.root)) {
+@@ -235,29 +258,36 @@
+ 			let stat: import("node:fs").Stats;
+ 			try {
+ 				stat = statSync(abs);
+-			} catch {
++			} catch (error) {
++				this.options.onError?.(toRel(this.root, abs), "stat", error);
++				if (this.cache.delete(abs)) changed = true;
+ 				continue;
+ 			}
+ 			let entry = this.cache.get(abs);
+-			if (!entry || entry.mtimeMs !== stat.mtimeMs || entry.size !== stat.size) {
++			if (this.options.verifyContent || !entry || entry.mtimeMs !== stat.mtimeMs || entry.size !== stat.size) {
+ 				let content: string;
+ 				try {
+-					content = readFileSync(abs, "utf8");
+-				} catch {
++					content = this.options.readContent ? this.options.readContent(abs) : readFileSync(abs, "utf8");
++				} catch (error) {
++					this.options.onError?.(toRel(this.root, abs), "read", error);
+ 					if (this.cache.delete(abs)) changed = true;
+ 					continue;
+ 				}
+-				const { frontmatter } = parseFile(content);
+-				entry = {
+-					rel: toRel(this.root, abs),
+-					mtimeMs: stat.mtimeMs,
+-					size: stat.size,
+-					content: isSpec(frontmatter) ? content : "",
+-					frontmatter,
+-				};
+-				this.cache.set(abs, entry);
+-				changed = true;
+-			}
++				if (!entry || entry.mtimeMs !== stat.mtimeMs || entry.size !== stat.size || entry.content !== content) {
++					const { frontmatter } = parseFile(content);
++					entry = {
++						rel: toRel(this.root, abs),
++						mtimeMs: stat.mtimeMs,
++						size: stat.size,
++						content: this.options.retainNonSpecs || isSpec(frontmatter) ? content : "",
++						frontmatter,
++					};
++					this.cache.set(abs, entry);
++					changed = true;
++				}
++			}
++			if (!entry) continue;
++			this.documents.push({ abs, rel: entry.rel, content: entry.content, frontmatter: entry.frontmatter });
+ 			const fm = entry.frontmatter;
+ 			if (isSpec(fm)) {
+ 				specs.push({ abs, rel: entry.rel, content: entry.content, frontmatter: fm });
+@@ -273,6 +303,12 @@
+ 
+ 		if (changed) this.graphCache = null;
+ 		return specs;
++	}
++
++	// Pi Learn patch: guides remain available without becoming graph nodes.
++	documentEntries(): DocumentFileRecord[] {
++		this.scan();
++		return this.documents;
+ 	}
+ 
+ 	graph(): SpecGraph {
+--- a/core/parse.ts
++++ b/core/parse.ts
+@@ -1,3 +1,4 @@
++// Modified by Pi Learn: suppress source-bearing YAML warnings, retain parse errors; see ../pi-learn.patch.
+ import { Document, isMap, isScalar, isSeq, parseDocument, parse as parseYaml } from "yaml";
+ 
+ export type FrontmatterValue = string | string[];
+@@ -107,7 +108,7 @@
+ 	if (fmText === null) return { frontmatter: null, body };
+ 	let loaded: unknown;
+ 	try {
+-		loaded = parseYaml(fmText);
++		loaded = parseYaml(fmText, { logLevel: "error" });
+ 	} catch {
+ 		return { frontmatter: null, body: content };
+ 	}

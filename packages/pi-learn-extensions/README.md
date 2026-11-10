@@ -37,12 +37,23 @@ themes/
 - Trong `/wiki-update`, agent tự phân loại yêu cầu và chọn `wiki/**/_rules.md` thuộc domain phù hợp cho chính sách lâu dài; không cần tên file hay từ khóa đặc biệt. Facts thuộc normal Wiki, chỉ thị một lần không được lưu; khi mơ hồ thì hỏi lại. Rule vẫn được bảo vệ ngoài lượt update.
 - Không có command hỏi Wiki riêng. Agent dùng block `Project Wiki` trong `AGENTS.md`/`CLAUDE.md`: chỉ đọc `wiki/quickstart.md` cho câu hỏi về project khi context chưa có, và chỉ đọc rule áp dụng ngay trước khi sửa component liên quan.
 - `wiki/INSTRUCTIONS.md` là brief do người dùng quản lý. `wiki/.last-update.json` do extension quản lý.
-- Sau mỗi run, extension kiểm tra link nội bộ và rule layout trước khi đánh dấu hoàn tất.
+- Trước no-op và sau run, extension kiểm tra link nội bộ, rule layout và schema/graph. Graph/schema lỗi không được skip hay đánh dấu complete; warnings không chặn hoàn tất và không tự promote draft. Legacy guides vẫn hợp lệ khi không có graph nodes.
+- Có sáu tools đọc: `wiki_search`, `wiki_get`, `wiki_locate`, `wiki_rules`, `wiki_graph`, `wiki_validate`, trên read model tái sử dụng core ThinkRail ở commit cố định. Graph/schema validation đã có trong no-op/finalization. Có hai tools metadata `wiki_spec_create`/`wiki_spec_update` chỉ trong active Wiki run cùng cwd; không migration hoặc tool xóa. Xem [provenance, license Apache-2.0 và patches](extensions/wiki/vendor/thinkrail-spec-graph/README.md).
+- Prompt init tập trung research/write/safety/validation, không manuals tools; bootstrap là bước setup riêng, plan file chỉ khi cần và chưa có, brief vắng được bỏ qua. Update vẫn có lookup guidance. Specs theo module thực, IDs/relations có evidence và status draft; giữ trang/canonical owners hiện có, không chuyển đổi/split/move/duplicate tài liệu. Update giữ tri thức lâu dài của task, không chép checklist/history hoặc tự xóa user plans.
+- `wiki_spec_create` không overwrite và luôn draft; `wiki_spec_update` dùng `wiki_get` → `data.revision` (không phải output revision), giữ nguyên prose bytes/comments/nested fields. Hết run/shutdown/replacement thì mất quyền ghi. Built-in write/edit với normal Wiki pages vẫn giữ quyền cũ; tools này không sửa rules/brief/metadata hoặc tự approve active/done.
+- Search mặc định `scope: "all"` để tìm cả specs và guides cũ; get nhận đúng một `id` hoặc Wiki-relative `path`, mặc định metadata + headings, chỉ trả verbatim section khi có `heading` (exact title/`#anchor`, title trùng dùng `occurrence`). Graph chỉ có nodes cho tài liệu có metadata spec; không tự chuyển guides thành specs.
+- `wiki_locate({sourcePath})` tìm tất cả spec owners có `source-paths` khớp literal file hoặc directory có `/` cuối; không mở source, không chọn winner hoặc theo rename. Create nhận `sourcePaths`; update dùng `addList`/`removeList` key `source-paths`. Không tự thêm metadata cho guides cũ.
+- `wiki_rules({paths, task})` trả rule paths theo opt-in `wiki/_domains.json`, không đọc policy bodies/cấp quyền ghi. Config chọn domains cho discovery/lint/scaffold; thiếu config giữ legacy final sections, config lỗi không fallback. Config được bảo vệ như rules ngoài active update. [Schema và ví dụ](../../wiki/extensions/wiki-extension.md#source-scope-và-policy-domains).
+- Validate mặc định `scope: "graph"`; `links`, `rules`, `all` là lựa chọn rõ ràng. Rule lint chỉ trả diagnostics, không trả nội dung policy và không tạo scaffold. Giới hạn tổng content + details 24 KiB/lượt; output lớn dùng JSON fragments có revision/continuation, không ghi bản đầy đủ ra file tạm.
 
 Test:
 
 ```bash
 npm --prefix packages/pi-learn-extensions run test:wiki
+# Optional: tests ThinkRail nguyên bản, cần Bun
+npm --prefix packages/pi-learn-extensions run test:wiki:upstream
+# Optional: Pi loader + TypeBox thật, cần Pi CLI đã cài
+npm --prefix packages/pi-learn-extensions run test:wiki:host
 ```
 
 ## ChatGPT usage status

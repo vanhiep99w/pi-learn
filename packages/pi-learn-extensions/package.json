@@ -6,6 +6,8 @@
   "scripts": {
     "test": "npm run test:wiki && npm run test:aurora && npm run test:theme",
     "test:wiki": "node --test tests/wiki/*.test.mjs tests/wiki/*.test.mts",
+    "test:wiki:upstream": "bun test ./extensions/wiki/vendor/thinkrail-spec-graph/core/core.test.ts",
+    "test:wiki:host": "node --test tests/wiki/wiki-host.smoke.mjs",
     "test:aurora": "node --test tests/aurora/*.test.mjs",
     "test:navigation": "node --test tests/navigation/*.test.mjs",
     "test:navigation:pty": "python3 tests/navigation/smoke.py && python3 tests/navigation/tree-smoke.py",
@@ -28,7 +30,8 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-ai": {
@@ -39,6 +42,9 @@
     },
     "@earendil-works/pi-tui": {
       "optional": true
+    },
+    "typebox": {
+      "optional": true
     }
   },
   "files": [
@@ -46,5 +52,8 @@
     "tests",
     "themes",
     "README.md"
-  ]
+  ],
+  "dependencies": {
+    "yaml": "2.9.1"
+  }
 }

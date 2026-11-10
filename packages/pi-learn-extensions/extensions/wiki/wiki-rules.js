@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { isWikiDomainsPath, readPolicyDomainConfig, safePolicyTarget, WIKI_DOMAINS_PATH } from "./wiki-policy.js";
+export { isWikiDomainsPath, WIKI_DOMAINS_PATH } from "./wiki-policy.js";
 
 export const WIKI_DIR = "wiki";
 export const WIKI_RULE_BASENAME = "_rules.md";
@@ -40,6 +42,10 @@ export function isWikiRulePath(value) {
     || (normalized.startsWith(`${WIKI_DIR}/`) && normalized.endsWith(`/${WIKI_RULE_BASENAME}`));
 }
 
+export function isWikiPolicyPath(value) {
+  return isWikiRulePath(value) || isWikiDomainsPath(normalizeRepositoryPath(value));
+}
+
 export function isWikiMetadataPath(value) {
   return normalizeRepositoryPath(value) === WIKI_METADATA_PATH;
 }
@@ -50,7 +56,7 @@ export function isWikiInstructionsPath(value) {
 
 export function isWikiTemporaryPath(value) {
   const normalized = normalizeRepositoryPath(value);
-  if (isWikiRulePath(normalized) || isWikiMetadataPath(normalized)) return false;
+  if (isWikiPolicyPath(normalized) || isWikiMetadataPath(normalized)) return false;
   if (normalized === WIKI_PLAN_PATH) return true;
   const segments = normalized.split("/");
   return segments.some((segment, index) => index > 0 && (segment.startsWith(".") || segment.startsWith("_")));
@@ -65,7 +71,10 @@ export function isWikiDocumentationPath(value) {
     && !isWikiTemporaryPath(normalized);
 }
 
-export function discoverWikiPromptRules({ projectRoot }) {
+// Optional read hooks let the public read-only tool enforce stricter path policy;
+// command/scaffold callers keep their existing behavior when hooks are absent.
+/** @param {{projectRoot: string, includePath?: (path: string, directory: boolean) => boolean, readRuleFile?: (absolutePath: string) => Buffer}} options */
+export function discoverWikiPromptRules({ projectRoot, includePath, readRuleFile }) {
   const root = path.resolve(projectRoot);
   const wikiRoot = path.join(root, WIKI_DIR);
   const report = {
@@ -95,8 +104,18 @@ export function discoverWikiPromptRules({ projectRoot }) {
   report.wikiExists = true;
 
   const sectionPaths = new Set([WIKI_DIR]);
-  walkWikiDirectory({ root, absoluteDir: wikiRoot, relativeDir: WIKI_DIR, sectionPaths, report });
-  report.sections = [...sectionPaths].sort(compareRulePaths);
+  walkWikiDirectory({ root, absoluteDir: wikiRoot, relativeDir: WIKI_DIR, sectionPaths, report, includePath });
+  let config;
+  report.mode = "legacy";
+  try {
+    config = readPolicyDomainConfig(root);
+    if (config) report.mode = "domains";
+  } catch (error) {
+    report.mode = "invalid";
+    report.errors.push({ path: WIKI_DOMAINS_PATH, code: error.code ?? "invalid_policy_config", message: "Cannot safely load policy-domain configuration; repair wiki/_domains.json before completion." });
+  }
+  report.sections = (config ? [WIKI_DIR, ...config.domains.map((domain) => path.posix.dirname(domain.rule))]
+    : report.mode === "invalid" ? [WIKI_DIR] : [...sectionPaths]).sort(compareRulePaths);
   report.files.sort(compareRulePaths);
   report.rootRuleExists = report.files.includes(`${WIKI_DIR}/${WIKI_RULE_BASENAME}`);
 
@@ -118,7 +137,11 @@ export function discoverWikiPromptRules({ projectRoot }) {
 
   const idsByFile = new Map();
   for (const rulePath of report.files) {
-    const lint = lintWikiPromptRuleFile({ projectRoot: root, rulePath });
+    if (config) {
+      try { safePolicyTarget(root, rulePath); }
+      catch { report.errors.push({ path: rulePath, code: "unsafe_policy_path", message: "Configured policy mode requires regular rule files without symlink components." }); continue; }
+    }
+    const lint = lintWikiPromptRuleFile({ projectRoot: root, rulePath, readRuleFile });
     report.errors.push(...lint.errors);
     report.warnings.push(...lint.warnings);
     idsByFile.set(rulePath, lint.ruleIds);
@@ -146,7 +169,8 @@ export function discoverWikiPromptRules({ projectRoot }) {
   return report;
 }
 
-export function lintWikiPromptRuleFile({ projectRoot, rulePath }) {
+/** @param {{projectRoot: string, rulePath: string, readRuleFile?: (absolutePath: string) => Buffer}} options */
+export function lintWikiPromptRuleFile({ projectRoot, rulePath, readRuleFile }) {
   const root = path.resolve(projectRoot);
   const normalized = normalizeRepositoryPath(rulePath);
   const result = { path: normalized, ruleIds: [], errors: [], warnings: [] };
@@ -199,7 +223,7 @@ export function lintWikiPromptRuleFile({ projectRoot, rulePath }) {
     return result;
   }
 
-  const buffer = fs.readFileSync(absolutePath);
+  const buffer = readRuleFile ? readRuleFile(absolutePath) : fs.readFileSync(absolutePath);
   if (buffer.includes(0)) {
     result.errors.push({ path: normalized, code: "nul_byte", message: `Prompt-rule file contains a NUL byte: ${normalized}.` });
     return result;
@@ -244,18 +268,36 @@ export function lintWikiPromptRuleFile({ projectRoot, rulePath }) {
 export function ensureWikiPromptRuleScaffolds({ projectRoot }) {
   const root = path.resolve(projectRoot);
   const wikiRoot = path.join(root, WIKI_DIR);
+  let config;
+  try {
+    config = readPolicyDomainConfig(root);
+    if (config) safePolicyTarget(root, `${WIKI_DIR}/${WIKI_RULE_BASENAME}`, true);
+  } catch {
+    // Do not silently fall back to legacy scaffolds for invalid opt-in configuration.
+    // Update can still run to repair it; discovery/finalization reports the error.
+    return { created: [], sections: [], mode: "invalid" };
+  }
   fs.mkdirSync(wikiRoot, { recursive: true });
-
-  const sections = discoverWikiSectionPaths({ projectRoot: root });
+  const sections = config ? [WIKI_DIR, ...config.domains.map((domain) => path.posix.dirname(domain.rule))].sort(compareRulePaths)
+    : discoverWikiSectionPaths({ projectRoot: root });
   const created = [];
+  if (config) {
+    try { for (const section of sections) safePolicyTarget(root, `${section}/${WIKI_RULE_BASENAME}`, true); }
+    catch { return { created, sections, mode: "invalid" }; }
+  }
   for (const section of sections) {
     const rulePath = `${section}/${WIKI_RULE_BASENAME}`;
-    const absolutePath = path.join(root, ...rulePath.split("/"));
-    if (fs.existsSync(absolutePath)) continue;
-    fs.writeFileSync(absolutePath, renderPromptRuleScaffold(section), { encoding: "utf8", flag: "wx" });
+    // Preserve legacy treatment of pre-existing rule aliases; domain mode is stricter.
+    if (!config && fs.existsSync(path.join(root, rulePath))) continue;
+    const target = safePolicyTarget(root, rulePath, true);
+    if (target.exists) continue;
+    fs.mkdirSync(path.dirname(target.absolute), { recursive: true });
+    const fresh = safePolicyTarget(root, rulePath, true);
+    try { fs.writeFileSync(fresh.absolute, renderPromptRuleScaffold(section), { encoding: "utf8", flag: "wx" }); }
+    catch (error) { if (error.code === "EEXIST") { safePolicyTarget(root, rulePath); continue; } throw error; }
     created.push(rulePath);
   }
-  return { created, sections };
+  return { created, sections, mode: config ? "domains" : "legacy" };
 }
 
 export function discoverWikiSectionPaths({ projectRoot }) {
@@ -293,14 +335,16 @@ export function renderPromptRuleScaffold(sectionPath) {
   ].join("\n");
 }
 
-function walkWikiDirectory({ root, absoluteDir, relativeDir, sectionPaths, report }) {
+function walkWikiDirectory({ root, absoluteDir, relativeDir, sectionPaths, report, includePath }) {
   const entries = fs.readdirSync(absoluteDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
-  const hasDocumentationPage = entries.some((entry) => entry.isFile() && isFinalDocumentationPage(entry.name));
+  const hasDocumentationPage = entries.some((entry) => entry.isFile() && isFinalDocumentationPage(entry.name)
+    && (!includePath || includePath(`${relativeDir}/${entry.name}`, false)));
   if (relativeDir !== WIKI_DIR && hasDocumentationPage) sectionPaths.add(normalizeRepositoryPath(relativeDir));
 
   for (const entry of entries) {
     const relativePath = normalizeRepositoryPath(`${relativeDir}/${entry.name}`);
     const absolutePath = path.join(absoluteDir, entry.name);
+    if (includePath && !includePath(relativePath, entry.isDirectory())) continue;
     if (entry.isSymbolicLink()) {
       if (entry.name === WIKI_RULE_BASENAME) report.files.push(relativePath);
       else report.warnings.push({ path: relativePath, code: "symlink_skipped", message: `Skipping Wiki symlink during discovery: ${relativePath}.` });
@@ -308,7 +352,7 @@ function walkWikiDirectory({ root, absoluteDir, relativeDir, sectionPaths, repor
     }
     if (entry.isDirectory()) {
       if (shouldSkipSectionDirectory(entry.name)) continue;
-      walkWikiDirectory({ root, absoluteDir: absolutePath, relativeDir: relativePath, sectionPaths, report });
+      walkWikiDirectory({ root, absoluteDir: absolutePath, relativeDir: relativePath, sectionPaths, report, includePath });
       continue;
     }
     if (entry.isFile() && entry.name === WIKI_RULE_BASENAME) report.files.push(relativePath);

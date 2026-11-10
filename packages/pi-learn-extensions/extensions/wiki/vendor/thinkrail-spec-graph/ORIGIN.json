@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/JetBrains/thinkrail",
+  "commit": "519286befe0f15cc2dd270e251ecd8cdb9d0a01c",
+  "upstreamPath": "packages/spec-graph",
+  "license": "Apache-2.0",
+  "originalSha256": {
+    "LICENSE": "8634c6a81dfa39860c8a9e508b3dcd8255b242a2c080f3ce59e29afd5f300579",
+    "SPEC.md": "b391f411cf55ae869bf001cd32e87a48e010698f60110336e4f1bf8709bdd546",
+    "core/SPEC.md": "121005ecfcc63fe4604d5aa2e629c2173a139d4fa0d2f00b0d09fd23fdc3618a",
+    "core/core.test.ts": "a9615e24006ddc9dc4cb4e2d351c88820e08564e13358861891a38148c63b40e",
+    "core/graph.ts": "f32689b201b121f7c4b54a8a1dc5040fb4fab1b89cc452b45fd2e4529109bfe0",
+    "core/index.ts": "f832e41fbddaeb62919009017976b5c0c1c26c8026d3c3f708466c1cca21d631",
+    "core/parse.ts": "2a091535aaaa668d775e144c61df0d7a13520f494edad8c5d858e470476f4a15",
+    "core/query.ts": "df3f50b86de7fd81f0af764aab9d6781b1d9f85d626053e503ad82cf2e85e8c5",
+    "core/store.ts": "cf39714c64950f7b53a3dd51f5058a56e22bf276ab98b88b2faf6870bb73eaa3",
+    "core/validate.ts": "32611107df3c57440e2acae9ab98b7af1d50ef51332052c54f51ea852348e994",
+    "package.upstream.json": "c5712629af0ce6269d88d9d899670ad13ec1b46bdbf6a84567a9a6d73f550810"
+  },
+  "patchedFiles": [
+    "core/index.ts",
+    "core/store.ts",
+    "core/parse.ts"
+  ]
+}

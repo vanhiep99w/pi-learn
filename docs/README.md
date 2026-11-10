@@ -63,6 +63,10 @@ Các file dưới đây không phải bản mirror trực tiếp từ docs chín
 
 - [CLAUDE_CODE_TOOLS_GUIDE.md](./CLAUDE_CODE_TOOLS_GUIDE.md)
 
+## Thiết kế và kế hoạch nội bộ
+
+- [Kế hoạch nâng cấp Wiki sang Spec Graph](./WIKI_SPEC_GRAPH_UPGRADE_PLAN.md) — thiết kế và tiến độ triển khai: specs trong `wiki/`, graph/tools, source/policy routing, guards, kiểm thử và nguồn ThinkRail. Migration Wiki cũ đã bỏ khỏi scope; phần tiến độ phân biệt tính năng đã có với đề xuất còn lại.
+
 ## Ghi chú sync
 
 - Repo nguồn chính thức hiện dùng namespace `earendil-works/pi`.

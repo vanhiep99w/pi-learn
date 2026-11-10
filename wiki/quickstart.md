@@ -49,6 +49,8 @@ Migration còn lại: `GLOBAL-RULE-001` và `EXT-WIKI-RULE-001` trong các file 
 
 `/wiki [message]` khởi tạo; `/wiki-update [message]` cập nhật có chọn lọc. Dùng provider/model/tools hiện tại; prompt không inject Git context. Không có command hỏi Wiki riêng: project question theo bootstrap top-level.
 
+Có sáu [read tools](extensions/wiki-extension.md#read-only-wiki-tools): `wiki_search`, `wiki_get`, `wiki_locate`, `wiki_rules`, `wiki_graph`, `wiki_validate`. Search mặc định cả specs/guides; get metadata hoặc section khi có heading. Locate tra `source-paths`; rules resolver chỉ trả paths, dùng opt-in `wiki/_domains.json` và giữ legacy behavior khi vắng config. [Khai báo source/policy domains](extensions/wiki-extension.md#source-scope-và-policy-domains). Update có lookup guidance, init tập trung research/write; no-op/finalization kiểm thêm schema/graph. Có thêm `wiki_spec_create`/`wiki_spec_update` trong active Wiki run, revision-checked metadata-only; [contract ghi](extensions/wiki-extension.md#controlled-spec-metadata-tools). Không migration Wiki cũ; generator chỉ tạo specs cho vùng thật sự chưa được document. Chỉ dùng scope rules/all của validate khi cần lint rules, không nạp policy text cho câu hỏi thông thường.
+
 Xem [lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle), [agent-directed rule updates](extensions/wiki-extension.md#agent-directed-rule-updates), [no-op](extensions/wiki-extension.md#no-op-behavior). Command usage/account và theme ở [catalog](extensions/catalog.md).
 
 ## Task routing
@@ -76,6 +78,6 @@ Dùng bounded grep tìm heading, rồi ranged read. `#anchor` chỉ navigation h
 
 ## Backlog có evidence
 
-- Có 39 automated Wiki tests, gồm command guards và permission lifecycle. Chưa kiểm đầy đủ snapshot/no-op/interrupted metadata, semantic classification bằng model thật hoặc OAuth/TUI. [Coverage và manual checks](operations/testing-and-safety.md#automated-tests).
+- Có 148 automated Wiki tests, gồm guards/lifecycle, read + metadata tools, strict authoring/concurrency fixtures và schema/graph trong no-op/finalization. Tests ThinkRail nguyên bản chạy riêng bằng Bun; có smoke Pi loader/TypeBox thật nhưng chưa phải TUI integration. Chưa kiểm hết snapshot/Git failure/concurrency/recovery, semantic classification bằng model thật hoặc OAuth/TUI. [Coverage và manual checks](operations/testing-and-safety.md#automated-tests).
 - Aurora có host-mocked UI/headless tests và Midnight Aurora có contrast tests; chưa có integration tests trên TUI thật. Usage shutdown vẫn không clear global/cache/pending hoặc cancel details timeouts; cần focused lifecycle tests trước khẳng định an toàn mọi mode. [Catalog](extensions/catalog.md#aurora-ui).
 - Không có declared Node/Pi compatibility matrix hoặc release/test CI pipeline; remote ChatGPT APIs và implementation external PR-review action chưa được xác minh trong Wiki run này. [Operations](operations/development.md#pr-review-workflow).
