@@ -1,0 +1,43 @@
+{
+  "repository": "https://github.com/JetBrains/thinkrail",
+  "commit": "883affb98416fddd2d8c4f7f18fba92cc435cb4b",
+  "upstreamPaths": [
+    "packages/pi-subagents/",
+    "packages/pi-delegation/"
+  ],
+  "license": "Apache-2.0",
+  "originalSha256": {
+    "pi-subagents/index.ts": "b72dd43de3b572b7bd0daddaf11ede60627a9feb2007b877236f606cf080ba3e",
+    "pi-subagents/SPEC.md": "be0124547a0d4ba4157c1c1db8300b11e8e33c168ff4166fc2f20f7950af86ca",
+    "pi-subagents/package.upstream.json": "9759d251bf0ef371cbe5c68f9fbd49e8f34347d8ea861b32353711dbbb2b0e47",
+    "pi-subagents/src/thinking.ts": "c6177109a24fcb3e447aaf6bca2214722fdb0c251f426962cc52f0cfde827184",
+    "pi-subagents/src/mapping.ts": "c1bf8679ef19bf600ab6094689125a70a5c8d62e19a4975e21cb234e7686d901",
+    "pi-subagents/src/mapping.test.ts": "3a7d3ccd9de3d016c9fee4ce3b761f056647e4343ea32c46ceed24dcf2b3565b",
+    "pi-subagents/src/extension.ts": "b46a259eabcef2d5bb20ce6190e953ac4470dbd5565ac1d269db1d5a83cbbf31",
+    "pi-subagents/src/extension.test.ts": "a38f4c3634d98b086a1cdc16719fb5ba1a9b3b46442f91c4eb405169a70d9b27",
+    "pi-subagents/src/definitions.ts": "33587b377fb7fceffb7eaa5a533dd1497fb07e7af9ad42abf787e16bfb16e2dd",
+    "pi-subagents/src/definitions.test.ts": "afa2a893baa6623b5b67d1d33899442149628fa44626bf09b30cafed27252c40",
+    "pi-subagents/src/builtins.ts": "574e4bc044b29b5c828cfb9bb94d08175aaa8109c5bb7885e79929cd7bee14b8",
+    "pi-delegation/index.ts": "9abeff787b21122d38947c745043d7282866df40908eac48e1665dfe06c1b8bb",
+    "pi-delegation/SPEC.md": "5c77c14a265c652e015c8bb1c7bafef0274133ce8b4585600a85fe8e2706c2c1",
+    "pi-delegation/package.upstream.json": "902c0ca3d96262e631706bb8ac5958657f34bcfc00929022ac7a793f069d6876",
+    "pi-delegation/src/types.ts": "77b5e95c9a7d0ffdf8fdcf6da9febd0c04a4e2d0131732b61434517583451d72",
+    "pi-delegation/src/storage.ts": "3618b4402f94f07584d6efaf0c74a7989972ab75266e8f9925ed84238156e9e3",
+    "pi-delegation/src/storage.test.ts": "62a32544453c2be4de84000f964195cb386a2cc0e02f5afc1c8d9c8160905c14",
+    "pi-delegation/src/service.ts": "18e637ce3ef40947663cd25862b1453d44e847307dcc60f86f54c7117b542ffa",
+    "pi-delegation/src/service.test.ts": "32205019205a3d3ea7074b68efafa1c34bff59d53a83e24a5e492d367e8fa8f3",
+    "pi-delegation/src/semaphore.ts": "d1acc903e65cadbf98667e590af93c1287f6b4618661059bc08c2a0962336fa2",
+    "pi-delegation/src/semaphore.test.ts": "4ea5b2383c92ccd66f36cc3292d7a7303964068c5f9193c95b209de505839653",
+    "pi-delegation/src/resource.test.ts": "a596b5fb57febf9c6acd1dcaa3c80c9909ab1b07d225933098093f18ff55536c",
+    "pi-delegation/src/replayTools.ts": "7c30f3d0b2cedc8d32254d5fa9a3cb77062f2c82950a3fb060fa10afbfdc84de",
+    "pi-delegation/src/history.ts": "c4a88fe57882a14bfc27b655e9fdc9fbc2cbe31064529870d44d90d474e3ede9",
+    "pi-delegation/src/history.test.ts": "b51feca615f2cfd78292fcd8d1f686863ddc3f13376c4ec17c4631917bd5e96a",
+    "LICENSE": "8634c6a81dfa39860c8a9e508b3dcd8255b242a2c080f3ce59e29afd5f300579"
+  },
+  "patchedFiles": [
+    "pi-subagents/src/extension.ts",
+    "pi-subagents/src/mapping.ts",
+    "pi-subagents/src/definitions.ts",
+    "pi-delegation/src/service.ts"
+  ]
+}

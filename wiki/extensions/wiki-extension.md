@@ -26,6 +26,7 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 |---|---|
 | `wiki/index.ts` | Entrypoint duy nhất, đăng ký hai commands, sáu read tools và hai metadata tools |
 | `wiki/wiki-commands.ts` | Lifecycle, tool guard, snapshot, no-op và metadata |
+| `wiki/wiki-protection.ts` | Shared path/bash mutation checks, dùng lại trong delegated children mà không cấp Wiki run permit |
 | `wiki/wiki-prompt.ts` | Task contract, phân loại intent/ownership bằng agent, bootstrap AGENTS/CLAUDE |
 | `wiki/wiki-rules.js` | Phân loại path, discovery, scaffold, rule lint |
 | `wiki/wiki-links.js` / `wiki/wiki-headings.js` | Internal Markdown links và shared ATX heading/anchor resolver, bỏ frontmatter/fenced code |
@@ -38,7 +39,7 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 | `wiki/wiki-mutation-tools.ts` | `wiki_spec_create`/`wiki_spec_update`, active run permits, session lifecycle và bounded receipts |
 | `wiki/vendor/thinkrail-spec-graph/` | Core/tests ThinkRail được pin commit, Apache-2.0, provenance và patches; không có extension entrypoint riêng |
 
-Tools đọc đã được wire vào entrypoint và task prompts. No-op/finalization đã kiểm thêm schema/graph qua read model; không đổi bootstrap, rules permissions hoặc layout Wiki. Hai metadata tools và generator prompt cho Wiki mới đã có; không migration Wiki cũ hoặc tool xóa. Generator vẫn dùng agent hiện tại, chưa có semantic benchmark bằng model thật; đây chưa phải rollout toàn bộ workflow ThinkRail/subagents.
+Tools đọc đã được wire vào entrypoint và task prompts. No-op/finalization đã kiểm thêm schema/graph qua read model; không đổi bootstrap, rules permissions hoặc layout Wiki. Hai metadata tools và generator prompt cho Wiki mới đã có; không migration Wiki cũ hoặc tool xóa. Generator vẫn dùng agent hiện tại, chưa có semantic benchmark bằng model thật; đây chưa phải rollout workflow skills của ThinkRail. Subagents là capability riêng đã nối với shared Wiki guard, xem [contract](subagents.md).
 
 Thay command cần đồng bộ prompt, README, test và routes; thêm helper giữ trong thư mục Wiki để không thành public entrypoint độc lập.
 

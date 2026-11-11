@@ -6,6 +6,10 @@ Phạm vi: resources public trong `packages/pi-learn-extensions/`, ownership và
 
 Entrypoint `packages/pi-learn-extensions/extensions/wiki/index.ts` đăng ký `/wiki` và `/wiki-update`. Agent hiện tại thực hiện tác vụ; command layer quản lý snapshot/validation/metadata. Xem [lifecycle](wiki-extension.md#commands-and-run-lifecycle), [agent-directed rule updates](wiki-extension.md#agent-directed-rule-updates) và [tests](../operations/testing-and-safety.md#automated-tests).
 
+## Subagents
+
+Entrypoint `packages/pi-learn-extensions/extensions/subagents/index.ts` expose `Agent`, `get_subagent_result` và `/subagents` status/stop. Reuse ThinkRail delegation, context riêng/cwd chung; không tự bật workflow router. Model/auth qua parent registry, tool ceiling và Wiki guard ở child. [Usage, definitions, limits và lifecycle](subagents.md).
+
 ## ChatGPT usage status
 
 Ownership toàn bộ ở `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts`: OAuth compatibility, account persistence, network usage, cache và producer của state Aurora đọc.

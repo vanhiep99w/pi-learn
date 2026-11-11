@@ -1,10 +1,13 @@
 {
   "name": "pi-learn-extensions",
   "version": "1.0.1",
-  "description": "Pi Coding Agent extensions: repository Wiki, ChatGPT usage status, Aurora UI, and Midnight Aurora theme.",
+  "description": "Pi Coding Agent extensions: repository Wiki, ThinkRail subagents, ChatGPT usage status, Aurora UI, and Midnight Aurora theme.",
   "type": "module",
   "scripts": {
-    "test": "npm run test:wiki && npm run test:aurora && npm run test:theme",
+    "test": "npm run test:wiki && npm run test:subagents && npm run test:aurora && npm run test:theme",
+    "test:subagents": "node --test tests/subagents/*.test.mjs",
+    "test:subagents:upstream": "node tests/subagents/run-upstream.mjs",
+    "test:subagents:host": "node --test tests/subagents/subagents.host.smoke.mjs",
     "test:wiki": "node --test tests/wiki/*.test.mjs tests/wiki/*.test.mts",
     "test:wiki:upstream": "bun test ./extensions/wiki/vendor/thinkrail-spec-graph/core/core.test.ts",
     "test:wiki:host": "node --test tests/wiki/wiki-host.smoke.mjs",
@@ -28,12 +31,16 @@
     ]
   },
   "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
+    "@earendil-works/pi-agent-core": {
+      "optional": true
+    },
     "@earendil-works/pi-ai": {
       "optional": true
     },

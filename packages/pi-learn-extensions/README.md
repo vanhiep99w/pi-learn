@@ -17,6 +17,7 @@ Sau khi cài/update, restart Pi hoặc chạy `/reload`.
 ```txt
 extensions/
 ├── wiki/                    # /wiki và /wiki-update
+├── subagents/               # Agent/get_subagent_result + /subagents
 ├── chatgpt-usage-status/    # ChatGPT Plus/Pro usage
 ├── aurora-ui.ts             # custom TUI/editor/footer/status + navigation
 └── aurora/                  # helpers sidebar/tree, không entrypoint riêng
@@ -54,6 +55,21 @@ npm --prefix packages/pi-learn-extensions run test:wiki
 npm --prefix packages/pi-learn-extensions run test:wiki:upstream
 # Optional: Pi loader + TypeBox thật, cần Pi CLI đã cài
 npm --prefix packages/pi-learn-extensions run test:wiki:host
+```
+
+## Subagents
+
+Reuse `pi-subagents` + `pi-delegation` của ThinkRail tại commit cố định, không workflow engine/router mới. Tools `Agent({subagent_type, task, model?, run_in_background?})` và `get_subagent_result({session_id})`; builtins scout/planner/worker/reviewer. Foreground chờ report, background tự deliver; `/subagents` xem status, `/subagents stop <id|all>` hủy owned children. Parent abort/reload/shutdown dừng/dispose children.
+
+Context riêng, nhưng cùng cwd/worktree. Child chỉ có giao của requested tools, active parent tools và curated SDK/Wiki tools; không MCP/arbitrary extensions/nested Agent. Shared Wiki guard không cho child kế thừa mutation authority. Custom permission/approval extensions không tự clone, bash không là read-only sandbox. Parent registry xử lý auth qua public streaming bridge, không copy keys; physical models only. Report bounded 32 KiB, tasks 32K chars, 4 concurrent/32 retained children, soft turn cap 24 mặc định/64 tối đa.
+
+Custom definitions trong user agent dir hoặc trusted `.pi/agents/` / `.agents/agents/`; upstream first-name-wins precedence giữ nguyên, builtins không bị project override. [Contract đầy đủ](../../wiki/extensions/subagents.md), [provenance/patches](extensions/subagents/vendor/thinkrail/README.md).
+
+```bash
+npm --prefix packages/pi-learn-extensions run test:subagents
+# Cần Pi; upstream thêm Bun; fixtures/Faux, không model/auth thật:
+npm --prefix packages/pi-learn-extensions run test:subagents:upstream
+npm --prefix packages/pi-learn-extensions run test:subagents:host
 ```
 
 ## ChatGPT usage status

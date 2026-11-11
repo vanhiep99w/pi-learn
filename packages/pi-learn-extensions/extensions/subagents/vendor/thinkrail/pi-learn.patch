@@ -1,0 +1,136 @@
+--- a/pi-subagents/src/extension.ts
++++ b/pi-subagents/src/extension.ts
+@@ -1,3 +1,4 @@
++// Pi Learn: local delegation import, optional discovery hook and flush-timer cleanup; see ../../pi-learn.patch.
+ import type {
+ 	ExtensionAPI,
+ 	ExtensionContext,
+@@ -16,7 +17,7 @@
+ 	type RunOutcome,
+ 	type RunSnapshot,
+ 	type RunStatus,
+-} from "pi-delegation";
++} from "../../pi-delegation/index.ts";
+ import { Type } from "typebox";
+ import { type AgentDefinition, discoverAgentDefinitions } from "./definitions";
+ import { RECURSION_GUARD_TOOLS, toSpawnMapping } from "./mapping";
+@@ -36,6 +37,7 @@
+ 	scope?: string;
+ 	isEnabled?: () => boolean;
+ 	canDeliverCompletion?: () => boolean;
++	discoverAgents?: (ctx: ExtensionContext) => AgentDefinition[];
+ }
+ 
+ export interface Subagents {
+@@ -125,6 +127,7 @@
+ 	let closed = false;
+ 	let flushing = false;
+ 	let flushScheduled = false;
++	let flushTimer: ReturnType<typeof setTimeout> | undefined;
+ 	let wakeDeferred = false;
+ 	let turnEnd: { runContinues: boolean } | undefined;
+ 	let owedWake = false;
+@@ -132,6 +135,9 @@
+ 
+ 	function dispose(): void {
+ 		closed = true;
++		if (flushTimer !== undefined) clearTimeout(flushTimer);
++		flushTimer = undefined;
++		flushScheduled = false;
+ 		sender = undefined;
+ 		pending.clear();
+ 	}
+@@ -199,7 +205,8 @@
+ 	function scheduleFlush(): void {
+ 		if (closed || flushScheduled) return;
+ 		flushScheduled = true;
+-		setTimeout(() => {
++		flushTimer = setTimeout(() => {
++			flushTimer = undefined;
+ 			flushScheduled = false;
+ 			wakeDeferred = false;
+ 			flushCompletions();
+@@ -278,7 +285,7 @@
+ 		}
+ 
+ 		function registerAgentTool(sessionCtx: ExtensionContext): void {
+-			const definitions = discoverFor(sessionCtx);
++			const definitions = options.discoverAgents?.(sessionCtx) ?? discoverFor(sessionCtx);
+ 			const known = agentListLines(definitions);
+ 
+ 			pi.registerTool({
+--- a/pi-subagents/src/mapping.ts
++++ b/pi-subagents/src/mapping.ts
+@@ -1,7 +1,8 @@
+ import { readFileSync, statSync } from "node:fs";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import type { Model } from "@earendil-works/pi-ai";
+-import type { SessionOptions } from "pi-delegation";
++// Pi Learn: resolve the pinned sibling package instead of a workspace dependency.
++import type { SessionOptions } from "../../pi-delegation/index.ts";
+ import type { AgentDefinition } from "./definitions";
+ import { isThinkingLevel, THINKING_LEVELS } from "./thinking";
+ 
+--- a/pi-subagents/src/definitions.ts
++++ b/pi-subagents/src/definitions.ts
+@@ -1,3 +1,4 @@
++// Pi Learn: optional bounded/no-symlink reader hook; parser and layer precedence stay upstream.
+ import { readdirSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+@@ -77,7 +78,7 @@
+ 	};
+ }
+ 
+-function readDefinitionDir(dir: string, source: AgentDefinition["source"]): AgentDefinition[] {
++function readDefinitionDir(dir: string, source: AgentDefinition["source"], readDefinitionFile?: (file: string) => string): AgentDefinition[] {
+ 	let files: string[];
+ 	try {
+ 		files = readdirSync(dir);
+@@ -88,7 +89,7 @@
+ 	for (const file of files.filter((name) => name.endsWith(".md")).sort()) {
+ 		const filePath = join(dir, file);
+ 		try {
+-			const parsed = parseAgentDefinition(readFileSync(filePath, "utf8"), source, filePath);
++			const parsed = parseAgentDefinition(readDefinitionFile ? readDefinitionFile(filePath) : readFileSync(filePath, "utf8"), source, filePath);
+ 			if (parsed) definitions.push(parsed);
+ 		} catch {}
+ 	}
+@@ -99,16 +100,17 @@
+ 	cwd: string;
+ 	agentDir: string;
+ 	includeProject: boolean;
++	readDefinitionFile?: (file: string) => string;
+ }
+ 
+ export function discoverAgentDefinitions(options: DiscoverOptions): AgentDefinition[] {
+ 	const layers: AgentDefinition[][] = [
+ 		[...BUILTIN_AGENTS],
+-		readDefinitionDir(join(options.agentDir, "agents"), "personal"),
++		readDefinitionDir(join(options.agentDir, "agents"), "personal", options.readDefinitionFile),
+ 		...(options.includeProject
+ 			? [
+-					readDefinitionDir(join(options.cwd, CONFIG_DIR_NAME, "agents"), "project"),
+-					readDefinitionDir(join(options.cwd, ".agents", "agents"), "project"),
++					readDefinitionDir(join(options.cwd, CONFIG_DIR_NAME, "agents"), "project", options.readDefinitionFile),
++					readDefinitionDir(join(options.cwd, ".agents", "agents"), "project", options.readDefinitionFile),
+ 				]
+ 			: []),
+ 	];
+--- a/pi-delegation/src/service.ts
++++ b/pi-delegation/src/service.ts
+@@ -1,3 +1,4 @@
++// Pi Learn: emit shutdown for parent-owned children too, before disposing their extensions.
+ import type { AssistantMessage } from "@earendil-works/pi-ai";
+ import {
+ 	type AgentSession,
+@@ -718,8 +719,7 @@
+ 			entry.snapshot = { ...entry.snapshot, finalText };
+ 		}
+ 		try {
+-			if (entry.resource)
+-				await entry.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
++			await entry.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
+ 		} finally {
+ 			entry.session.dispose();
+ 			if ("parentSessionId" in entry.record) {

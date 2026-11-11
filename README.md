@@ -1,6 +1,6 @@
 # Pi Learn
 
-Pi Learn là package cho Pi Coding Agent, tập trung vào Wiki repository, giao diện Aurora và tài liệu học Pi bằng tiếng Việt.
+Pi Learn là package cho Pi Coding Agent, gồm Wiki repository, subagents dựa trên ThinkRail, giao diện Aurora và tài liệu học Pi bằng tiếng Việt.
 
 ## Thành phần
 
@@ -8,6 +8,7 @@ Pi Learn là package cho Pi Coding Agent, tập trung vào Wiki repository, giao
 packages/pi-learn-extensions/
 ├── extensions/
 │   ├── wiki/                    # /wiki và /wiki-update
+│   ├── subagents/               # Agent + get_subagent_result, /subagents
 │   ├── chatgpt-usage-status/    # trạng thái usage ChatGPT
 │   ├── aurora-ui.ts             # editor/footer/status + sidebar + /tree-v2
 │   └── aurora/                  # helper nội bộ, không auto-load riêng
@@ -74,6 +75,14 @@ Agent có sáu tools đọc: `wiki_search` (specs + guides), `wiki_get` (metadat
 
 Chi tiết và pagination: [`Wiki read tools`](wiki/extensions/wiki-extension.md#read-only-wiki-tools).
 
+## Subagents
+
+Sau `/reload` đúng bản vừa cài, agent có tools `Agent` và `get_subagent_result`, với roles `scout`, `planner`, `worker`, `reviewer`. Bạn có thể yêu cầu “dùng scout tìm callers của X” hoặc “giao worker sửa module A ở background”. Child có context riêng nhưng **dùng chung cwd/worktree**, không là sandbox; parent cần chia task tránh ghi cùng file.
+
+`/subagents` xem status; `/subagents stop <id>` hoặc `/subagents stop all` yêu cầu dừng. Mặc định kế thừa model/thinking, background tự trả report, không cần polling. Tool set bị giới hạn theo parent + curated SDK/Wiki tools; Wiki policies/brief/metadata vẫn protected. Custom approval hooks/extensions của parent không tự được clone; scout/reviewer có bash nên read-only không phải OS guarantee. Không tự bật workflow router.
+
+[Definitions, giới hạn và model/auth](wiki/extensions/subagents.md). Runtime vendor hai packages ThinkRail cùng commit, giữ Apache-2.0/provenance; không đọc user auth/transcripts để kiểm thử.
+
 ## ChatGPT usage status
 
 Extension hiển thị usage khi provider hiện tại là `openai-codex` hoặc `chatgpt`.
@@ -134,7 +143,7 @@ pi install git:github.com/nicobailon/pi-web-access
 
 ## Kiểm thử và bảo trì
 
-Chạy toàn bộ tests từ source (Wiki, Aurora UI và theme); cài dependency runtime `yaml`, không cài bản sao Pi peers:
+Chạy toàn bộ tests từ source (Wiki, subagents adapter, Aurora UI và theme); cài dependency runtime `yaml`, không cài bản sao Pi peers:
 
 ```bash
 npm install --ignore-scripts --omit=peer

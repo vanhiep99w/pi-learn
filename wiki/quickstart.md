@@ -1,6 +1,6 @@
 # Pi Learn quickstart
 
-Pi Learn là package Pi Coding Agent và repository học Pi bằng tiếng Việt. Public surface: Wiki repository, ChatGPT usage UI, Aurora UI và theme `midnight-aurora`. Không còn runtime session-observability/proposal/eval/apply, image-generation hoặc model-prompt tools.
+Pi Learn là package Pi Coding Agent và repository học Pi bằng tiếng Việt. Public surface: Wiki repository, ThinkRail subagents, ChatGPT usage UI, Aurora UI và theme `midnight-aurora`. Không còn runtime session-observability/proposal/eval/apply, image-generation hoặc model-prompt tools.
 
 ## Khi nào đọc trang này
 
@@ -62,6 +62,7 @@ Dùng bounded grep tìm heading, rồi ranged read. `#anchor` chỉ navigation h
 | Package/manifest/entrypoint | [Package boundaries](architecture/overview.md#package-boundaries) | Resource discovery/install/compatibility đổi |
 | Wiki commands/prompt/selective reading | [Wiki lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle) | Tool guard, metadata hoặc validation đổi |
 | Rules/snapshot/links | [Wiki validation](extensions/wiki-extension.md#link-and-rule-validation) | Rule permissions, no-op hoặc settlement bị ảnh hưởng |
+| Subagent dispatch/model/tools/background/stop | [Subagents](extensions/subagents.md) | Parent lifecycle, curated child guards, upstream provenance/SDK compatibility |
 | ChatGPT usage/OAuth/accounts | [Usage](extensions/catalog.md#chatgpt-usage-status) | Credential adapters hoặc shared object đổi |
 | Usage badge consumer | [Shared contract](extensions/catalog.md#contract-dùng-chung-với-aurora) | Producer, stale handling hoặc lifecycle đổi |
 | Aurora editor/footer/Git/theme | [Aurora](extensions/catalog.md#aurora-ui) | Host layout/API, cleanup hoặc tokens đổi |

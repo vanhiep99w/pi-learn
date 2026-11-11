@@ -12,13 +12,12 @@ import {
   discoverWikiPromptRules,
   ensureWikiPromptRuleScaffolds,
   isWikiDocumentationPath,
-  isWikiInstructionsPath,
   isWikiMetadataPath,
   isWikiPolicyPath,
   isWikiDomainsPath,
-  relativeProjectPath,
 } from "./wiki-rules.js";
 import { createWikiTaskPrompt } from "./wiki-prompt.js";
+import { isProtectedWikiMutationPath, commandMutatesProtectedWikiPath } from "./wiki-protection.ts";
 import { WikiModelError, WikiReadModel, type WikiDiagnostic } from "./wiki-model.ts";
 import { readPolicyConfigText, WikiPolicyError } from "./wiki-policy.js";
 
@@ -416,27 +415,6 @@ function assertPromptRulesValidForWikiRun(cwd: string) {
   if (report.valid) return;
   const details = report.errors.slice(0, 5).map((item: { path: string; message: string }) => `${item.path}: ${item.message}`).join("; ");
   throw new Error(`Wiki cannot initialize while rule lint is invalid. Use /wiki-update to repair the applicable rules. ${details}`);
-}
-
-type ProtectionOptions = { protectRules: boolean; protectWikiBrief: boolean };
-
-function isProtectedWikiMutationPath(cwd: string, value: unknown, options: ProtectionOptions): boolean {
-  if (typeof value !== "string") return false;
-  const relative = relativeProjectPath(cwd, value);
-  return relative !== undefined && (
-    (options.protectRules && isWikiPolicyPath(relative))
-    || isWikiMetadataPath(relative)
-    || (options.protectWikiBrief && isWikiInstructionsPath(relative))
-  );
-}
-
-function commandMutatesProtectedWikiPath(command: string, options: ProtectionOptions): boolean {
-  const normalized = command.replace(/\\/g, "/");
-  const mentionsRules = options.protectRules && (/wiki\/(?:[^\s'";&|>]+\/)*_rules\.md\b/.test(normalized) || /wiki\/_domains\.json\b/i.test(normalized));
-  const mentionsMetadata = /wiki\/\.last-update\.json\b/.test(normalized);
-  const mentionsWikiBrief = options.protectWikiBrief && /wiki\/INSTRUCTIONS\.md\b/.test(normalized);
-  if (!mentionsRules && !mentionsMetadata && !mentionsWikiBrief) return false;
-  return /(?:>>?|\brm\b|\bmv\b|\bcp\b|\btruncate\b|\btee\b|\bsed\s+-[^\n]*i|\bperl\s+-[^\n]*i)/i.test(normalized);
 }
 
 function isMetadataStatusLine(line: string): boolean {
