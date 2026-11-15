@@ -7,12 +7,14 @@ Phạm vi: focused verification, failure/recovery checks và privacy cho Wiki/us
 Root không có test script. Chạy từ root:
 
 ```bash
+npm install --ignore-scripts --omit=peer
 npm --prefix packages/pi-learn-extensions test
+npm --prefix packages/pi-learn-extensions run test:navigation
 # Focused: run test:wiki, run test:aurora, run test:theme, run test:setup
 node -e 'JSON.parse(require("node:fs").readFileSync("packages/pi-learn-extensions/themes/midnight-aurora.json", "utf8")); console.log("Theme JSON OK")'
 ```
 
-Suite Wiki có 148 test pass trên Node v26.9.0 sau khi thêm read model và read tools; 39 tests baseline cũng pass trên phiên bản này. Đây không phải minimum supported Node; manifest không khai báo engines. File .mts import TypeScript source nên runner phải hỗ trợ strip types; command tests dùng `node:module.registerHooks` để ánh xạ riêng import `wiki-prompt.js` sang source `.ts`, tương tự loader jiti của Pi.
+Kiểm tra trên Node v26.9.0, npm 11.19.1: suite mặc định có 232 pass (Wiki 192, Aurora 8, theme 6, setup 26); `test:navigation` chạy riêng có 124 pass; không fail/skip. Cài dependency chỉ cần khi checkout chưa có `yaml`; không cần cài bản sao host peers. Đây không phải minimum supported Node; manifest không khai báo engines. File .mts import TypeScript source nên runner phải hỗ trợ strip types; command tests dùng `node:module.registerHooks` để ánh xạ riêng import `wiki-prompt.js` sang source `.ts`, tương tự loader jiti của Pi.
 
 | Test source (trong `packages/pi-learn-extensions/tests/wiki/`) | Evidence được kiểm tra |
 |---|---|
@@ -33,7 +35,9 @@ Herdsman setup: `test:setup` kiểm profile/script bằng isolated temporary age
 
 Ngoài Wiki, `tests/aurora/aurora-ui.test.mjs` kiểm banner/theme changes/width/cleanup, headless picker và editor tokens bằng host giả lập; `tests/theme/midnight-aurora.test.mjs` kiểm variable resolution, dark appearance, WCAG ≥4.5:1 cho các cặp chữ/nền khai báo và phân cấp dim/muted/text. Contrast audit chỉ áp dụng màu sRGB cụ thể, với `vars.bg` là nền terminal dự kiến; không bảo đảm nền terminal khác hoặc 256 màu.
 
-Gaps: chưa kiểm hết Wiki snapshot/Git failure/concurrency và interrupted-recovery cases ngoài fixtures đã nêu, semantic classification bằng model thật, OAuth/account/network, Aurora trên host TUI thật hoặc theme schema. JSON parse chỉ kiểm syntax. Suite không chứng minh mọi rule được viết đúng nghĩa, mọi generated claim chính xác, hoặc mọi host Pi version tương thích. Không có test CI job trong workflow PR review đã inspect.
+Navigation chạy riêng qua `npm --prefix packages/pi-learn-extensions run test:navigation`: `tests/navigation/sidebar.test.mjs` và `tree.test.mjs` dùng installed Pi TUI với synthetic data. `npm --prefix packages/pi-learn-extensions run test:navigation:pty` chạy hai Python smoke scripts, cần Pi và `pexpect`, dùng HOME/fixtures tạm offline. Lượt kiểm tra này chỉ chạy Node navigation suite, không chạy PTY. `npm test` không bao gồm hai commands navigation này; không coi default suite là toàn bộ integration checks.
+
+Gaps: chưa kiểm hết Wiki snapshot/Git failure/concurrency và interrupted-recovery cases ngoài fixtures đã nêu, semantic classification bằng model thật, OAuth/account/network, TUI `/reload` tương tác hoặc theme schema. Aurora host-mocked suite không instantiate footer factory, nên không chứng minh branch subscription được dọn bởi host dispose. Navigation fixtures/PTY smoke cũng không chứng minh mọi host layout/version tương thích. JSON parse chỉ kiểm syntax. Suite không chứng minh mọi rule được viết đúng nghĩa, mọi generated claim chính xác, hoặc mọi host Pi version tương thích. Không có test CI job trong workflow PR review đã inspect.
 
 Muốn kiểm tra validators không ghi/scaffold files, từ root:
 

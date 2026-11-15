@@ -52,7 +52,7 @@ Các path dưới đây chỉ mô tả **source contract**, không yêu cầu m�
 
 Login ưu tiên legacy `modelRegistry.authStorage.login`; fallback `modelRegistry.runtime.login(provider, "oauth", callbacks)`. Write/delete credential cũng qua legacy storage hoặc runtime credentials; runtime refresh dùng allowNetwork false. Read có fallback file; write activate không âm thầm fallback nếu runtime API thiếu. Browser mở bằng `xdg-open` best effort, URL/device code vẫn hiện để nhập thủ công.
 
-Switch import current openai-codex account, refresh saved token nếu cần, ghi credential openai-codex, cập nhật activeAccountId, reset cache rồi refresh usage. Không có account/chỉ một account thì notify. Delete active chọn account còn lại đầu tiên; hết account/xóa tất cả thì xóa cả credential openai-codex và chatgpt, reset cache/global. Delete không xóa OpenCode fallback: nếu fallback còn credential, usage có thể xuất hiện lại. Usage credential priority và active marker không phải cùng một nguồn dữ liệu tuyệt đối.
+Switch import current openai-codex account, refresh saved token nếu cần, ghi credential openai-codex, cập nhật activeAccountId, reset cache rồi refresh usage. Không có account/chỉ một account thì notify. Delete active chọn account còn lại đầu tiên; hết account/xóa tất cả thì yêu cầu xóa credential openai-codex và chatgpt, reset cache/global. `removeProviderCredential()` có thể trả về mà không xóa nếu legacy storage thiếu cả remove/logout hoặc runtime thiếu credentials.delete; không nên coi thông báo delete là bằng chứng mọi host đã xóa credential. Delete không xóa OpenCode fallback: nếu fallback còn credential, usage có thể xuất hiện lại. Usage credential priority và active marker không phải cùng một nguồn dữ liệu tuyệt đối.
 
 Ghi file extension dùng lock `.lock` exclusive `wx`, tối đa 100 lần thử cách 50 ms, loại lock cũ hơn 30 giây, dọn lock trong finally. Tạo directory mode 0700, file 0600 và best-effort chmod; không mã hóa credential và không có cross-file transaction. `readJson()` nuốt read/parse error thành `{}`: không được suy ra store thật sự trống, và write sau đó có thể mất dữ liệu không parse được.
 
@@ -67,7 +67,7 @@ Producer `setGlobalUsage()` ghi `globalThis.__piChatGptUsageStatus`:
 | stale | true khi đang hiện snapshot sau fetch error |
 | updatedAt | snapshot fetchedAt, mili giây |
 
-Consumer trong repository là `getChatGptUsageBadge()` ở Aurora. Không có evidence về consumer ngoài repo. Contract là object in-process, không schema version/export package/event bus; khi đổi field phải kiểm tra cả producer lẫn consumer.
+Consumer trong repository là `getChatGptUsageBadge()` ở Aurora. Consumer không dùng `updatedAt` để tự hết hạn dữ liệu; stale do producer quyết định. Không có evidence về consumer ngoài repo. Contract là object in-process, không schema version/export package/event bus; khi đổi field phải kiểm tra cả producer lẫn consumer.
 
 Shutdown dừng interval, bỏ status/widget và active flag; source không xóa global/cache/pending ở hook này. Global được xóa khi đổi sang non-ChatGPT hoặc explicit delete path. Các timeout details/list accounts có catch stale UI nhưng không được tracking để cancel. Đây là giới hạn lifecycle cần kiểm tra sau reload/session replacement.
 
@@ -83,7 +83,7 @@ Ownership `packages/pi-learn-extensions/extensions/aurora-ui.ts`: editor/footer,
 
 ### Lifecycle và rendering
 
-`session_start` có hasUI guard: banner ẩn sau 5 giây, render tên/màu theme hiện tại qua component factory (không cache ANSI, cắt theo visible width), cleanup session cũng xóa banner; cài AuroraEditor (extends CustomEditor), footer, fetch Git status ngay và mỗi 2,5 giây. Footer subscribe branch change để refresh/render. `session_shutdown` chạy cleanup callbacks; footer dispose dọn timers/subscription, unregister cleanup; disposed flag ngăn render muộn. `refreshingGitStats` ngăn fetch overlap; không abort git request đang chạy.
+`session_start` có hasUI guard: banner ẩn sau 5 giây, render tên/màu theme hiện tại qua component factory (không cache ANSI, cắt theo visible width), cleanup session cũng xóa banner; cài AuroraEditor (extends CustomEditor), footer, fetch Git status ngay và mỗi 2,5 giây. Footer subscribe branch change để refresh/render. `session_shutdown` chạy cleanup callbacks để dọn timers/banner; subscription branch được dọn trong footer `dispose()`, phụ thuộc host gọi disposal. Dispose cũng dọn timers, unregister cleanup; disposed flag ngăn render muộn. `refreshingGitStats` ngăn fetch overlap; không abort git request đang chạy.
 
 Editor giữ content/autocomplete từ super.render(), thay viền trên/dưới, không viền dọc/góc, tối thiểu ba dòng content. Terminal fullscreen chuyển viền dưới sang hàng footer đã dành sẵn; mode khác vẽ dưới editor. Footer chỉ hiển thị extension statuses (bao gồm Wiki status). Width dùng visibleWidth để fit badges; width <20 chỉ còn rail, ưu tiên bỏ cwd khi chật; usage badge quá dài bị ẩn toàn bộ.
 

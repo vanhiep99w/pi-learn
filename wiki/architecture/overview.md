@@ -66,13 +66,15 @@ Luồng chính:
 
 Chi tiết state/persistence/failure không lặp ở đây: [Wiki](../extensions/wiki-extension.md#commands-and-run-lifecycle), [usage contract](../extensions/catalog.md#contract-dùng-chung-với-aurora), [Aurora](../extensions/catalog.md#aurora-ui). Không có backend chung, inter-service protocol hoặc persisted usage history; shared usage object chỉ sống trong process. External consumers chưa được biết từ repo.
 
-Extension code chạy trong process Pi với quyền OS của user, không sandbox. UI hooks phần lớn hasUI-guarded nhưng theme command/shortcut hiện có gap; xem [catalog](../extensions/catalog.md#inputs-git-và-actions). Session cleanup và compatibility phải xác minh trên host thật.
+Extension code chạy trong process Pi với quyền OS của user, không sandbox. Theme command/shortcut đã có hasUI guards và host-mocked regression tests; [catalog](../extensions/catalog.md#inputs-git-và-actions) sở hữu UI contract. Navigation còn phụ thuộc private host layout; cleanup toàn bộ footer cần host gọi dispose. Không suy từ guards/tests rằng mọi host mode/version đã tương thích.
 
 ## Reduced supported surface
 
 Auto-load surface hiện hành là Wiki, ChatGPT usage, Aurora UI và theme. Runtime ThinkRail subagents, vendor/tests riêng và direct peer dependency phục vụ nó đã bị xóa. Subagents dùng external `pi-herdsman`, với [profile/setup companion](../operations/herdsman-setup.md); Wiki Spec Graph tiếp tục giữ ThinkRail core/provenance độc lập. README và Git commit `5d753dd` ghi retirement session-observability/proposal/eval/apply, image generation và model-prompt tools; manifest/source inventory hiện không expose chúng. Không coi compatibility với subsystem đã bỏ là yêu cầu ngầm. Web tools cài riêng, không bundled.
 
 ## Source-of-truth table
+
+Draft module specs cung cấp source ownership và boundary cho [Wiki](../modules/wiki/SPEC.md), [usage/accounts](../modules/chatgpt-usage/SPEC.md) và [Aurora/theme](../modules/aurora/SPEC.md). Chúng liên kết tới guides sở hữu contract chi tiết bên dưới, không chuyển đổi guides thành graph nodes. Reference Aurora → usage thể hiện shared badge contract tùy chọn, không phải load-order dependency; không có evidence để nối Wiki vào hai module UI.
 
 | Thay đổi | Source chính | Contract / validation |
 |---|---|---|

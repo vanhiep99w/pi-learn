@@ -27,7 +27,7 @@ Nếu không thấy command/theme, kiểm tra `pi list`, resource selection bằ
 
 Hai manifests version hiện 1.0.1, cùng expose resources nhưng path relative khác nhau. Xem [package boundaries](../architecture/overview.md#package-boundaries) trước sửa. Giữ versions đồng bộ khi chủ động release; host packages là optional peers `*`, không bundled runtime dependencies.
 
-`package-lock.json` v3 có root package version/peers; `bun.lock` cũng mô tả optional peers, packages rỗng. Không có root test/build scripts, engines hoặc release automation trong manifests. Test .mts cần Node hỗ trợ TypeScript hiện dùng; chưa có minimum-version declaration, không hứa mọi Node/Pi version chạy được. Dùng package manager có chủ đích, rà lockfile diff, không regenerate cả hai chỉ để đổi format.
+`package-lock.json` v3 và `bun.lock` cùng ghi dependency runtime `yaml` 2.9.1 và optional host peers. `yaml` phục vụ setup script; peers do host Pi cung cấp, không phải bản Pi runtime bundled. Không có root test/build scripts, engines hoặc release automation trong manifests. Test .mts cần Node hỗ trợ TypeScript hiện dùng; chưa có minimum-version declaration, không hứa mọi Node/Pi version chạy được. Dùng package manager có chủ đích, rà lockfile diff, không regenerate cả hai chỉ để đổi format.
 
 ## Public source map
 
@@ -51,7 +51,7 @@ Khi source đổi:
 1. Đi từ producer/owner tới consumer/shared contract và failure path; kiểm chứng focused tests.
 2. Sửa canonical topic trước; README command/path phải đồng bộ. Thêm/xóa indexed docs thì cập nhật `docs/README.md`.
 3. Chỉ đổi quickstart khi route/ownership/setup/backlog thay đổi. Nội dung detailed giữ ở topic page.
-4. Với Wiki run, plan nếu cần chỉ là tạm, giữ brief/rules/metadata đúng owner; rules chỉ sửa trong active `/wiki-update`, agent chọn owner theo intent. Chi tiết [workflow](../extensions/wiki-extension.md#documentation-workflow).
+4. Với Wiki run, plan nếu cần chỉ là tạm; giữ brief/rules/metadata đúng owner. Source cho phép lưu user-requested lasting policy trong chat thường hoặc `/wiki-update`, không cần từ khóa tên file; init vẫn chặn sửa rules. Tuy nhiên `GLOBAL-RULE-001` và `EXT-WIKI-RULE-001` checked-in còn giới hạn opt-in cũ: đây là lệch policy/source cần user giải quyết qua lượt cập nhật rule riêng, không phải quyền sửa rule trong init. Chi tiết [workflow](../extensions/wiki-extension.md#documentation-workflow).
 5. Kiểm tra link/anchor, rule layout, bootstrap và diff. Không sửa metadata bằng tay để giả completed.
 
 AGENTS/CLAUDE hiện có đúng một compact Project Wiki section khớp prompt test. Chúng chỉ điều hướng agent, không chứa toàn bộ docs hay yêu cầu read rules cho câu hỏi read-only.

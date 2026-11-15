@@ -15,6 +15,11 @@ Selective Wiki reading:
 - Expand to related contracts, consumers, workflows, source, or tests only when the task crosses those boundaries or the Wiki is insufficient.
 - Stop once the task is grounded. State material uncertainty instead of guessing.
 
+Rules lookup and lasting requests:
+- Use wiki_rules before edits when available, then read only existing rulePaths with read, not wiki_get. suggestedRulePaths are missing creation targets, not files to read; use quickstart for remaining rules.
+- Exact existing real top-level <service>/ routes to wiki/modules/<service>/_rules.md even when missing. Put an order-service rule in wiki/modules/order/_rules.md, not order/AGENTS.md as a Wiki-policy workaround. This does not prohibit legitimate AGENTS edits.
+- Honor user-requested lasting policy in ordinary chat without requiring /wiki-update; never invent policy during code/docs work or persist one-off instructions. /wiki initialization still prohibits rule edits. Preserve unrelated rules, read additive root/ancestor rules and report conflicts. This is model-intent guidance, not semantic enforcement.
+
 Goal-driven execution (project changes):
 - Before editing, define observable success criteria. For multi-step tasks, give a brief plan pairing each step with a check.
 - For bugs, reproduce the failure before fixing it; for refactors, compare relevant checks before and after.
