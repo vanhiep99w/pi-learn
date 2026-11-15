@@ -57,20 +57,20 @@ Wiki dùng model/provider hiện tại của Pi, bổ sung tools tra cứu và m
 
 - `/wiki` khởi tạo tài liệu dưới `wiki/`. Sau init hợp lệ, không hủy/lỗi, extension tự ghi section `Project Wiki` cố định vào top-level `AGENTS.md`/`CLAUDE.md` (cả hai vắng thì tạo `AGENTS.md`), giữ nội dung khác; mẫu không nằm trong prompt gen Wiki.
 - `/wiki-update` cập nhật tài liệu theo source hiện tại và yêu cầu cụ thể; prompt không chứa Git status, lịch sử commit hoặc diff.
-- Trong `/wiki-update`, agent tự phân biệt facts, chính sách lâu dài và chỉ thị một lần, rồi chọn trang Wiki hoặc `_rules.md` thuộc domain phù hợp. Không cần nêu tên file hay từ khóa đặc biệt, ví dụ:
+- Trong chat thường hoặc `/wiki-update`, agent tự phân biệt facts, user-requested lasting policy và chỉ thị một lần, rồi chọn trang Wiki hoặc `_rules.md` phù hợp. Không cần nêu tên file hay từ khóa đặc biệt, ví dụ:
 
   ```txt
   /wiki-update Khi viết code tôi không muốn tự thêm unit test nữa
   ```
 
-  Chỉ thị một lần không được lưu thành rule; yêu cầu mơ hồ thì agent hỏi lại. Ngoài lượt `/wiki-update`, rule vẫn được bảo vệ.
+  Chỉ thị một lần không được lưu; yêu cầu mơ hồ thì hỏi lại. Ví dụ nhắn thường “thêm rule cho order: không viết unit test mới” sẽ dùng `wiki/modules/order/_rules.md`, không tạo `order/AGENTS.md` thay Wiki policy. Init vẫn chặn rule edits; metadata/active brief giữ bảo vệ. Intent do model phân loại, không phải semantic enforcement.
 
 - Không có command hỏi Wiki riêng. Với câu hỏi về project, agent đọc `wiki/quickstart.md` một lần khi context hiện tại chưa có; câu hỏi không liên quan project thì không cần đọc.
 - Rule chỉ được load ngay trước khi agent cần sửa component/domain mà rule đó quản lý. Read-only question không bắt buộc load rule.
 - `wiki/INSTRUCTIONS.md` là brief tùy chọn để định hướng scope, ưu tiên và ngôn ngữ.
 - Extension kiểm tra internal links, rule layout và schema/graph trước khi cập nhật `wiki/.last-update.json`. Graph lỗi chặn no-op và đánh dấu run `interrupted`, kể cả khi Wiki không đổi; hoàn tất không đồng nghĩa specs đã được review.
 
-Agent có sáu tools đọc: `wiki_search` (specs + guides), `wiki_get` (metadata mặc định, section khi chọn heading), `wiki_locate` (source path → declared spec owners), `wiki_rules` (rule paths theo opt-in `wiki/_domains.json`), `wiki_graph` (quan hệ có giới hạn) và `wiki_validate` (graph mặc định; links/rules/all khi chọn rõ). Không config thì giữ routing/scaffolding cũ; không tự chuyển đổi Wiki hoặc policy files. Hai tools `wiki_spec_create`/`wiki_spec_update` chỉ hoạt động trong active Wiki run cùng cwd: tạo draft mới hoặc sửa metadata với document revision, không sửa prose/ID và không ghi protected files. Wiki cũ giữ nguyên, không migration; vẫn search/get theo path được nhưng chưa có graph nodes. Sau update cần `/reload` đúng package đang dùng.
+Agent có sáu tools đọc: `wiki_search` (specs + guides), `wiki_get` (metadata mặc định, section khi chọn heading), `wiki_locate` (source path → declared spec owners), `wiki_rules` (existing rule paths và missing creation targets theo tên service), `wiki_graph` (quan hệ có giới hạn) và `wiki_validate` (graph mặc định; links/rules/all khi chọn rõ). Không cần config: `order/` → `wiki/modules/order/_rules.md` kể cả chưa có. Agent `read` existing `rulePaths`, chỉ tạo missing `suggestedRulePaths` khi user yêu cầu rule. Không tự chuyển đổi Wiki hoặc policy files. Hai tools `wiki_spec_create`/`wiki_spec_update` chỉ hoạt động trong active Wiki run cùng cwd: tạo draft mới hoặc sửa metadata với document revision, không sửa prose/ID và không ghi protected files. Wiki cũ giữ nguyên, không migration; vẫn search/get theo path được nhưng chưa có graph nodes. Sau update cần `/reload` đúng package đang dùng.
 
 Chi tiết và pagination: [`Wiki read tools`](wiki/extensions/wiki-extension.md#read-only-wiki-tools).
 

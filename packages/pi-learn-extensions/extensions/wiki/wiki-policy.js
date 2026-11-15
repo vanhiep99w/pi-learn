@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { isLiteralSourcePath, matchesSourcePath, validSourcePaths } from "./wiki-source-paths.js";
+import { isLiteralSourcePath } from "./wiki-source-paths.js";
 
-export const WIKI_DOMAINS_PATH = "wiki/_domains.json";
-export const MAX_POLICY_CONFIG_BYTES = 64 * 1024;
 const ROOT_RULE = "wiki/_rules.md";
 const NAME = /^[a-z][a-z0-9-]{0,63}$/u;
 const EXCLUDED = new Set(["assets", "node_modules", "dist", "build"]);
@@ -12,9 +10,6 @@ export class WikiPolicyError extends Error {
   constructor(code, message) { super(message); this.name = "WikiPolicyError"; this.code = code; }
 }
 function fail(code, message) { throw new WikiPolicyError(code, message); }
-export function isWikiDomainsPath(value) {
-  return typeof value === "string" && value.replace(/\\/gu, "/").replace(/^\.\//u, "").normalize("NFC").toLowerCase() === WIKI_DOMAINS_PATH;
-}
 export function isPolicyRulePath(value) {
   if (typeof value !== "string" || value.length > 1024) return false;
   const parts = value.split("/");
@@ -24,7 +19,7 @@ export function isPolicyRulePath(value) {
 
 /** Check components without reading policy text. Also used immediately around scaffold creation. */
 export function safePolicyTarget(projectRoot, repositoryPath, allowMissing = false) {
-  if (repositoryPath !== WIKI_DOMAINS_PATH && !isPolicyRulePath(repositoryPath)) fail("invalid_policy_path", "Use a canonical wiki/**/_rules.md policy path.");
+  if (!isPolicyRulePath(repositoryPath)) fail("invalid_policy_path", "Use a canonical wiki/**/_rules.md policy path.");
   let absolute = fs.realpathSync(projectRoot);
   const parts = repositoryPath.split("/");
   for (let index = 0; index < parts.length; index++) {
@@ -41,55 +36,10 @@ export function safePolicyTarget(projectRoot, repositoryPath, allowMissing = fal
   return { absolute, exists: true };
 }
 
-/** No cache: edits/removal of the opt-in configuration take effect on the next call. */
-export function readPolicyConfigText(projectRoot) {
-  const target = safePolicyTarget(projectRoot, WIKI_DOMAINS_PATH, true);
-  if (!target.exists) return null;
-  const expected = fs.lstatSync(target.absolute);
-  if (expected.size > MAX_POLICY_CONFIG_BYTES || expected.nlink !== 1) fail("invalid_policy_config", "Policy config must be at most 64 KiB with no hardlink aliases.");
-  const fd = fs.openSync(target.absolute, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0));
-  try {
-    const actual = fs.fstatSync(fd);
-    if (!actual.isFile() || actual.nlink !== 1 || actual.dev !== expected.dev || actual.ino !== expected.ino || actual.size > MAX_POLICY_CONFIG_BYTES) fail("unsafe_policy_path", "Policy config changed identity while opening.");
-    safePolicyTarget(projectRoot, WIKI_DOMAINS_PATH);
-    const bytes = Buffer.alloc(MAX_POLICY_CONFIG_BYTES + 1);
-    let length = 0;
-    while (length < bytes.length) {
-      const count = fs.readSync(fd, bytes, length, bytes.length - length, null);
-      if (!count) break;
-      length += count;
-    }
-    if (length > MAX_POLICY_CONFIG_BYTES || bytes.subarray(0, length).includes(0)) fail("invalid_policy_config", "Policy config exceeds its bound or contains a NUL byte.");
-    try { return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, length)); }
-    catch { fail("invalid_policy_config", "Policy config must be valid UTF-8; source contents are not included in errors."); }
-  } finally { fs.closeSync(fd); }
-}
-
-export function readPolicyDomainConfig(projectRoot) {
-  const text = readPolicyConfigText(projectRoot);
-  if (text === null) return null;
-  let raw;
-  try { raw = JSON.parse(text.replace(/^\ufeff/u, "")); }
-  catch { fail("invalid_policy_config", "Policy config must be valid JSON; source contents are not included in errors."); }
-  const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-  const keys = (value, allowed) => Object.keys(value).every((key) => allowed.includes(key));
-  if (!object(raw) || !keys(raw, ["version", "domains"]) || raw.version !== 1 || !Array.isArray(raw.domains) || raw.domains.length > 100) fail("invalid_policy_config", "Use {version: 1, domains: [...]} with at most 100 domains.");
-  const ids = new Set(), rules = new Set();
-  for (const domain of raw.domains) {
-    if (!object(domain) || !keys(domain, ["id", "rule", "paths", "tasks"]) || typeof domain.id !== "string" || !NAME.test(domain.id) || !isPolicyRulePath(domain.rule) || domain.rule === ROOT_RULE) fail("invalid_policy_config", "Each domain needs a unique lowercase id and a non-root wiki/**/_rules.md rule path.");
-    if (ids.has(domain.id) || rules.has(domain.rule)) fail("invalid_policy_config", "Domain ids and rule paths must be unique; combine selectors for one domain.");
-    ids.add(domain.id); rules.add(domain.rule);
-    if (domain.paths !== undefined && (!validSourcePaths(domain.paths) || !domain.paths.length)) fail("invalid_policy_config", "Domain paths must be a nonempty array of unique literal project-relative scopes (directory scopes end with /).");
-    if (domain.tasks !== undefined && (!Array.isArray(domain.tasks) || !domain.tasks.length || domain.tasks.length > 32 || domain.tasks.some((task) => typeof task !== "string" || !NAME.test(task)) || new Set(domain.tasks).size !== domain.tasks.length)) fail("invalid_policy_config", "Domain tasks must be unique lowercase names, at most 32 per domain.");
-    if (domain.paths === undefined && domain.tasks === undefined) fail("invalid_policy_config", "Each domain needs paths and/or tasks; root rules are implicit.");
-  }
-  return raw;
-}
-
-/** Exact top-level service -> existing wiki/modules/<service>/_rules.md, only without config.
+/** Exact top-level service -> wiki/modules/<service>/_rules.md, even before it exists.
  * Inspect path types, never source/rule contents; missing descendants may be edit targets.
  */
-function serviceConventionDomain(projectRoot, source) {
+function serviceConventionMatch(projectRoot, source) {
   const parts = source.replace(/\/$/u, "").split("/");
   const service = parts[0];
   const rule = `wiki/modules/${service}/_rules.md`;
@@ -111,38 +61,31 @@ function serviceConventionDomain(projectRoot, source) {
       if (!stat.isDirectory()) fail("unsafe_policy_path", "Service scopes must traverse real directories.");
     } else if (!stat.isFile() && !stat.isDirectory()) fail("unsafe_policy_path", "Service scopes must name regular files or real directories.");
   }
-  if (!safePolicyTarget(projectRoot, rule, true).exists) return null;
-  return { id: service, rule, paths: [service, `${service}/`] };
+  return { service, rule, exists: safePolicyTarget(projectRoot, rule, true).exists };
 }
 
-/** Returns paths/selectors only, never policy contents or inferred permission/precedence.
+/** Returns existing paths and missing service targets separately, never file contents.
  * @param {string} projectRoot
  * @param {{paths?: string[], task: string}} query
  */
-export function resolveWikiPolicyDomains(projectRoot, { paths = [], task }) {
+export function resolveWikiRules(projectRoot, { paths = [], task }) {
   if (!Array.isArray(paths) || paths.length > 100 || !paths.every(isLiteralSourcePath) || new Set(paths).size !== paths.length || typeof task !== "string" || !NAME.test(task)) fail("invalid_policy_query", "Supply task (lowercase name) and at most 100 unique literal project-relative paths.");
-  const config = readPolicyDomainConfig(projectRoot);
-  const rulePaths = new Set([ROOT_RULE]);
-  const matches = config ? config.domains.filter((domain) => (!domain.tasks || domain.tasks.includes(task))
-    && (!domain.paths || paths.some((source) => domain.paths.some((scope) => matchesSourcePath(scope, source)))))
-    : [...new Map(paths.map((source) => serviceConventionDomain(projectRoot, source)).filter(Boolean).map((domain) => [domain.rule, domain])).values()];
-  for (const domain of matches) {
-    // An existing ancestor rule remains applicable, even if only its child has selectors.
-    const parts = domain.rule.split("/");
-    for (let size = 1; size < parts.length - 2; size++) {
-      const ancestor = `${parts.slice(0, size + 1).join("/")}/_rules.md`;
-      if (safePolicyTarget(projectRoot, ancestor, true).exists) rulePaths.add(ancestor);
-    }
-    safePolicyTarget(projectRoot, domain.rule);
-    rulePaths.add(domain.rule);
+  const rulePaths = new Set();
+  if (safePolicyTarget(projectRoot, ROOT_RULE, true).exists) rulePaths.add(ROOT_RULE);
+  const matches = [...new Map(paths.map((source) => serviceConventionMatch(projectRoot, source))
+    .filter(Boolean).map((match) => [match.service, match])).values()];
+  const suggestedRulePaths = [];
+  for (const match of matches) {
+    // Existing root/ancestor policies remain additive when the leaf is still missing.
+    if (safePolicyTarget(projectRoot, "wiki/modules/_rules.md", true).exists) rulePaths.add("wiki/modules/_rules.md");
+    if (match.exists) rulePaths.add(match.rule);
+    else suggestedRulePaths.push(match.rule);
   }
-  safePolicyTarget(projectRoot, ROOT_RULE);
+  const compare = (a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b);
   return {
-    mode: config ? "domains" : matches.length ? "convention" : "legacy", configPath: config ? WIKI_DOMAINS_PATH : null, task, paths,
-    rulePaths: [...rulePaths].sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b)),
-    matches: matches.map((domain) => ({ id: domain.id, rule: domain.rule })),
-    unmatchedPaths: paths.filter((source) => !matches.some((domain) => !domain.paths || domain.paths.some((scope) => matchesSourcePath(scope, source)))),
-    note: config ? "Declared domains only. Paths and tasks within a domain are ANDed; matching domains are unioned. Read applicable rules only before edits; conflicts must be reported, not overridden. This does not grant mutation permission."
-      : "No opt-in config: exact top-level service names select existing wiki/modules/<service>/_rules.md plus existing ancestors. Legacy discovery/scaffolding is unchanged. Results are only a known minimum, not the complete applicable policy set; consult quickstart/agent guidance for remaining rules. Read rules before edits; no override or mutation permission.",
+    mode: matches.length ? "convention" : "legacy", task, paths,
+    rulePaths: [...rulePaths].sort(compare), suggestedRulePaths: suggestedRulePaths.sort(compare), matches,
+    unmatchedPaths: paths.filter((source) => !matches.some(({ service }) => source === service || source.startsWith(`${service}/`))),
+    note: "Exact real top-level service names route to wiki/modules/<service>/_rules.md, even when missing. Read only existing rulePaths with read, not wiki_get. suggestedRulePaths are missing targets, not files to read. Existing ancestors are additive; consult quickstart for remaining rules. No contents, writes, scaffolds or inferred policy permission.",
   };
 }

@@ -119,22 +119,33 @@ test("update delegates intent classification and rule ownership to the agent wit
   }
 });
 
-test("update routes durable service rules into Wiki and reads resolved paths without requiring config", () => {
+test("update routes new service policies into Wiki without a config or existing leaf", () => {
   const prompt = render("update", "Hãy lưu quy tắc lâu dài cho order: không tự thêm unit test");
-  assert.match(prompt, /wiki_rules: applicable paths before edits, then read returned _rules\.md files with read, not wiki_get/);
-  assert.match(prompt, /Config is authoritative/);
-  assert.match(prompt, /exact top-level service names select existing wiki\/modules\/<service>\/_rules\.md plus ancestors/);
-  assert.match(prompt, /Consult quickstart for remaining rules; lookup never scaffolds/);
-  assert.match(prompt, /Honor configured routing\. Without config, a real top-level <service>\//);
-  assert.match(prompt, /by exact name; no config needed/);
+  assert.match(prompt, /read only existing rulePaths with read, not wiki_get/);
+  assert.match(prompt, /Missing suggestedRulePaths are creation targets, not files to read/);
+  assert.match(prompt, /Existing root\/ancestors are additive/);
+  assert.match(prompt, /Lookup never scaffolds/);
+  assert.match(prompt, /A real top-level <service>\//);
+  assert.match(prompt, /by exact name, even when missing/);
   assert.match(prompt, /durable order-scoped rule in wiki\/modules\/order\/_rules\.md, never order\/AGENTS\.md/);
   assert.match(prompt, /Do not guess other ownership/);
+  assert.doesNotMatch(prompt, /_domains\.json|configured routing|Config is authoritative/);
+});
+
+test("shared bootstrap guides ordinary chat policy requests without requiring a Wiki command", () => {
+  const bootstrap = createWikiAgentInstructions();
+  assert.match(bootstrap, /suggestedRulePaths are missing creation targets, not files to read/);
+  assert.match(bootstrap, /order-service rule in wiki\/modules\/order\/_rules\.md, not order\/AGENTS\.md/);
+  assert.match(bootstrap, /ordinary chat without requiring \/wiki-update/);
+  assert.match(bootstrap, /never invent policy during code\/docs work or persist one-off instructions/);
+  assert.match(bootstrap, /initialization still prohibits rule edits/);
+  assert.doesNotMatch(bootstrap, /_domains\.json/);
 });
 
 test("init never permits rule updates even when the request names rules", () => {
   const prompt = render("init", "Update wiki/_rules.md");
   assert.match(prompt, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
-  assert.match(prompt, /only during an active \/wiki-update run/);
+  assert.match(prompt, /during \/wiki initialization/);
   assert.doesNotMatch(prompt, /Agent-directed rule updates/);
 });
 
@@ -174,9 +185,9 @@ test("init bootstrap defines verifiable goals without mandating new tests", () =
   assert.doesNotMatch(render("update"), /Goal-driven execution \(project changes\):/);
 });
 
-test("the reusable bootstrap is compact and matches checked-in agent files", () => {
+test("the reusable bootstrap stays compact and preserves legacy project guidance", () => {
   const bootstrap = createWikiAgentInstructions();
-  assert.ok(bootstrap.length < 2000);
+  assert.ok(bootstrap.length < 3000);
   assert.match(bootstrap, /Selective Wiki reading:/);
   assert.match(bootstrap, /Do not preload the entire wiki/);
   assert.doesNotMatch(render("init"), /Selective Wiki reading:|```markdown|## Project Wiki/);
@@ -192,7 +203,9 @@ test("the reusable bootstrap is compact and matches checked-in agent files", () 
     const marker = "## Project Wiki\n";
     assert.equal(content.split(marker).length - 1, 1, `${filename} must contain one Project Wiki block`);
     const block = content.slice(content.indexOf(marker)).split(/\n## /, 1)[0].trim();
-    assert.equal(block, bootstrap, `${filename} must match the generated bootstrap`);
+    // Existing projects are not silently rewritten when the template gains rule guidance.
+    const withoutNewGuidance = bootstrap.replace(/Rules lookup and lasting requests:\n[\s\S]*?\n\n(?=Goal-driven execution)/u, "");
+    assert.equal(block, withoutNewGuidance, `${filename} legacy guidance must be preserved by the template`);
   }
 });
 

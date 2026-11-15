@@ -16,14 +16,14 @@ Suite Wiki có 148 test pass trên Node v26.9.0 sau khi thêm read model và rea
 
 | Test source (trong `packages/pi-learn-extensions/tests/wiki/`) | Evidence được kiểm tra |
 |---|---|
-| `wiki-prompt.test.mts` | Init khảo sát có thứ tự, working model trong context, không tool/runtime manuals, optional plan/brief, bootstrap setup riêng và khớp AGENTS/CLAUDE; update giữ lookup/fallback, scope/intent/ownership; cả hai giữ safety, evidence/review/no-migration và không inject Git |
+| `wiki-prompt.test.mts` | Init khảo sát có thứ tự, working model trong context, không tool/runtime manuals, optional plan/brief, bootstrap setup riêng, ordinary-chat rule guidance và giữ baseline AGENTS/CLAUDE cũ; update giữ lookup/fallback, scope/intent/ownership; cả hai giữ safety, evidence/review/no-migration và không inject Git |
 | `wiki-commands.test.mjs` | Guards/lifecycle hiện có; schema/graph trước no-op/finalization, clean-Git metadata-only status, invalid/no-change, warnings, interrupted repair, abort/error/retry/shutdown và giữ metadata khi không đổi |
 | `wiki-rules.test.mjs` | Path classification, outside-root rejection, discovery/missing sections, IDs/origin lint, scaffold idempotency, symlink escape |
 | `wiki-links.test.mjs` | Checked-in Wiki links, file/Unicode/duplicate anchors, punctuation, traversal/encoding, reserved sources, symlink target/root |
 | `wiki-model.test.mts` | Wiki-only index, guides/specs, metadata lookup, filtered search/pagination, typed/reverse graph, schema diagnostics, duplicate IDs, external/same-size edits, root isolation, symlinks/escapes, UTF-8/size limits và provenance |
-| `wiki-tools.test.mjs` | Sáu read tools/hai metadata tools/hai commands, active-run permits, cross-instance isolation, no legacy conversion, headless, scopes, safe rule lint, link targets không đọc protected text, JSON output budget/revision pagination, session/cwd replacement, sanitized YAML warnings và không mở quyền ghi; TypeBox host double |
+| `wiki-tools.test.mjs` | Sáu read tools/hai metadata tools/hai commands, active-run permits, cross-instance isolation, no legacy conversion, headless, scopes, safe rule lint, link targets không đọc protected text, JSON output budget/revision pagination, session/cwd replacement, sanitized YAML warnings, ordinary-chat rule writes, init protection và metadata-tool permits không đổi; TypeBox host double |
 
-`wiki-routing.test.mjs` kiểm section Unicode/BOM/CRLF/fences/duplicate anchors, bounded heading lists, exact/prefix source scopes, nhiều owners và invalid schema, source không bị mở, domain selectors/ancestor union, opt-in legacy compatibility, config lỗi/symlinks và không leak policy text. Tool fixtures kiểm pagination section lớn/stale output; command fixtures kiểm config-only snapshot và invalid-config no-op/finalization/repair. Config không được tạo trong repo thật; chỉ fixture tests.
+`wiki-routing.test.mjs` kiểm section Unicode/BOM/CRLF/fences/duplicate anchors, source scopes/owners/schema, không đọc source, exact service convention, root/ancestor union, missing targets, create → next lookup, safe paths/symlinks và không leak policy text. Tool/host fixtures kiểm chat thường lấy suggested target, guard cho phép ghi rồi lookup thấy existing leaf, init vẫn chặn, metadata permits không đổi; không dùng model thật. Stale domain files không còn được parse hoặc ảnh hưởng discovery/scaffold/lint/snapshot/finalization.
 
 `wiki-spec-writer.test.mts` kiểm source-paths create/add/remove qua YAML AST, comments/CRLF/body preservation và reject malformed scopes, ngoài exclusive create, strict authoring, duplicate/edge/cycle guards, revision conflicts, body/BOM/CRLF/comments/nested-field preservation, symlink/hardlink protection, cross-path create races, queued cancellation/run expiry và editor changes. Đây là filesystem fixtures, không chứng minh an toàn trước mọi external process race hoặc OS sandbox.
 
@@ -69,6 +69,7 @@ Sau source changes: automated checks → `/reload` hoặc restart đúng package
 | Abort/shutdown sau đổi Wiki | Interrupted; retry có thể complete kể cả không thêm thay đổi nếu validation valid |
 | Abort không đổi, valid links/rules | Metadata cũ giữ nguyên |
 | Finalization exception | Notify error, kiểm tra docs và retry; không giả metadata đã được ghi |
+| Ordinary lasting rule request for `order/`, no rule file | `wiki_rules` trả missing target; đọc existing rules, tạo `wiki/modules/order/_rules.md`, không tạo service AGENTS; giữ unrelated policy |
 | Ordinary project question | Quickstart một lần khi context chưa có, rules chỉ load khi chuẩn bị edit |
 
 Chỉ hai command Wiki được register. Kiểm tra guards bằng fixtures trong repo tạm; không sửa metadata thật thủ công. Full contract ở [Wiki lifecycle](../extensions/wiki-extension.md#commands-and-run-lifecycle).
@@ -89,13 +90,13 @@ Chỉ hai command Wiki được register. Kiểm tra guards bằng fixtures tron
 
 Không đọc/quote/commit live `.env`, auth/account stores, keys, tokens, payload logs hoặc raw session logs. Chỉ sample placeholder không secret mới dùng làm fixture. Các tên path trong [catalog persistence](../extensions/catalog.md#account-state-và-persistence) là hợp đồng source, không cho phép đọc live stores.
 
-Extension chạy với quyền OS user. Wiki `tool_call` guard chỉ kiểm named write/edit paths và bash regex cho mutation phổ biến; không cover mọi custom tool, codemode indirection, shell script hoặc write ngoài Wiki. Generated task prompt đặt write/read boundaries và selective-reading; đó không phải filesystem sandbox. Quyền sửa rule trong update không mở quyền truy cập secrets hoặc sửa metadata/brief.
+Extension chạy với quyền OS user. Wiki `tool_call` guard chỉ kiểm named write/edit paths và bash regex cho mutation phổ biến; không cover mọi custom tool, codemode indirection, shell script hoặc write ngoài Wiki. Generated task prompt đặt write/read boundaries và selective-reading; đó không phải filesystem sandbox. Quyền sửa rule trong chat thường/update không mở quyền truy cập secrets hoặc metadata; active brief và init rules vẫn bị chặn. Guard không phân loại ý nghĩa user request: chỉ lưu lasting policy được yêu cầu là model guidance.
 
 Auth/account stores là JSON plaintext (mode 0600 best effort), không encrypted. OAuth refresh error hiện có thể kèm remote response text trong notification; redact trước chia sẻ diagnostic. JWT decode metadata không phải token validation. PR review có pull_request_target/secrets boundary cần audit riêng: [workflow](development.md#pr-review-workflow).
 
 ## Wiki path safety
 
-- Metadata luôn extension-owned; brief được tool guard bảo vệ trong active run; rules bị bảo vệ trừ active `/wiki-update` cùng cwd (và extension scaffold thiếu).
+- Metadata luôn extension-owned; brief được bảo vệ trong active run. Canonical rules được ghi trong chat thường và update cùng cwd; init/active run khác cwd vẫn chặn. Rule writes không được traversal, ngoài cwd hoặc qua symlink; giới hạn intent dựa trên prompt, không semantic detector.
 - Rule discovery yêu cầu real Wiki root, bỏ directory symlink; rule file symlink chỉ cho resolve trong project. Link validator từ chối symlink Wiki root/target và realpath ngoài Wiki.
 - Link traversal/file/anchor validation không thay kiểm tra Markdown đầy đủ hoặc claim evidence. Reserved rule/brief/temp pages không là source docs scan; rules lint là bước độc lập.
 - Không coi scaffold, path checks hay regex guard là transaction/rollback. Failure có thể để docs partial; sửa topic/link/lint rồi retry, không xóa evidence để giả hoàn tất.
@@ -110,4 +111,4 @@ git diff --check
 git diff -- wiki/ AGENTS.md CLAUDE.md
 ```
 
-Chọn diff paths đúng scope khi sửa source. `.gitignore` không blanket-ignore toàn bộ private state; kiểm tra filename trước mở content. Không commit auth/.env/key/payload/session logs, temporary `_plan.md` hoặc unrelated local changes; không auto-push. Trong Wiki run, không edit `.last-update.json` (extension finalize sau settled), không sửa brief hoặc rules ngoài scope của active update.
+Chọn diff paths đúng scope khi sửa source. `.gitignore` không blanket-ignore toàn bộ private state; kiểm tra filename trước mở content. Không commit auth/.env/key/payload/session logs, temporary `_plan.md` hoặc unrelated local changes; không auto-push. Trong Wiki run, không edit `.last-update.json` (extension finalize sau settled), không sửa brief trong active run hoặc rules ngoài user-requested policy scope.

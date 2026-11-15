@@ -92,7 +92,17 @@ test("real Pi loader/TypeBox handle one Wiki entrypoint and headless factory rep
   assert.equal(JSON.parse((await invoke(extension, "wiki_locate", { sourcePath: "src/new/file.ts" })).content[0].text).data.matches[0].id, "new");
   assert.equal(JSON.parse((await invoke(extension, "wiki_get", { id: "new", heading: "Boundary" })).content[0].text).data.section.anchor, "boundary");
   assert.equal(JSON.parse((await invoke(extension, "wiki_rules", { paths: ["src/new/file.ts"], task: "code" })).content[0].text).data.mode, "legacy");
+  await emit(extension, "agent_settled");
   mkdirSync(path.join(cwd, "order/src"), { recursive: true });
+  writeFileSync(path.join(cwd, "wiki/_domains.json"), "INVALID_STALE_CONFIG_SENTINEL");
+  const missing = JSON.parse((await invoke(extension, "wiki_rules", { paths: ["order/"], task: "docs" })).content[0].text).data;
+  assert.equal(missing.mode, "convention");
+  assert.deepEqual(missing.rulePaths, ["wiki/_rules.md"]);
+  assert.deepEqual(missing.suggestedRulePaths, ["wiki/modules/order/_rules.md"]);
+  for (const handler of extension.handlers.get("tool_call") ?? []) {
+    assert.equal(await handler({ toolName: "write", input: { path: missing.suggestedRulePaths[0] } }, ctx), undefined);
+    assert.equal((await handler({ toolName: "write", input: { path: "wiki/.last-update.json" } }, ctx)).block, true);
+  }
   mkdirSync(path.join(cwd, "wiki/modules/order"), { recursive: true });
   writeFileSync(path.join(cwd, "wiki/modules/_rules.md"), "# Module policies\n");
   writeFileSync(path.join(cwd, "wiki/modules/order/_rules.md"), "# Order policies\nORDER_POLICY_SENTINEL\n");
@@ -102,13 +112,9 @@ test("real Pi loader/TypeBox handle one Wiki entrypoint and headless factory rep
   assert.deepEqual(JSON.parse(serviceRules.content[0].text).data.unmatchedPaths, ["unmatched/file"]);
   assert.equal(JSON.stringify(serviceRules).includes("ORDER_POLICY_SENTINEL"), false);
   assert.equal((await invoke(extension, "wiki_get", { path: "modules/order/_rules.md" })).details.errorCode, "reserved_path");
-  mkdirSync(path.join(cwd, "wiki/policies"));
-  writeFileSync(path.join(cwd, "wiki/policies/_rules.md"), "# Fixture policy\nPOLICY_BODY_SENTINEL\n");
-  writeFileSync(path.join(cwd, "wiki/_domains.json"), JSON.stringify({ version: 1, domains: [{ id: "new", rule: "wiki/policies/_rules.md", paths: ["src/new/"], tasks: ["code"] }] }));
-  const routed = await invoke(extension, "wiki_rules", { paths: ["src/new/file.ts", "order/src/Foo.java"], task: "code" });
-  assert.deepEqual(JSON.parse(routed.content[0].text).data.rulePaths, ["wiki/_rules.md", "wiki/policies/_rules.md"]);
-  assert.deepEqual(JSON.parse(routed.content[0].text).data.unmatchedPaths, ["order/src/Foo.java"]);
-  assert.equal(JSON.stringify(routed).includes("POLICY_BODY_SENTINEL"), false);
+  assert.deepEqual(JSON.parse(serviceRules.content[0].text).data.suggestedRulePaths, []);
+  assert.equal(JSON.stringify(serviceRules).includes("INVALID_STALE_CONFIG_SENTINEL"), false);
+  await extension.commands.get("wiki-update").handler("Confirm service rule and queued edit", ctx);
   let release, admitted;
   const gate = new Promise((resolve) => { release = resolve; });
   const started = new Promise((resolve) => { admitted = resolve; });
@@ -132,6 +138,9 @@ test("real Pi loader/TypeBox handle one Wiki entrypoint and headless factory rep
   assert.equal((await invoke(extension, "wiki_search", { pattern: "needle" })).details.errorCode, "session_inactive");
   await replacement.commands.get("wiki").handler("Confirm existing Wiki", ctx);
   assert.doesNotMatch(prompts.at(-1), /Bootstrap setup|## Project Wiki|```markdown/);
+  for (const handler of replacement.handlers.get("tool_call") ?? []) {
+    assert.equal((await handler({ toolName: "write", input: { path: "wiki/modules/order/_rules.md" } }, ctx)).block, true);
+  }
   await emit(replacement, "agent_settled");
   assert.match(readFileSync(path.join(cwd, "AGENTS.md"), "utf8"), /^## Project Wiki\n/);
   assert.match(notifications.at(-1), /Wiki init completed/);

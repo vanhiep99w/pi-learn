@@ -14,13 +14,11 @@ import {
   isWikiDocumentationPath,
   isWikiMetadataPath,
   isWikiPolicyPath,
-  isWikiDomainsPath,
 } from "./wiki-rules.js";
 import { createWikiTaskPrompt } from "./wiki-prompt.js";
 import { ensureWikiAgentBootstrap } from "./wiki-bootstrap.ts";
 import { isProtectedWikiMutationPath, commandMutatesProtectedWikiPath } from "./wiki-protection.ts";
 import { WikiModelError, WikiReadModel, type WikiDiagnostic } from "./wiki-model.ts";
-import { readPolicyConfigText, WikiPolicyError } from "./wiki-policy.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -80,23 +78,23 @@ export function registerWikiCommands(pi: ExtensionAPI): WikiWriteAccess {
     const toolName = event.toolName;
     const currentRun = state.active?.cwd === ctx.cwd ? state.active : null;
     const protectWikiBrief = currentRun !== null;
-    const protectRules = currentRun?.command !== "update";
+    const protectRules = state.active !== null && (currentRun === null || currentRun.command === "init");
     if (toolName === "write" || toolName === "edit") {
       const candidate = (event.input as { path?: unknown })?.path;
       if (isProtectedWikiMutationPath(ctx.cwd, candidate, { protectRules, protectWikiBrief })) {
         return {
           block: true,
-          reason: "Wiki metadata and the active run's wiki/INSTRUCTIONS.md are protected. _rules.md and wiki/_domains.json may be changed only during an active /wiki-update run; the agent chooses the applicable policy from the user's intent.",
+          reason: "Wiki blocked a protected or unsafe path. Metadata is extension-owned; active-run briefs and init rules are protected. Rule writes must stay in this cwd on canonical, non-symlink Wiki paths.",
         };
       }
     }
 
     if (toolName === "bash") {
       const command = String((event.input as { command?: unknown })?.command ?? "");
-      if (commandMutatesProtectedWikiPath(command, { protectRules, protectWikiBrief })) {
+      if (commandMutatesProtectedWikiPath(ctx.cwd, command, { protectRules, protectWikiBrief })) {
         return {
           block: true,
-          reason: "Wiki blocked a shell mutation of protected metadata, instructions, or rule files outside an active /wiki-update run.",
+          reason: "Wiki blocked a shell mutation of protected metadata, an active-run brief, init rules, or an unsafe rule path.",
         };
       }
     }
@@ -308,7 +306,7 @@ async function getUpdateNoopStatus(cwd: string): Promise<UpdateNoopStatus> {
   if (head !== lastUpdate.gitHead) {
     const changedPaths = await getChangedPathsSince(cwd, lastUpdate.gitHead);
     if (changedPaths.length === 0) return { shouldSkip: false, reason: "git head changed but changed paths are unavailable" };
-    if (changedPaths.some(isWikiPolicyPath)) return { shouldSkip: false, reason: "prompt rules or domain configuration changed" };
+    if (changedPaths.some(isWikiPolicyPath)) return { shouldSkip: false, reason: "prompt rules changed" };
     if (changedPaths.some((changedPath) => !isWikiDocumentationPath(changedPath) && !isWikiMetadataPath(changedPath))) {
       return { shouldSkip: false, reason: "source or configuration changed" };
     }
@@ -387,10 +385,7 @@ async function addWikiContentToSnapshot(
   const repositoryPath = `${WIKI_DIR}/${relativePath}`;
   if (!info.isFile() || (!isWikiDocumentationPath(repositoryPath) && !isWikiPolicyPath(repositoryPath))) return;
   hash.update(`file:${repositoryPath}\0`);
-  if (isWikiDomainsPath(repositoryPath)) {
-    try { hash.update(readPolicyConfigText(path.resolve(absolutePath, "../..")) ?? "missing-policy-config"); }
-    catch (error) { hash.update(`invalid-policy-config:${error instanceof WikiPolicyError ? error.code : "read_failed"}`); }
-  } else hash.update(await readFile(absolutePath));
+  hash.update(await readFile(absolutePath));
   hash.update("\0");
 }
 

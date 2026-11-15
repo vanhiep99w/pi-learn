@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { isWikiDomainsPath, readPolicyDomainConfig, safePolicyTarget, WIKI_DOMAINS_PATH } from "./wiki-policy.js";
-export { isWikiDomainsPath, WIKI_DOMAINS_PATH } from "./wiki-policy.js";
+import { safePolicyTarget } from "./wiki-policy.js";
 
 export const WIKI_DIR = "wiki";
 export const WIKI_RULE_BASENAME = "_rules.md";
@@ -43,7 +42,7 @@ export function isWikiRulePath(value) {
 }
 
 export function isWikiPolicyPath(value) {
-  return isWikiRulePath(value) || isWikiDomainsPath(normalizeRepositoryPath(value));
+  return isWikiRulePath(value);
 }
 
 export function isWikiMetadataPath(value) {
@@ -105,17 +104,8 @@ export function discoverWikiPromptRules({ projectRoot, includePath, readRuleFile
 
   const sectionPaths = new Set([WIKI_DIR]);
   walkWikiDirectory({ root, absoluteDir: wikiRoot, relativeDir: WIKI_DIR, sectionPaths, report, includePath });
-  let config;
-  report.mode = "legacy";
-  try {
-    config = readPolicyDomainConfig(root);
-    if (config) report.mode = "domains";
-  } catch (error) {
-    report.mode = "invalid";
-    report.errors.push({ path: WIKI_DOMAINS_PATH, code: error.code ?? "invalid_policy_config", message: "Cannot safely load policy-domain configuration; repair wiki/_domains.json before completion." });
-  }
-  report.sections = (config ? [WIKI_DIR, ...config.domains.map((domain) => path.posix.dirname(domain.rule))]
-    : report.mode === "invalid" ? [WIKI_DIR] : [...sectionPaths]).sort(compareRulePaths);
+  report.mode = "sections";
+  report.sections = [...sectionPaths].sort(compareRulePaths);
   report.files.sort(compareRulePaths);
   report.rootRuleExists = report.files.includes(`${WIKI_DIR}/${WIKI_RULE_BASENAME}`);
 
@@ -137,10 +127,6 @@ export function discoverWikiPromptRules({ projectRoot, includePath, readRuleFile
 
   const idsByFile = new Map();
   for (const rulePath of report.files) {
-    if (config) {
-      try { safePolicyTarget(root, rulePath); }
-      catch { report.errors.push({ path: rulePath, code: "unsafe_policy_path", message: "Configured policy mode requires regular rule files without symlink components." }); continue; }
-    }
     const lint = lintWikiPromptRuleFile({ projectRoot: root, rulePath, readRuleFile });
     report.errors.push(...lint.errors);
     report.warnings.push(...lint.warnings);
@@ -268,27 +254,14 @@ export function lintWikiPromptRuleFile({ projectRoot, rulePath, readRuleFile }) 
 export function ensureWikiPromptRuleScaffolds({ projectRoot }) {
   const root = path.resolve(projectRoot);
   const wikiRoot = path.join(root, WIKI_DIR);
-  let config;
-  try {
-    config = readPolicyDomainConfig(root);
-    if (config) safePolicyTarget(root, `${WIKI_DIR}/${WIKI_RULE_BASENAME}`, true);
-  } catch {
-    // Do not silently fall back to legacy scaffolds for invalid opt-in configuration.
-    // Update can still run to repair it; discovery/finalization reports the error.
-    return { created: [], sections: [], mode: "invalid" };
-  }
+  safePolicyTarget(root, `${WIKI_DIR}/${WIKI_RULE_BASENAME}`, true);
   fs.mkdirSync(wikiRoot, { recursive: true });
-  const sections = config ? [WIKI_DIR, ...config.domains.map((domain) => path.posix.dirname(domain.rule))].sort(compareRulePaths)
-    : discoverWikiSectionPaths({ projectRoot: root });
+  const sections = discoverWikiSectionPaths({ projectRoot: root });
   const created = [];
-  if (config) {
-    try { for (const section of sections) safePolicyTarget(root, `${section}/${WIKI_RULE_BASENAME}`, true); }
-    catch { return { created, sections, mode: "invalid" }; }
-  }
   for (const section of sections) {
     const rulePath = `${section}/${WIKI_RULE_BASENAME}`;
-    // Preserve legacy treatment of pre-existing rule aliases; domain mode is stricter.
-    if (!config && fs.existsSync(path.join(root, rulePath))) continue;
+    // Preserve pre-existing rule files/aliases; lint reports unsafe aliases separately.
+    if (fs.existsSync(path.join(root, rulePath))) continue;
     const target = safePolicyTarget(root, rulePath, true);
     if (target.exists) continue;
     fs.mkdirSync(path.dirname(target.absolute), { recursive: true });
@@ -297,7 +270,7 @@ export function ensureWikiPromptRuleScaffolds({ projectRoot }) {
     catch (error) { if (error.code === "EEXIST") { safePolicyTarget(root, rulePath); continue; } throw error; }
     created.push(rulePath);
   }
-  return { created, sections, mode: config ? "domains" : "legacy" };
+  return { created, sections, mode: "sections" };
 }
 
 export function discoverWikiSectionPaths({ projectRoot }) {

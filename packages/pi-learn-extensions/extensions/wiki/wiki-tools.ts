@@ -10,7 +10,7 @@ import { Type, type Static, type TSchema } from "typebox";
 import { LINK_KINDS, SLICE_DIRECTIONS } from "./vendor/thinkrail-spec-graph/core/index.ts";
 import { WikiModelError, WikiReadModel } from "./wiki-model.ts";
 import { validateWikiReadOnly, WIKI_VALIDATION_SCOPES } from "./wiki-validation.ts";
-import { resolveWikiPolicyDomains, WikiPolicyError } from "./wiki-policy.js";
+import { resolveWikiRules, WikiPolicyError } from "./wiki-policy.js";
 
 export const MAX_WIKI_TOOL_OUTPUT_BYTES = 24 * 1024;
 // Reserve space for details instead of hiding unbounded data outside model-facing content.
@@ -55,7 +55,7 @@ export const wikiLocateParameters = Type.Object({
 
 export const wikiRulesParameters = Type.Object({
   paths: Type.Array(Type.String({ minLength: 1, maxLength: 1024 }), { maxItems: 100, description: "Affected project-relative files/directories; no globs or traversal." }),
-  task: Type.String({ pattern: "^[a-z][a-z0-9-]{0,63}$", description: "Task kind, e.g. code, docs, tests or release. Configured task selectors apply; service convention is task-independent." }),
+  task: Type.String({ pattern: "^[a-z][a-z0-9-]{0,63}$", description: "Task label, e.g. code, docs, tests or release. Service routing is task-independent." }),
   ...outputPaging,
 }, { additionalProperties: false });
 
@@ -162,14 +162,14 @@ export function registerWikiReadTools(pi: ExtensionAPI, createModel = (root: str
       return model.search({ ...query, scope: query.scope ?? "all" });
     });
   register("wiki_get", wikiGetParameters,
-    "wiki_get — metadata, bounded heading list and forward/reverse links for exactly one spec id or Wiki-relative path. No prose by default. Supply heading (exact title or #anchor) for a verbatim section including subheadings, ending before the next same/higher-level heading; repeated titles require occurrence. Never reads reserved rules/config/brief files.",
+    "wiki_get — metadata, bounded heading list and forward/reverse links for exactly one spec id or Wiki-relative path. No prose by default. Supply heading (exact title or #anchor) for a verbatim section including subheadings, ending before the next same/higher-level heading; repeated titles require occurrence. Never reads reserved rules/brief files.",
     (model, params) => model.get(params));
   register("wiki_locate", wikiLocateParameters,
     "wiki_locate — find declared spec owners for a source path via optional source-paths frontmatter. Literal files match exactly, trailing-/ directories match prefixes. Returns all matches up to 200 sorted by specificity, never an automatic winner or source contents. No matches does not prove no contract exists.",
     (model, params) => model.locate(params.sourcePath));
   register("wiki_rules", wikiRulesParameters,
-    "wiki_rules — before edits, resolve rule paths for affected source files/directories and task. Explicit wiki/_domains.json is authoritative. Without config, an exact real top-level service directory (order, order/ or order/src/Foo.java) selects existing wiki/modules/order/_rules.md; Wiki doc paths are not source scopes. No matching convention: legacy known minimum; consult quickstart for remaining rules. Root and existing ancestors are additive. Returns paths/selectors only, never policy text or mutation permission; no writes/scaffolds. Then use read on returned rule files, not wiki_get.",
-    (model, params) => resolveWikiPolicyDomains(model.projectRoot, params));
+    "wiki_rules — resolve existing rulePaths and missing suggestedRulePaths, without reading source/policy bodies or writing/scaffolding. An exact existing real top-level service (order, order/ or order/src/Foo.java) routes to wiki/modules/order/_rules.md even if its Wiki directories/leaf do not exist. Matches identify the service, target and exists flag. Existing root/ancestor rules are additive; read only rulePaths with read, not wiki_get. Suggested targets are not files to read. Consult quickstart for unmatched paths/remaining rules; Wiki doc paths are not source scopes. In ordinary chat, honor a user-requested lasting rule by creating/editing the canonical Wiki rule target; no /wiki-update required. A request to add an order-service rule belongs in wiki/modules/order/_rules.md, not order/AGENTS.md. Never invent policy during ordinary code/docs work or persist one-off instructions. Init still prohibits rule edits; metadata and active briefs stay protected. This is model-intent guidance, not semantic authorization enforcement.",
+    (model, params) => resolveWikiRules(model.projectRoot, params));
   register("wiki_graph", wikiGraphParameters,
     "wiki_graph — get a bounded subtree/ancestors/neighbors slice. Neighbor edges include reverse dependencies; default depth 1, max 4, at most 100 nodes/200 edges/100 missing targets. Declared edges do not prove complete code impact coverage.",
     (model, params) => {

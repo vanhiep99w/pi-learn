@@ -8,7 +8,7 @@ import { WikiReadModel } from "../../extensions/wiki/wiki-model.ts";
 import { wikiHeadings } from "../../extensions/wiki/wiki-headings.js";
 import { validateWikiInternalLinks } from "../../extensions/wiki/wiki-links.js";
 import { discoverWikiPromptRules, ensureWikiPromptRuleScaffolds } from "../../extensions/wiki/wiki-rules.js";
-import { readPolicyDomainConfig, resolveWikiPolicyDomains } from "../../extensions/wiki/wiki-policy.js";
+import { resolveWikiRules } from "../../extensions/wiki/wiki-policy.js";
 import { validateWikiReadOnly } from "../../extensions/wiki/wiki-validation.ts";
 
 function fixture(t) {
@@ -19,8 +19,7 @@ function fixture(t) {
     fs.writeFileSync(target, content); return target;
   };
   put("wiki/_rules.md", "# Root\nROOT_POLICY_SENTINEL\n");
-  const config = (domains) => put("wiki/_domains.json", JSON.stringify({ version: 1, domains }));
-  return { root, put, config, model: new WikiReadModel(root) };
+  return { root, put, model: new WikiReadModel(root) };
 }
 const spec = (id, scopes, body = "# Contract\nbody\n") => `---\nid: ${id}\ntype: module-design\ntitle: ${id}\n${scopes === undefined ? "" : `source-paths: ${JSON.stringify(scopes)}\n`}---\n${body}`;
 const code = (expected) => (error) => error.code === expected;
@@ -115,53 +114,16 @@ test("duplicate matching spec IDs cannot be presented as canonical source owners
   assert.throws(() => f.model.locate("src/file"), code("duplicate_id"));
 });
 
-test("configured policy discovery/scaffolding follows declared domains, not documentation folders", (t) => {
-  const f = fixture(t);
-  f.put("wiki/modules/one/SPEC.md", spec("one")); f.put("wiki/modules/two/SPEC.md", spec("two"));
-  const old = f.put("wiki/legacy/_rules.md", "# Preserve legacy policies\nLEGACY_SENTINEL\n");
-  f.config([{ id: "backend", rule: "wiki/policies/backend/_rules.md", paths: ["src/"] }]);
-  const missing = discoverWikiPromptRules({ projectRoot: f.root });
-  assert.equal(missing.mode, "domains");
-  assert.deepEqual(missing.missingRuleSections, ["wiki/policies/backend"]);
-  const result = ensureWikiPromptRuleScaffolds({ projectRoot: f.root });
-  assert.deepEqual(result.created, ["wiki/policies/backend/_rules.md"]);
-  assert.equal(fs.existsSync(path.join(f.root, "wiki/modules/one/_rules.md")), false);
-  assert.equal(fs.existsSync(path.join(f.root, "wiki/modules/two/_rules.md")), false);
-  assert.equal(fs.readFileSync(old, "utf8"), "# Preserve legacy policies\nLEGACY_SENTINEL\n");
-  assert.equal(discoverWikiPromptRules({ projectRoot: f.root }).valid, true);
-  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).created, []);
-});
-
-test("policy routing unions matches with root/ancestors, ANDs task and paths, and reads no rule bodies", (t) => {
-  const f = fixture(t);
-  f.put("wiki/policies/_rules.md", "ANCESTOR_POLICY_SENTINEL");
-  f.put("wiki/policies/backend/_rules.md", "BACKEND_POLICY_SENTINEL");
-  f.put("wiki/operations/_rules.md", "OPS_POLICY_SENTINEL");
-  f.config([
-    { id: "backend", rule: "wiki/policies/backend/_rules.md", paths: ["src/"], tasks: ["code", "tests"] },
-    { id: "docs", rule: "wiki/operations/_rules.md", tasks: ["docs"] },
-  ]);
-  const opened = [], original = fs.openSync;
-  t.mock.method(fs, "openSync", (file, ...rest) => { opened.push(String(file)); return original(file, ...rest); });
-  const result = resolveWikiPolicyDomains(f.root, { paths: ["src/a.ts", "other/a.ts"], task: "code" });
-  assert.deepEqual(result.rulePaths, ["wiki/_rules.md", "wiki/policies/_rules.md", "wiki/policies/backend/_rules.md"]);
-  assert.deepEqual(result.unmatchedPaths, ["other/a.ts"]);
-  assert.equal(JSON.stringify(result).includes("POLICY_SENTINEL"), false);
-  assert.deepEqual(opened.map((p) => path.basename(p)), ["_domains.json"]);
-  assert.deepEqual(resolveWikiPolicyDomains(f.root, { paths: ["src/a.ts"], task: "docs" }).rulePaths, ["wiki/_rules.md", "wiki/operations/_rules.md"]);
-  assert.equal(resolveWikiPolicyDomains(f.root, { paths: ["srcx/a.ts"], task: "code" }).matches.length, 0);
-});
-
 test("unconfigured service files and directories select exact module rules plus existing parents", (t) => {
   const f = fixture(t);
   f.put("order/src/Foo.java", "SOURCE_SENTINEL");
   f.put("wiki/modules/_rules.md", "PARENT_POLICY_SENTINEL");
   f.put("wiki/modules/order/_rules.md", "ORDER_POLICY_SENTINEL");
   for (const source of ["order/src/Foo.java", "order/", "order", "order/src/", "order/src/New.java"]) {
-    const result = resolveWikiPolicyDomains(f.root, { paths: [source], task: "code" });
+    const result = resolveWikiRules(f.root, { paths: [source], task: "code" });
     assert.deepEqual(result.rulePaths, ["wiki/_rules.md", "wiki/modules/_rules.md", "wiki/modules/order/_rules.md"]);
-    assert.equal(result.mode, "convention"); assert.equal(result.configPath, null);
-    assert.deepEqual(result.matches, [{ id: "order", rule: "wiki/modules/order/_rules.md" }]);
+    assert.equal(result.mode, "convention"); assert.equal("configPath" in result, false);
+    assert.deepEqual(result.matches, [{ service: "order", rule: "wiki/modules/order/_rules.md", exists: true }]);
     assert.deepEqual(result.unmatchedPaths, []);
     assert.equal(JSON.stringify(result).includes("SENTINEL"), false);
   }
@@ -178,58 +140,39 @@ test("service convention unions batches without content reads, writes or ownersh
   f.put("wiki/modules/missing/_rules.md", "NO_SOURCE_DIRECTORY");
   f.put("wiki/modules/root-file/_rules.md", "NOT_A_DIRECTORY");
   f.put("root-file", "source file");
-  for (const service of ["unknown", "order-extra", "Order"]) f.put(`${service}/file`, "unmapped service");
-  f.put("src/order/file", "nested names do not match");
+
   const unmatched = ["unknown/file", "order-extra/file", "Order/file", "src/order/file", "wiki/modules/order/SPEC.md", "wiki/modules/order/", "missing/", "root-file"];
   for (const method of ["openSync", "readFileSync", "writeFileSync", "mkdirSync"]) {
     t.mock.method(fs, method, () => { throw new Error(`Resolver must not call ${method}`); });
   }
-  const result = resolveWikiPolicyDomains(f.root, { paths: ["order/", "order/src/file", "billing", ...unmatched], task: "tests" });
+  const result = resolveWikiRules(f.root, { paths: ["order/", "order/src/file", "billing", ...unmatched], task: "tests" });
   assert.deepEqual(result.rulePaths, ["wiki/_rules.md", "wiki/modules/_rules.md", "wiki/modules/billing/_rules.md", "wiki/modules/order/_rules.md"]);
-  assert.deepEqual(result.matches.map((m) => m.id), ["order", "billing"]);
+  assert.deepEqual(result.matches.map((m) => m.service), ["order", "billing"]);
   assert.deepEqual(result.unmatchedPaths, unmatched);
   assert.equal(JSON.stringify(result).includes("SENTINEL"), false);
   for (const paths of [[], unmatched]) {
-    const legacy = resolveWikiPolicyDomains(f.root, { paths, task: "docs" });
+    const legacy = resolveWikiRules(f.root, { paths, task: "docs" });
     assert.equal(legacy.mode, "legacy"); assert.deepEqual(legacy.rulePaths, ["wiki/_rules.md"]);
-    assert.deepEqual(legacy.unmatchedPaths, paths); assert.match(legacy.note, /known minimum.*not the complete.*consult quickstart/u);
+    assert.deepEqual(legacy.unmatchedPaths, paths); assert.match(legacy.note, /consult quickstart/u);
   }
 });
 
-test("service convention tolerates absent parents/rules and sees rule changes without scaffolding", (t) => {
+test("service convention suggests absent rules and sees rule changes without scaffolding", (t) => {
   const f = fixture(t); f.put("order/src/file", "source");
   const query = { paths: ["order/"], task: "code" };
-  assert.deepEqual(resolveWikiPolicyDomains(f.root, query).rulePaths, ["wiki/_rules.md"]);
+  assert.deepEqual(resolveWikiRules(f.root, query).rulePaths, ["wiki/_rules.md"]);
   assert.equal(fs.existsSync(path.join(f.root, "wiki/modules")), false);
   const rule = f.put("wiki/modules/order/_rules.md", "# Policy\n");
-  assert.deepEqual(resolveWikiPolicyDomains(f.root, query).rulePaths, ["wiki/_rules.md", "wiki/modules/order/_rules.md"]);
+  assert.deepEqual(resolveWikiRules(f.root, query).rulePaths, ["wiki/_rules.md", "wiki/modules/order/_rules.md"]);
   fs.rmSync(rule);
-  assert.equal(resolveWikiPolicyDomains(f.root, query).mode, "legacy");
-});
-
-test("explicit domains remain authoritative over service convention, including empty/task-mismatched scopes", (t) => {
-  const f = fixture(t); f.put("order/src/file", "source");
-  f.put("wiki/modules/order/_rules.md", "CONVENTION_POLICY_SENTINEL");
-  f.put("wiki/custom/_rules.md", "# Declared\n");
-  const query = { paths: ["order/src/file"], task: "code" };
-  for (const domains of [[], [{ id: "elsewhere", rule: "wiki/custom/_rules.md", paths: ["other/"] }], [{ id: "docs", rule: "wiki/custom/_rules.md", paths: ["order/"], tasks: ["docs"] }]]) {
-    f.config(domains);
-    const result = resolveWikiPolicyDomains(f.root, query);
-    assert.equal(result.mode, "domains"); assert.equal(result.configPath, "wiki/_domains.json");
-    assert.deepEqual(result.rulePaths, ["wiki/_rules.md"]); assert.deepEqual(result.unmatchedPaths, query.paths);
-  }
-  const config = f.config([{ id: "declared", rule: "wiki/custom/_rules.md", paths: ["order/"] }]);
-  assert.deepEqual(resolveWikiPolicyDomains(f.root, query).rulePaths, ["wiki/_rules.md", "wiki/custom/_rules.md"]);
-  f.put("wiki/_domains.json", "invalid");
-  assert.throws(() => resolveWikiPolicyDomains(f.root, query), code("invalid_policy_config"));
-  fs.rmSync(config);
-  assert.equal(resolveWikiPolicyDomains(f.root, query).mode, "convention");
+  assert.equal(resolveWikiRules(f.root, query).mode, "convention");
+  assert.deepEqual(resolveWikiRules(f.root, query).suggestedRulePaths, ["wiki/modules/order/_rules.md"]);
 });
 
 test("service convention rejects unsafe query paths before filesystem routing", (t) => {
   const f = fixture(t); f.put("order/src/file", "source"); f.put("wiki/modules/order/_rules.md", "# Policy\n");
   for (const source of ["../order/file", "/order/file", "order/../file", "order/./file", "order//file", "order\\file", "C:order/file", "order/*", "order/\u0000file"]) {
-    assert.throws(() => resolveWikiPolicyDomains(f.root, { paths: [source], task: "code" }), code("invalid_policy_query"));
+    assert.throws(() => resolveWikiRules(f.root, { paths: [source], task: "code" }), code("invalid_policy_query"));
   }
 });
 
@@ -241,75 +184,69 @@ test("service convention refuses source and policy symlink components or files",
     const isFile = relative.endsWith("file") || relative.endsWith(".md");
     fs.rmSync(target, { recursive: true, force: true });
     fs.symlinkSync(path.join(outside.root, isFile ? "_rules.md" : ""), target, isFile ? "file" : "dir");
-    assert.throws(() => resolveWikiPolicyDomains(f.root, { paths: ["order/src/file"], task: "code" }), code("unsafe_policy_path"), relative);
+    assert.throws(() => resolveWikiRules(f.root, { paths: ["order/src/file"], task: "code" }), code("unsafe_policy_path"), relative);
   }
 });
 
-test("policy config is opt-in, fresh each call, and legacy routing reports only a minimum", (t) => {
-  const f = fixture(t); f.put("wiki/legacy/page.md", "# Page\n");
-  let result = resolveWikiPolicyDomains(f.root, { paths: ["src/file.ts"], task: "code" });
-  assert.equal(result.mode, "legacy"); assert.match(result.note, /not the complete/);
-  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).created, ["wiki/legacy/_rules.md"]);
-  const config = f.config([]);
-  assert.equal(resolveWikiPolicyDomains(f.root, { paths: [], task: "code" }).mode, "domains");
-  fs.rmSync(config);
-  assert.equal(resolveWikiPolicyDomains(f.root, { paths: [], task: "code" }).mode, "legacy");
+test("recognized service with missing policy directories suggests a target without reads or writes", (t) => {
+  const f = fixture(t); f.put("order/src/Foo.java", "SOURCE_SENTINEL");
+  const result = resolveWikiRules(f.root, { paths: ["order/"], task: "docs" });
+  assert.equal(result.mode, "convention");
+  assert.deepEqual(result.rulePaths, ["wiki/_rules.md"]);
+  assert.deepEqual(result.suggestedRulePaths, ["wiki/modules/order/_rules.md"]);
+  assert.deepEqual(result.matches, [{ service: "order", rule: "wiki/modules/order/_rules.md", exists: false }]);
+  assert.deepEqual(result.unmatchedPaths, []);
+  assert.equal(fs.existsSync(path.join(f.root, "wiki/modules")), false);
 });
 
-test("invalid opt-in config fails closed without creating legacy scaffolds or leaking its contents", (t) => {
-  const f = fixture(t); f.put("wiki/deep/page.md", "# Page\n");
-  for (const content of ["SECRET_CONFIG_SENTINEL", JSON.stringify({ version: 2, domains: [] }), JSON.stringify({ version: 1, domains: [{ id: "bad", rule: "../outside/_rules.md", paths: ["src/"] }] }), "x".repeat(65537), Buffer.from([255])]) {
+
+test("only exact top-level names route; missing targets are not aliased to another service", (t) => {
+  const f = fixture(t);
+  for (const service of ["order", "order-extra", "Order", "src"]) f.put(`${service}/file`, "source");
+  f.put("wiki/modules/order/_rules.md", "# Rules\n");
+  const result = resolveWikiRules(f.root, { paths: ["order-extra/", "Order/", "src/order/file"], task: "code" });
+  assert.deepEqual(result.suggestedRulePaths, ["wiki/modules/Order/_rules.md", "wiki/modules/order-extra/_rules.md", "wiki/modules/src/_rules.md"].sort((a, b) => a.localeCompare(b)));
+  assert.deepEqual(result.rulePaths, ["wiki/_rules.md"]);
+  assert.deepEqual(result.unmatchedPaths, []);
+});
+
+test("suggested target becomes an existing rule on the next lookup, with additive ancestors", (t) => {
+  const f = fixture(t); f.put("order/src/file", "source"); f.put("wiki/modules/_rules.md", "PARENT_SENTINEL");
+  const query = { paths: ["order/src/file"], task: "code" };
+  let result = resolveWikiRules(f.root, query);
+  assert.deepEqual(result.rulePaths, ["wiki/_rules.md", "wiki/modules/_rules.md"]);
+  assert.deepEqual(result.suggestedRulePaths, ["wiki/modules/order/_rules.md"]);
+  f.put(result.suggestedRulePaths[0], "LEAF_SENTINEL");
+  result = resolveWikiRules(f.root, query);
+  assert.deepEqual(result.rulePaths, ["wiki/_rules.md", "wiki/modules/_rules.md", "wiki/modules/order/_rules.md"]);
+  assert.deepEqual(result.suggestedRulePaths, []); assert.equal(result.matches[0].exists, true);
+  assert.equal(JSON.stringify(result).includes("SENTINEL"), false);
+});
+
+test("missing Wiki/root still yields a service target and no nonexistent read paths", (t) => {
+  const f = fixture(t); f.put("order/file", "source"); fs.rmSync(path.join(f.root, "wiki"), { recursive: true });
+  const result = resolveWikiRules(f.root, { paths: ["order/"], task: "docs" });
+  assert.equal(result.mode, "convention"); assert.deepEqual(result.rulePaths, []);
+  assert.deepEqual(result.suggestedRulePaths, ["wiki/modules/order/_rules.md"]);
+  assert.equal(fs.existsSync(path.join(f.root, "wiki")), false);
+});
+
+test("stale domain files never influence routing, discovery, scaffolding or rule validation", (t) => {
+  const f = fixture(t); f.put("order/file", "source"); f.put("wiki/guide/page.md", "# Page\n");
+  const query = { paths: ["order/"], task: "code" };
+  const expected = resolveWikiRules(f.root, query);
+  for (const content of ["INVALID_CONFIG_SENTINEL", Buffer.from([255]), "x".repeat(70000), JSON.stringify({ version: 1, domains: [{ id: "wrong", rule: "wiki/wrong/_rules.md", paths: ["order/"] }] })]) {
     f.put("wiki/_domains.json", content);
-    assert.throws(() => readPolicyDomainConfig(f.root));
-    assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).created, []);
-    const report = discoverWikiPromptRules({ projectRoot: f.root });
-    assert.equal(report.valid, false); assert.equal(report.mode, "invalid");
-    assert.equal(JSON.stringify(report).includes("SECRET_CONFIG_SENTINEL"), false);
-    assert.equal(fs.existsSync(path.join(f.root, "wiki/deep/_rules.md")), false);
-    const validation = validateWikiReadOnly(f.model, "all");
-    assert.equal(validation.groups.graph.valid, true); assert.equal(validation.groups.rules.valid, false);
+    assert.deepEqual(resolveWikiRules(f.root, query), expected);
+    assert.deepEqual(discoverWikiPromptRules({ projectRoot: f.root }).missingRuleSections, ["wiki/guide"]);
   }
-});
-
-test("policy config validates domains/selectors and routing queries", (t) => {
-  const f = fixture(t);
-  for (const domains of [
-    [{ id: "bad", rule: "wiki/_rules.md", paths: ["src/"] }],
-    [{ id: "bad", rule: "wiki/domain/_rules.md" }],
-    [{ id: "bad", rule: "wiki/assets/_rules.md", tasks: ["code"] }],
-    [{ id: "bad", rule: "wiki/domain/_rules.md", paths: ["src/**"] }],
-    [{ id: "bad", rule: "wiki/domain/_rules.md", tasks: ["code", "code"] }],
-    [{ id: "bad", rule: "wiki/domain/_rules.md", tasks: ["code"], unknown: true }],
-    [{ id: "dup", rule: "wiki/a/_rules.md", tasks: ["code"] }, { id: "dup", rule: "wiki/b/_rules.md", tasks: ["docs"] }],
-  ]) { f.config(domains); assert.throws(() => readPolicyDomainConfig(f.root), code("invalid_policy_config")); }
-  f.config([{ id: "missing", rule: "wiki/missing/_rules.md", paths: ["src/"] }]);
-  assert.throws(() => resolveWikiPolicyDomains(f.root, { paths: ["src/a"], task: "code" }), code("policy_rule_missing"));
-  for (const query of [{ paths: ["../escape"], task: "code" }, { paths: [], task: "" }, { paths: ["src/", "src/"], task: "code" }]) assert.throws(() => resolveWikiPolicyDomains(f.root, query), code("invalid_policy_query"));
-});
-
-test("legacy scaffolding preserves existing project-local rule aliases without a config", { skip: process.platform === "win32" }, (t) => {
-  const f = fixture(t);
-  const target = f.put("local-rule.md", "# Existing rules\n");
-  fs.rmSync(path.join(f.root, "wiki/_rules.md"));
-  fs.symlinkSync(target, path.join(f.root, "wiki/_rules.md"));
-  f.put("wiki/topic/page.md", "# Page\n");
-  const result = ensureWikiPromptRuleScaffolds({ projectRoot: f.root });
-  assert.equal(result.mode, "legacy");
-  assert.deepEqual(result.created, ["wiki/topic/_rules.md"]);
+  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).created, ["wiki/guide/_rules.md"]);
   assert.equal(discoverWikiPromptRules({ projectRoot: f.root }).valid, true);
-  assert.equal(fs.readlinkSync(path.join(f.root, "wiki/_rules.md")), target);
-});
-
-test("policy config and scaffold targets refuse symlink roots/components/files", { skip: process.platform === "win32" }, (t) => {
-  const f = fixture(t);
-  const outside = f.put("outside/config.json", '{"version":1,"domains":[]}');
-  fs.symlinkSync(outside, path.join(f.root, "wiki/_domains.json"));
-  assert.throws(() => readPolicyDomainConfig(f.root), code("unsafe_policy_path"));
-  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).created, []);
+  assert.equal(validateWikiReadOnly(f.model, "all").valid, true);
+  assert.equal(fs.existsSync(path.join(f.root, "wiki/wrong")), false);
   fs.rmSync(path.join(f.root, "wiki/_domains.json"));
-  f.config([{ id: "bad", rule: "wiki/alias/_rules.md", paths: ["src/"] }]);
-  fs.symlinkSync(path.join(f.root, "outside"), path.join(f.root, "wiki/alias"), "dir");
-  assert.equal(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).mode, "invalid");
-  assert.equal(discoverWikiPromptRules({ projectRoot: f.root }).valid, false);
-  assert.equal(fs.existsSync(path.join(f.root, "outside/_rules.md")), false);
+  fs.symlinkSync(path.join(f.root, "outside-missing"), path.join(f.root, "wiki/_domains.json"));
+  assert.deepEqual(resolveWikiRules(f.root, query), expected);
+  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).created, []);
+  assert.equal(validateWikiReadOnly(f.model, "all").valid, true);
 });

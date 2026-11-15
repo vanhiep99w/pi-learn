@@ -13,7 +13,7 @@ Chỉ vendor pi-free core và tài liệu/manifest liên quan, không load nguy�
 
 ## Các gap mới không có ở snapshot upstream
 
-`spec_get` upstream chỉ metadata; Wiki thêm explicit section retrieval dùng shared `wiki-headings.js` với link validation, không thêm Markdown engine song song. `source-paths` là field riêng được upstream parser/serializer giữ như unknown metadata; literal matcher/schema thuộc adapter, list update dùng upstream cho base fields rồi một YAML-AST edit cho field này. `wiki-policy.js` là opt-in policy-domain config/resolver riêng vì upstream core không sở hữu Wiki rules/scaffold/permissions. Không patch thêm vendor core/tests cho ba capability này; adapter và tests vẫn pin cùng snapshot trên.
+`spec_get` upstream chỉ metadata; Wiki thêm explicit section retrieval dùng shared `wiki-headings.js` với link validation, không thêm Markdown engine song song. `source-paths` là field riêng được upstream parser/serializer giữ như unknown metadata; literal matcher/schema thuộc adapter, list update dùng upstream cho base fields rồi một YAML-AST edit cho field này. `wiki-policy.js` là service-convention rule resolver riêng: tách existing read paths và missing creation targets, vì upstream core không sở hữu Wiki rules/scaffold/permissions; không có domain-config support. Không patch thêm vendor core/tests cho ba capability này; adapter và tests vẫn pin cùng snapshot trên.
 
 ## Kiểm thử
 

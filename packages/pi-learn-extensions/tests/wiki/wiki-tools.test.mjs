@@ -318,16 +318,17 @@ test("session/cwd lifetimes clear instance-owned caches and inactive/aborted too
   await f.call("wiki_get", { id: "a" }); assert.equal(roots.length, 3);
 });
 
-test("read tools do not grant rule/metadata write permissions or add commands", async (t) => {
+test("read tools do not alter ordinary rule permissions, metadata protection or commands", async (t) => {
   const f = fixture(t);
   f.put("wiki/guide.md", "# Guide\ntext\n");
   await f.emit("session_start");
   const before = snapshot(f.cwd);
   for (const [name, params] of [["wiki_search", { pattern: "Guide" }], ["wiki_get", { path: "guide.md" }], ["wiki_validate", { scope: "all" }]]) await f.call(name, params);
-  for (const target of ["wiki/_rules.md", "wiki/.last-update.json"]) {
-    const results = await f.emit("tool_call", { toolName: "write", input: { path: target } });
-    assert.ok(results.some((result) => result?.block === true));
-  }
+  const ordinaryRuleWrite = await f.emit("tool_call", { toolName: "write", input: { path: "wiki/_rules.md" } });
+  assert.equal(ordinaryRuleWrite.some((result) => result?.block === true), false);
+  const metadataWrite = await f.emit("tool_call", { toolName: "write", input: { path: "wiki/.last-update.json" } });
+  assert.ok(metadataWrite.some((result) => result?.block === true));
+  assert.equal((await f.call("wiki_spec_create", { path: "new.md", id: "new", type: "module-design", title: "New" })).details.errorCode, "write_not_authorized");
   assert.deepEqual(snapshot(f.cwd), before);
   assert.deepEqual([...f.commands.keys()], ["wiki", "wiki-update"]);
 });
@@ -460,26 +461,43 @@ test("wiki_rules resolves conventional service scopes read-only while wiki_get s
   assert.equal((await f.call("wiki_rules", { paths: ["order/../outside"], task: "code" })).details.errorCode, "invalid_policy_query");
   assert.equal(opened.some((file) => /_rules\.md$|order\/src|billing\/file/u.test(file)), false);
   assert.deepEqual(snapshot(f.cwd), before);
-  assert.match(f.tools.get("wiki_rules").description, /Explicit wiki\/_domains\.json is authoritative/);
-  assert.match(f.tools.get("wiki_rules").description, /Then use read on returned rule files, not wiki_get/);
+  const description = f.tools.get("wiki_rules").description;
+  assert.match(description, /read only rulePaths with read, not wiki_get/);
+  assert.match(description, /In ordinary chat, honor a user-requested lasting rule/);
+  assert.match(description, /no \/wiki-update required/);
+  assert.match(description, /not order\/AGENTS\.md/);
+  assert.doesNotMatch(description, /_domains\.json/);
 });
 
-test("routing tools use declarations only and policy config stays reserved", async (t) => {
+test("ordinary chat can create a missing service rule target; stale config has no effect", async (t) => {
   const f = fixture(t);
-  f.put("wiki/mapped.md", spec("mapped", 'source-paths: ["src/"]\n'));
-  f.put("wiki/_domains.json", JSON.stringify({ version: 1, domains: [{ id: "code", rule: "wiki/code/_rules.md", paths: ["src/"] }] }));
-  f.put("wiki/code/_rules.md", "# Rules\nPOLICY_CONTENT_SENTINEL\n");
+  f.put("order/src/Foo.java", "SOURCE_CONTENT_SENTINEL");
+  f.put("wiki/mapped.md", spec("mapped", 'source-paths: ["order/"]\n'));
+  f.put("wiki/_domains.json", "INVALID_CONFIG_BODY_SENTINEL");
   await f.emit("session_start");
-  assert.equal(frame(await f.call("wiki_locate", { sourcePath: "src/file.ts" })).data.matches[0].id, "mapped");
-  const rules = await f.call("wiki_rules", { paths: ["src/file.ts"], task: "code" });
-  assert.deepEqual(frame(rules).data.rulePaths, ["wiki/_rules.md", "wiki/code/_rules.md"]);
-  assert.equal(JSON.stringify(rules).includes("POLICY_CONTENT_SENTINEL"), false); assertBounded(rules);
+  assert.equal(frame(await f.call("wiki_locate", { sourcePath: "order/src/Foo.java" })).data.matches[0].id, "mapped");
+  const before = snapshot(f.cwd);
+  const rules = await f.call("wiki_rules", { paths: ["order/"], task: "docs" });
+  const data = frame(rules).data;
+  assert.equal(data.mode, "convention");
+  assert.deepEqual(data.rulePaths, ["wiki/_rules.md"]);
+  assert.deepEqual(data.suggestedRulePaths, ["wiki/modules/order/_rules.md"]);
+  assert.deepEqual(data.unmatchedPaths, []);
+  assert.deepEqual(data.matches, [{ service: "order", rule: "wiki/modules/order/_rules.md", exists: false }]);
+  assert.equal(JSON.stringify(rules).includes("SENTINEL"), false); assertBounded(rules);
+  assert.deepEqual(snapshot(f.cwd), before);
+  const target = data.suggestedRulePaths[0];
+  const guards = await f.emit("tool_call", { toolName: "write", input: { path: target } });
+  assert.equal(guards.some((result) => result?.block === true), false);
+  // Emulate the built-in writer after its guard, without calling a model/provider.
+  f.put(target, "# Order rules\nPOLICY_CONTENT_SENTINEL\n");
+  const created = frame(await f.call("wiki_rules", { paths: ["order/"], task: "code" })).data;
+  assert.deepEqual(created.rulePaths, ["wiki/_rules.md", target]);
+  assert.deepEqual(created.suggestedRulePaths, []);
+  assert.equal(fs.existsSync(path.join(f.cwd, "order/AGENTS.md")), false);
+  assert.equal((await f.call("wiki_get", { path: "modules/order/_rules.md" })).details.errorCode, "reserved_path");
   assert.equal((await f.call("wiki_get", { path: "_domains.json" })).details.errorCode, "reserved_path");
   assert.equal(frame(await f.call("wiki_search", { pattern: "POLICY_CONTENT_SENTINEL" })).data.matches.length, 0);
-  f.put("wiki/_domains.json", "INVALID_CONFIG_BODY_SENTINEL");
-  const invalid = await f.call("wiki_rules", { paths: [], task: "code" });
-  assert.equal(invalid.details.errorCode, "invalid_policy_config");
-  assert.equal(JSON.stringify(invalid).includes("INVALID_CONFIG_BODY_SENTINEL"), false);
 });
 
 test("one extension instance cannot borrow another instance's active run, even at the same cwd", async (t) => {

@@ -53,17 +53,16 @@ async function fixture(t) {
 
 async function assertRulesProtected(f) {
   for (const toolName of ["write", "edit"]) {
-    for (const candidate of ["wiki/_rules.md", "wiki/domain/_rules.md", "wiki/_domains.json", path.join(f.cwd, "wiki/_domains.json"), path.join(f.cwd, "wiki/_rules.md")]) {
+    for (const candidate of ["wiki/_rules.md", "wiki/domain/_rules.md", path.join(f.cwd, "wiki/_rules.md")]) {
       assert.equal((await f.tool(toolName, { path: candidate })).block, true);
     }
   }
   assert.equal((await f.tool("bash", { command: "echo policy >> wiki/_rules.md" })).block, true);
-  assert.equal((await f.tool("bash", { command: "echo policy > wiki/_domains.json" })).block, true);
 }
 
 async function assertUpdateProtection(f) {
   for (const toolName of ["write", "edit"]) {
-    for (const candidate of ["wiki/_rules.md", "wiki/domain/_rules.md", "wiki/_domains.json", path.join(f.cwd, "wiki/_rules.md")]) {
+    for (const candidate of ["wiki/_rules.md", "wiki/domain/_rules.md", path.join(f.cwd, "wiki/_rules.md")]) {
       assert.equal(await f.tool(toolName, { path: candidate }), undefined);
     }
     for (const candidate of ["wiki/.last-update.json", "wiki/INSTRUCTIONS.md"]) {
@@ -71,7 +70,6 @@ async function assertUpdateProtection(f) {
     }
   }
   assert.equal(await f.tool("bash", { command: "echo policy >> wiki/_rules.md" }), undefined);
-  assert.equal(await f.tool("bash", { command: "echo policy > wiki/_domains.json" }), undefined);
   for (const candidate of ["wiki/.last-update.json", "wiki/INSTRUCTIONS.md"]) {
     assert.equal((await f.tool("bash", { command: `echo protected > ${candidate}` })).block, true);
   }
@@ -79,10 +77,19 @@ async function assertUpdateProtection(f) {
   assert.equal(await f.tool("bash", { command: "cat wiki/_rules.md" }), undefined);
 }
 
-test("rules remain protected outside an active Wiki update", async (t) => {
-  const f = await fixture(t);
-  await assertRulesProtected(f);
-  assert.equal((await f.tool("write", { path: "wiki/.last-update.json" })).block, true);
+async function assertOrdinaryProtection(f) {
+  for (const toolName of ["write", "edit"]) {
+    for (const candidate of ["wiki/_rules.md", "wiki/modules/order/_rules.md", "AGENTS.md", "order/AGENTS.md", "wiki/INSTRUCTIONS.md"]) {
+      assert.equal(await f.tool(toolName, { path: candidate }), undefined);
+    }
+    assert.equal((await f.tool(toolName, { path: "wiki/.last-update.json" })).block, true);
+  }
+  assert.equal(await f.tool("bash", { command: "echo policy >> wiki/modules/order/_rules.md" }), undefined);
+  assert.equal((await f.tool("bash", { command: "echo data > wiki/.last-update.json" })).block, true);
+}
+
+test("ordinary turns allow rule writes without globally blocking legitimate AGENTS edits", async (t) => {
+  await assertOrdinaryProtection(await fixture(t));
 });
 
 test("initialization cannot edit rules even with an explicit rule request", async (t) => {
@@ -118,26 +125,26 @@ test("update can repair invalid rule lint without naming a rule file", async (t)
   await f.run("wiki", "Refresh docs");
   assert.equal(f.messages.length, 0);
   assert.match(f.notices.at(-1), /cannot initialize while rule lint is invalid/);
-  await assertRulesProtected(f);
+  await assertOrdinaryProtection(f);
   await f.run("wiki-update", "Sửa các lỗi kiểm tra hiện có");
   assert.equal(f.messages.length, 1);
   await assertUpdateProtection(f);
 });
 
-test("settlement revokes rule permission and preserves no-change metadata", async (t) => {
+test("settlement restores ordinary brief access and preserves no-change metadata", async (t) => {
   const f = await fixture(t);
   await f.run("wiki-update", "Refresh docs");
   await assertUpdateProtection(f);
   await f.emit("agent_settled");
-  await assertRulesProtected(f);
+  await assertOrdinaryProtection(f);
   await assert.rejects(readFile(path.join(f.cwd, "wiki/.last-update.json")), { code: "ENOENT" });
 });
 
-test("shutdown revokes rule permission", async (t) => {
+test("shutdown clears active-run brief protection", async (t) => {
   const f = await fixture(t);
   await f.run("wiki-update", "Refresh docs");
   await f.emit("session_shutdown");
-  await assertRulesProtected(f);
+  await assertOrdinaryProtection(f);
 });
 
 test("failed message delivery clears the active update", async (t) => {
@@ -145,16 +152,16 @@ test("failed message delivery clears the active update", async (t) => {
   f.pi.sendUserMessage = () => { throw new Error("fixture delivery failed"); };
   await f.run("wiki-update", "Refresh docs");
   assert.match(f.notices.at(-1), /fixture delivery failed/);
-  await assertRulesProtected(f);
+  await assertOrdinaryProtection(f);
 });
 
-test("a busy command does not grant rule permission", async (t) => {
+test("a busy command leaves ordinary permissions and metadata protection intact", async (t) => {
   const f = await fixture(t);
   f.ctx.isIdle = () => false;
   await f.run("wiki-update", "Refresh docs");
   assert.equal(f.messages.length, 0);
   assert.match(f.notices.at(-1), /Agent is busy/);
-  await assertRulesProtected(f);
+  await assertOrdinaryProtection(f);
 });
 
 const metadataPath = (f) => path.join(f.cwd, "wiki/.last-update.json");
@@ -191,7 +198,7 @@ for (const [name, files, code] of [
     assert.match(f.notices.at(-1), /interrupted.*no Wiki changes/);
     assert.ok(f.notices.at(-1).includes(code));
     assert.doesNotMatch(f.notices.at(-1), /completed with no changes/);
-    await assertRulesProtected(f);
+    await assertOrdinaryProtection(f);
   });
 }
 
@@ -247,7 +254,7 @@ for (const mode of ["settled abort", "assistant error", "shutdown"]) {
     if (mode === "shutdown") await f.emit("session_shutdown");
     else await f.emit("agent_settled", { aborted: mode === "settled abort" });
     assert.equal((await readMetadata(f)).status, "interrupted");
-    await assertRulesProtected(f);
+    await assertOrdinaryProtection(f);
   });
 }
 
@@ -311,30 +318,25 @@ test("explicit request bypasses no-op but interrupted metadata also forces a run
   await f.run("wiki-update"); assert.equal(f.messages.length, 2);
 });
 
-test("domain config-only changes are snapshotted and invalid config cannot complete", async (t) => {
+test("stale domain files are absent from snapshots and cannot interrupt finalization", async (t) => {
   const f = await fixture(t);
   await writePrevious(f);
-  await f.run("wiki-update", "Configure policy domains");
-  await writeFile(path.join(f.cwd, "wiki/_domains.json"), JSON.stringify({ version: 1, domains: [] }));
-  await f.emit("agent_settled");
-  assert.equal((await readMetadata(f)).status, "complete");
-  assert.match(f.notices.at(-1), /completed; metadata updated/);
-  await f.run("wiki-update", "Check config");
+  const previous = await readFile(metadataPath(f), "utf8");
+  await f.run("wiki-update", "Check existing docs");
   await writeFile(path.join(f.cwd, "wiki/_domains.json"), "INVALID_CONFIG_SENTINEL");
   await f.emit("agent_settled");
-  assert.equal((await readMetadata(f)).status, "interrupted");
-  assert.match(f.notices.at(-1), /Rule validation failed/);
-  assert.equal(f.notices.at(-1).includes("INVALID_CONFIG_SENTINEL"), false);
+  assert.equal(await readFile(metadataPath(f), "utf8"), previous);
+  assert.doesNotMatch(f.notices.at(-1), /validation failed/i);
+  await f.run("wiki", "Check docs with stale file");
+  assert.equal(f.messages.length, 2);
 });
 
-test("committed invalid domain config cannot no-op and update can repair it", async (t) => {
+test("stale domain files do not block clean Git no-op", async (t) => {
   const f = await fixture(t);
   await cleanRepository(f, { "wiki/_domains.json": "INVALID_CONFIG_SENTINEL" });
   await f.run("wiki-update");
-  assert.equal(f.messages.length, 1);
-  await writeFile(path.join(f.cwd, "wiki/_domains.json"), JSON.stringify({ version: 1, domains: [] }));
-  await f.emit("agent_settled");
-  assert.equal((await readMetadata(f)).status, "complete");
+  assert.equal(f.messages.length, 0);
+  assert.match(f.notices.at(-1), /No meaningful repository changes.*skipping/i);
 });
 
 test("graph I/O errors cannot silently become complete or no-op", async (t) => {
@@ -461,4 +463,28 @@ test("bootstrap failure preserves both files and metadata, never announces init 
   const count = f.notices.length;
   await f.emit("agent_settled");
   assert.equal(f.notices.length, count, "failed finalization still clears the active run");
+});
+
+
+test("ordinary chat allows canonical rule creation without a Wiki command", async (t) => {
+  const f = await fixture(t);
+  assert.equal(await f.tool("write", { path: "wiki/modules/order/_rules.md", content: "# Order rules\n" }), undefined);
+  assert.equal((await f.tool("write", { path: "wiki/.last-update.json" })).block, true);
+});
+
+
+test("normal rule writes reject escapes and symlink parents/files while preserving same-cwd checks", async (t) => {
+  const f = await fixture(t);
+  const outside = await fixture(t);
+  await mkdir(path.join(f.cwd, "wiki/modules"));
+  await symlink(outside.cwd, path.join(f.cwd, "wiki/modules/order"), "dir");
+  const unsafe = ["wiki/modules/order/_rules.md", "wiki/../wiki/_rules.md", "../wiki/_rules.md", path.join(outside.cwd, "wiki/_rules.md")];
+  for (const toolName of ["write", "edit"]) for (const candidate of unsafe) {
+    assert.equal((await f.tool(toolName, { path: candidate })).block, true, candidate);
+  }
+  assert.equal((await f.tool("bash", { command: "echo policy > wiki/modules/order/_rules.md" })).block, true);
+  await symlink(path.join(outside.cwd, "wiki/_rules.md"), path.join(f.cwd, "wiki/modules/_rules.md"));
+  assert.equal((await f.tool("write", { path: "wiki/modules/_rules.md" })).block, true);
+  await f.run("wiki-update", "Check docs");
+  assert.equal((await f.tool("write", { path: "wiki/_rules.md" }, { ...f.ctx, cwd: outside.cwd })).block, true);
 });
