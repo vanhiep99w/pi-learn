@@ -86,6 +86,35 @@ export function readPolicyDomainConfig(projectRoot) {
   return raw;
 }
 
+/** Exact top-level service -> existing wiki/modules/<service>/_rules.md, only without config.
+ * Inspect path types, never source/rule contents; missing descendants may be edit targets.
+ */
+function serviceConventionDomain(projectRoot, source) {
+  const parts = source.replace(/\/$/u, "").split("/");
+  const service = parts[0];
+  const rule = `wiki/modules/${service}/_rules.md`;
+  // Wiki document paths are not source service scopes. No aliases or nested-name guesses.
+  if (service === "wiki" || !isPolicyRulePath(rule)) return null;
+  let absolute = fs.realpathSync(projectRoot);
+  for (let index = 0; index < parts.length; index++) {
+    absolute = path.join(absolute, parts[index]);
+    let stat;
+    try { stat = fs.lstatSync(absolute); }
+    catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      if (index === 0) return null;
+      break;
+    }
+    if (stat.isSymbolicLink()) fail("unsafe_policy_path", "Service scopes must not traverse symlinks.");
+    if (index === 0 && !stat.isDirectory()) return null;
+    if (index < parts.length - 1 || source.endsWith("/")) {
+      if (!stat.isDirectory()) fail("unsafe_policy_path", "Service scopes must traverse real directories.");
+    } else if (!stat.isFile() && !stat.isDirectory()) fail("unsafe_policy_path", "Service scopes must name regular files or real directories.");
+  }
+  if (!safePolicyTarget(projectRoot, rule, true).exists) return null;
+  return { id: service, rule, paths: [service, `${service}/`] };
+}
+
 /** Returns paths/selectors only, never policy contents or inferred permission/precedence.
  * @param {string} projectRoot
  * @param {{paths?: string[], task: string}} query
@@ -94,8 +123,9 @@ export function resolveWikiPolicyDomains(projectRoot, { paths = [], task }) {
   if (!Array.isArray(paths) || paths.length > 100 || !paths.every(isLiteralSourcePath) || new Set(paths).size !== paths.length || typeof task !== "string" || !NAME.test(task)) fail("invalid_policy_query", "Supply task (lowercase name) and at most 100 unique literal project-relative paths.");
   const config = readPolicyDomainConfig(projectRoot);
   const rulePaths = new Set([ROOT_RULE]);
-  const matches = config?.domains.filter((domain) => (!domain.tasks || domain.tasks.includes(task))
-    && (!domain.paths || paths.some((source) => domain.paths.some((scope) => matchesSourcePath(scope, source))))) ?? [];
+  const matches = config ? config.domains.filter((domain) => (!domain.tasks || domain.tasks.includes(task))
+    && (!domain.paths || paths.some((source) => domain.paths.some((scope) => matchesSourcePath(scope, source)))))
+    : [...new Map(paths.map((source) => serviceConventionDomain(projectRoot, source)).filter(Boolean).map((domain) => [domain.rule, domain])).values()];
   for (const domain of matches) {
     // An existing ancestor rule remains applicable, even if only its child has selectors.
     const parts = domain.rule.split("/");
@@ -108,11 +138,11 @@ export function resolveWikiPolicyDomains(projectRoot, { paths = [], task }) {
   }
   safePolicyTarget(projectRoot, ROOT_RULE);
   return {
-    mode: config ? "domains" : "legacy", configPath: config ? WIKI_DOMAINS_PATH : null, task, paths,
+    mode: config ? "domains" : matches.length ? "convention" : "legacy", configPath: config ? WIKI_DOMAINS_PATH : null, task, paths,
     rulePaths: [...rulePaths].sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b)),
     matches: matches.map((domain) => ({ id: domain.id, rule: domain.rule })),
-    unmatchedPaths: config ? paths.filter((source) => !matches.some((domain) => !domain.paths || domain.paths.some((scope) => matchesSourcePath(scope, source)))) : paths,
+    unmatchedPaths: paths.filter((source) => !matches.some((domain) => !domain.paths || domain.paths.some((scope) => matchesSourcePath(scope, source)))),
     note: config ? "Declared domains only. Paths and tasks within a domain are ANDed; matching domains are unioned. Read applicable rules only before edits; conflicts must be reported, not overridden. This does not grant mutation permission."
-      : "No opt-in config: legacy discovery/scaffolding is unchanged. Root is only the known minimum, not the complete applicable policy set; consult quickstart/agent guidance for domain rules.",
+      : "No opt-in config: exact top-level service names select existing wiki/modules/<service>/_rules.md plus existing ancestors. Legacy discovery/scaffolding is unchanged. Results are only a known minimum, not the complete applicable policy set; consult quickstart/agent guidance for remaining rules. Read rules before edits; no override or mutation permission.",
   };
 }

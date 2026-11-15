@@ -55,7 +55,7 @@ export const wikiLocateParameters = Type.Object({
 
 export const wikiRulesParameters = Type.Object({
   paths: Type.Array(Type.String({ minLength: 1, maxLength: 1024 }), { maxItems: 100, description: "Affected project-relative files/directories; no globs or traversal." }),
-  task: Type.String({ pattern: "^[a-z][a-z0-9-]{0,63}$", description: "Task kind declared by this repo, e.g. code, docs, tests or release." }),
+  task: Type.String({ pattern: "^[a-z][a-z0-9-]{0,63}$", description: "Task kind, e.g. code, docs, tests or release. Configured task selectors apply; service convention is task-independent." }),
   ...outputPaging,
 }, { additionalProperties: false });
 
@@ -168,7 +168,7 @@ export function registerWikiReadTools(pi: ExtensionAPI, createModel = (root: str
     "wiki_locate — find declared spec owners for a source path via optional source-paths frontmatter. Literal files match exactly, trailing-/ directories match prefixes. Returns all matches up to 200 sorted by specificity, never an automatic winner or source contents. No matches does not prove no contract exists.",
     (model, params) => model.locate(params.sourcePath));
   register("wiki_rules", wikiRulesParameters,
-    "wiki_rules — before edits, resolve applicable rule file paths from opt-in wiki/_domains.json, affected paths and task kind. Returns paths/selectors only, never policy text. Root and existing ancestors are additive; no override or mutation permission. Without config, reports legacy mode and only a known minimum; consult quickstart for remaining rules.",
+    "wiki_rules — before edits, resolve rule paths for affected source files/directories and task. Explicit wiki/_domains.json is authoritative. Without config, an exact real top-level service directory (order, order/ or order/src/Foo.java) selects existing wiki/modules/order/_rules.md; Wiki doc paths are not source scopes. No matching convention: legacy known minimum; consult quickstart for remaining rules. Root and existing ancestors are additive. Returns paths/selectors only, never policy text or mutation permission; no writes/scaffolds. Then use read on returned rule files, not wiki_get.",
     (model, params) => resolveWikiPolicyDomains(model.projectRoot, params));
   register("wiki_graph", wikiGraphParameters,
     "wiki_graph — get a bounded subtree/ancestors/neighbors slice. Neighbor edges include reverse dependencies; default depth 1, max 4, at most 100 nodes/200 edges/100 missing targets. Declared edges do not prove complete code impact coverage.",

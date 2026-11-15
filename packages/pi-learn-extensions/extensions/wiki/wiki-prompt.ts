@@ -91,7 +91,8 @@ function createWikiLookupInstructions(): string {
 Wiki lookup (if available; otherwise targeted grep/read):
 - wiki_search: scope specs for contracts, guides for operations, all for legacy pages. No matches does not prove no contract exists.
 - wiki_get: exactly one id or Wiki-relative path; metadata by default, heading for one verbatim section. Otherwise read only needed ranges.
-- wiki_locate: declared source -> spec owners, not inferred coverage. wiki_rules: applicable paths before edits; absent config means consult existing routes.
+- wiki_locate: declared source -> spec owners, not inferred coverage.
+- wiki_rules: applicable paths before edits, then read returned _rules.md files with read, not wiki_get. Config is authoritative; without it, exact top-level service names select existing wiki/modules/<service>/_rules.md plus ancestors. Consult quickstart for remaining rules; lookup never scaffolds.
 - wiki_graph: small depth, relevant parents or forward/reverse consumers; not every ancestor/dependency. Edges may be incomplete; confirm source/tests.
 - Follow match/output continuation only as needed; restart stale output, never combine revisions.
 - wiki_validate: graph/schema by default; links/rules/all for relevant checks only. Rule lint returns no policy text, not a substitute for applicable rules before edits. Validation never writes, approves specs or proves prose correct.
@@ -112,6 +113,7 @@ Rule-file boundary:
 Agent-directed rule updates:
 - /wiki-update permits needed ${WIKI_DIR}/**/_rules.md edits. Permission does not depend on keywords or a named file.
 - Classify the user's intent and choose the owning rule file yourself; do not ask the user to supply a rule filename.
+- Honor configured routing. Without config, a real top-level <service>/ uses wiki/modules/<service>/_rules.md by exact name; no config needed. Place a durable order-scoped rule in wiki/modules/order/_rules.md, never order/AGENTS.md. Do not guess other ownership.
 - Preserve unrelated rules. Do not invent policies or change them for a documentation-only request or without a specific policy request.
 - Keep stable rule IDs unique and rules concrete.
 - Rule updates do not require a proposal or approval workflow.

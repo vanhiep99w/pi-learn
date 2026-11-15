@@ -32,7 +32,7 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 | `wiki/wiki-rules.js` | Phân loại path, discovery, scaffold, rule lint |
 | `wiki/wiki-links.js` / `wiki/wiki-headings.js` | Internal Markdown links và shared ATX heading/anchor resolver, bỏ frontmatter/fenced code |
 | `wiki/wiki-source-paths.js` | Literal source-scope validation/matching, không đọc source |
-| `wiki/wiki-policy.js` | Opt-in domain config, safe path checks và rule-path resolution, không trả policy text |
+| `wiki/wiki-policy.js` | Opt-in domain config, exact service-name convention, safe path checks và rule-path resolution, không trả policy text |
 | `wiki/wiki-model.ts` | Read model: Wiki-only reads, guides/specs, lookup/search/slices và schema/graph diagnostics |
 | `wiki/wiki-tools.ts` | Pi adapter cho sáu read tools, session/cwd cache, output budget và revision-checked pagination |
 | `wiki/wiki-validation.ts` | Aggregate graph/links/rules theo scope; dùng validators hiện có qua safe read hooks |
@@ -53,7 +53,7 @@ Tools hoạt động sau reload đúng source/package. Chỉ đọc `wiki/` củ
 | `wiki_search` | Substring/regex, metadata filters `type`/`tag`/`parent`/`dependsOn`; `scope` specs/guides/all, mặc định all để không ẩn legacy guides. Mặc định 50, tối đa 200 matches; `data.nextOffset` dùng để lấy match page tiếp theo với cùng filters. |
 | `wiki_get` | Đúng một `id` hoặc Wiki-relative `path`, ví dụ `extensions/wiki-extension.md`. Mặc định trả metadata, revision, forward/reverse links và tối đa 100 headings (có cờ truncated), không body. `heading` là exact ATX title hoặc `#anchor`; trả verbatim section cùng subheadings tới trước heading cùng/cao cấp tiếp theo. Title trùng cần `occurrence` 1-based hoặc anchor; unknown/ambiguous selector là lỗi, không fallback body. BOM/CRLF/Unicode được giữ; section lớn dùng cùng output continuation. |
 | `wiki_locate` | `sourcePath` project-relative literal → các specs có `source-paths` khớp. File khớp exact, directory scope có `/` cuối khớp prefix. Tối đa 200 owners, có total/truncated; xếp theo độ cụ thể nhưng không chọn winner. Không mở source; không match không chứng minh thiếu contract. |
-| `wiki_rules` | `paths` + `task` → rule paths từ opt-in `wiki/_domains.json`. Root và ancestor rules hiện có cộng dồn; không policy text/override/quyền ghi. Không config thì trả legacy mode và minimum root, phải dùng routes hiện có để tìm domain còn lại. |
+| `wiki_rules` | `paths` + `task` → rule paths: config `wiki/_domains.json` là authoritative; khi vắng config dùng exact service-name convention bên dưới. Root và ancestor rules hiện có cộng dồn; không policy text/override/quyền ghi/scaffold. Dùng `read` đọc các rule paths trả về, không dùng `wiki_get`; consult quickstart cho rules còn lại. |
 | `wiki_graph` | subtree/ancestors/neighbors; neighbors đi cả forward/reverse, mặc định depends-on. Depth 0–4, mặc định 1; tối đa 100 nodes, 200 edges, 100 missing targets, có cờ truncated. Không trả prose/full frontmatter; graph khai báo không chứng minh đủ code consumers. |
 | `wiki_validate` | Mặc định graph/schema; chọn rõ links/rules/all để kiểm thêm. Trả validity từng nhóm và diagnostics có scope/path/severity; lỗi nhóm này không che nhóm khác. Findings là report data (`valid: false`), không phải execution error; không tạo scaffold hoặc sửa file. |
 
@@ -82,7 +82,11 @@ Generator prompt tạo specs ngắn theo genuine module boundaries trong Wiki m�
 
 Source mapping là extension của adapter Wiki, không phải capability upstream có sẵn. Specs có thể khai báo `source-paths: [src/payments/, src/shared/refund.ts]`: tối đa 200 unique literal paths, 1024 ký tự/path, không absolute/traversal/backslash/globs. Create nhận `sourcePaths`; update dùng `addList`/`removeList` với key `source-paths`, hoặc `remove: ["source-paths"]`. Strict validation áp dụng cả đọc và ghi; field lỗi là schema error. Upstream parser/serializer vẫn giữ metadata, adapter chỉ bổ sung một YAML-AST list edit cho field riêng, giữ prose/comments/unknown fields. Không auto-discover owner, không theo rename và không tự thêm metadata cho guides cũ.
 
-Policy config là opt-in user/repo policy, không tự sinh. Ví dụ cho một repo có backend:
+Khi **không có** `wiki/_domains.json`, `wiki_rules` dùng convention service-name chính xác: source thuộc top-level directory thật, hiện có `<service>/` → file hiện có `wiki/modules/<service>/_rules.md`, cùng tên và phân biệt hoa/thường, không đoán alias hay owner từ tên thư mục lồng nhau. Ví dụ `order`, `order/`, `order/src/` hoặc `order/src/Foo.java` chọn `wiki/modules/order/_rules.md`, cộng `wiki/_rules.md` và `wiki/modules/_rules.md` nếu ancestor này đã có. File/descendant mới chưa tồn tại bên trong service hiện có vẫn tra được. Đường dẫn rule phải canonical như bên dưới; source/rule paths không được qua symlink. Các doc edits `wiki/modules/order/...` không được diễn giải thành source `order/...`.
+
+Convention không cần config hay task selector riêng; `task` vẫn bắt buộc và hợp lệ nhưng không lọc convention. Batches union/deduplicate các module khớp; `unmatchedPaths` giữ paths không khớp. Có ít nhất một module khớp → `mode: "convention"`; không có → `mode: "legacy"`, root là known minimum, không phải toàn bộ rules áp dụng: consult quickstart/agent guidance. Resolver chỉ kiểm tra path types/tồn tại, không đọc source/rule prose, không ghi hay tạo scaffold. Sau `wiki_rules`, dùng `read` cho rules áp dụng, không dùng `wiki_get` (reserved rule files vẫn bị loại).
+
+Policy config là opt-in user/repo policy, không tự sinh và luôn authoritative khi có, kể cả domains rỗng hoặc path/task không khớp: không trộn thêm convention rules. Ví dụ cho một repo có backend:
 
 ```json
 {
@@ -115,7 +119,7 @@ Mọi active `/wiki-update` run cùng cwd được phép sửa rule khi intent y
 /wiki-update Khi viết code tôi không muốn tự thêm unit test nữa
 ```
 
-Prompt phân biệt facts về dự án → normal Wiki; chính sách làm việc lâu dài → `_rules.md` thuộc domain hẹp nhất; chỉ thị một lần → không lưu thành rule hay tài liệu. Root rule chỉ dành cho chính sách repository-wide. Agent đọc routes/rules/evidence để chọn owner, không hỏi người dùng tên file hoặc từ khóa cấp quyền. Chỉ hỏi lại nếu intent/thời hạn/ownership vẫn mơ hồ sau kiểm tra evidence. Không tự đổi chính sách cho yêu cầu docs-only hoặc update không có yêu cầu chính sách cụ thể; không suy diễn “không viết unit test mới” thành “không chạy test có sẵn”. Đây là phân loại bằng model theo prompt, không phải validator ngữ nghĩa deterministic.
+Prompt phân biệt facts về dự án → normal Wiki; chính sách làm việc lâu dài → `_rules.md` thuộc domain hẹp nhất; chỉ thị một lần → không lưu thành rule hay tài liệu. Root rule chỉ dành cho chính sách repository-wide. Agent dùng `wiki_rules` rồi `read` các rules áp dụng và kiểm tra routes/evidence để chọn owner, không hỏi người dùng tên file hoặc từ khóa cấp quyền. Nếu không có config và scope là service `order/` thật, lưu durable rule tại `wiki/modules/order/_rules.md`, không tạo `order/AGENTS.md` hay yêu cầu config chỉ để dùng convention. Chỉ hỏi lại nếu intent/thời hạn/ownership vẫn mơ hồ sau kiểm tra evidence. Không tự đổi chính sách cho yêu cầu docs-only hoặc update không có yêu cầu chính sách cụ thể; không suy diễn “không viết unit test mới” thành “không chạy test có sẵn”. Đây là phân loại bằng model theo prompt, không phải validator ngữ nghĩa deterministic.
 
 `tool_call` vẫn chặn built-in write/edit tới rules ngoài active update, trong init hoặc khi cwd khác. Metadata luôn được bảo vệ, brief được bảo vệ trong active run cùng cwd. Bash guard dò path và mutation phổ biến (redirect, rm/mv/cp, tee, truncate, sed/perl in-place). Không coi regex guard là sandbox cho mọi tool/script; chi tiết [safety](../operations/testing-and-safety.md#security-and-privacy).
 

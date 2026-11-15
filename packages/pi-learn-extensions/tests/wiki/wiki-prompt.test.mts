@@ -73,7 +73,7 @@ for (const mode of modes) {
       assert.match(prompt, /Edit top-level AGENTS\.md or CLAUDE\.md only when explicitly requested/);
       assert.doesNotMatch(prompt, /Bootstrap setup:|Documentation contract:|Research and writing:|```markdown|Build a repository inventory|discovery -> plan/);
       // Init is now lean too; comparing update to a bloated init rewards padding.
-      assert.ok(prompt.length < 5000, "focused update instructions stay compact for this fixture");
+      assert.ok(prompt.length < 5600, "focused update instructions with rule routing stay compact for this fixture");
     }
   });
 }
@@ -117,6 +117,18 @@ test("update delegates intent classification and rule ownership to the agent wit
     assert.match(prompt, /Do not rewrite documentation or bootstrap files unless the request requires it/);
     assert.doesNotMatch(prompt, /Do not create, edit, move, or delete wiki\/\*\*\/_rules\.md/);
   }
+});
+
+test("update routes durable service rules into Wiki and reads resolved paths without requiring config", () => {
+  const prompt = render("update", "Hãy lưu quy tắc lâu dài cho order: không tự thêm unit test");
+  assert.match(prompt, /wiki_rules: applicable paths before edits, then read returned _rules\.md files with read, not wiki_get/);
+  assert.match(prompt, /Config is authoritative/);
+  assert.match(prompt, /exact top-level service names select existing wiki\/modules\/<service>\/_rules\.md plus ancestors/);
+  assert.match(prompt, /Consult quickstart for remaining rules; lookup never scaffolds/);
+  assert.match(prompt, /Honor configured routing\. Without config, a real top-level <service>\//);
+  assert.match(prompt, /by exact name; no config needed/);
+  assert.match(prompt, /durable order-scoped rule in wiki\/modules\/order\/_rules\.md, never order\/AGENTS\.md/);
+  assert.match(prompt, /Do not guess other ownership/);
 });
 
 test("init never permits rule updates even when the request names rules", () => {

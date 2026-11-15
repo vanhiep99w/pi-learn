@@ -433,6 +433,37 @@ test("large explicit sections page losslessly and reject stale continuations", a
   assert.equal((await f.call("wiki_get", { ...query, ...oldCursor })).details.errorCode, "stale_output");
 });
 
+test("wiki_rules resolves conventional service scopes read-only while wiki_get still excludes module rules", async (t) => {
+  const f = fixture(t);
+  f.put("order/src/Foo.java", "SOURCE_CONTENT_SENTINEL");
+  f.put("billing/file", "SOURCE_CONTENT_SENTINEL");
+  f.put("wiki/modules/_rules.md", "PARENT_POLICY_SENTINEL");
+  f.put("wiki/modules/order/_rules.md", "ORDER_POLICY_SENTINEL");
+  f.put("wiki/modules/billing/_rules.md", "BILLING_POLICY_SENTINEL");
+  const before = snapshot(f.cwd);
+  await f.emit("session_start");
+  const opened = [], original = fs.openSync;
+  t.mock.method(fs, "openSync", (file, ...rest) => { opened.push(String(file)); return original(file, ...rest); });
+  for (const method of ["writeFileSync", "mkdirSync"]) t.mock.method(fs, method, () => { throw new Error(`Read tool must not call ${method}`); });
+  syncBuiltinESMExports(); t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  const rules = await f.call("wiki_rules", { paths: ["order/src/Foo.java", "order/", "billing", "unknown/file", "wiki/modules/order/SPEC.md"], task: "code" });
+  assert.equal(rules.isError, undefined);
+  assert.deepEqual(frame(rules).data.rulePaths, ["wiki/_rules.md", "wiki/modules/_rules.md", "wiki/modules/billing/_rules.md", "wiki/modules/order/_rules.md"]);
+  assert.deepEqual(frame(rules).data.unmatchedPaths, ["unknown/file", "wiki/modules/order/SPEC.md"]);
+  assert.equal(frame(rules).data.mode, "convention");
+  assert.equal(JSON.stringify(rules).includes("SENTINEL"), false); assertBounded(rules);
+  for (const path of ["_rules.md", "modules/_rules.md", "modules/order/_rules.md"]) {
+    for (const heading of [undefined, "Policy"]) {
+      assert.equal((await f.call("wiki_get", { path, ...(heading ? { heading } : {}) })).details.errorCode, "reserved_path");
+    }
+  }
+  assert.equal((await f.call("wiki_rules", { paths: ["order/../outside"], task: "code" })).details.errorCode, "invalid_policy_query");
+  assert.equal(opened.some((file) => /_rules\.md$|order\/src|billing\/file/u.test(file)), false);
+  assert.deepEqual(snapshot(f.cwd), before);
+  assert.match(f.tools.get("wiki_rules").description, /Explicit wiki\/_domains\.json is authoritative/);
+  assert.match(f.tools.get("wiki_rules").description, /Then use read on returned rule files, not wiki_get/);
+});
+
 test("routing tools use declarations only and policy config stays reserved", async (t) => {
   const f = fixture(t);
   f.put("wiki/mapped.md", spec("mapped", 'source-paths: ["src/"]\n'));
