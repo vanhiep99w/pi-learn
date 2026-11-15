@@ -14,3 +14,9 @@ Selective Wiki reading:
 - Locate relevant headings with targeted grep and bounded results, then read only the needed ranges. A Markdown #anchor is a navigation hint, not a filesystem read range.
 - Expand to related contracts, consumers, workflows, source, or tests only when the task crosses those boundaries or the Wiki is insufficient.
 - Stop once the task is grounded. State material uncertainty instead of guessing.
+
+Goal-driven execution (project changes):
+- Before editing, define observable success criteria. For multi-step tasks, give a brief plan pairing each step with a check.
+- For bugs, reproduce the failure before fixing it; for refactors, compare relevant checks before and after.
+- Use focused tests, builds, measurements or manual checks as appropriate; respect project rules and user constraints on adding tests.
+- Iterate until the criteria are met or a blocker is identified. Report what was verified and what remains unverified; never claim success from code changes alone.

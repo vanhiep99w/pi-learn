@@ -124,7 +124,7 @@ Prompt yêu cầu sửa tối thiểu, giữ rule không liên quan và ID ổn 
 
 Prompt `/wiki` giao agent đảm bảo mỗi top-level `AGENTS.md`/`CLAUDE.md` hiện có chứa đúng một section `## Project Wiki`; nếu cả hai vắng thì tạo AGENTS. Giữ nội dung khác, không sửa agent instruction file lồng nhau. `/wiki-update` không nhận mẫu bootstrap và chỉ được sửa section Project Wiki của các file này khi người dùng yêu cầu rõ ràng. Không có code rewrite bootstrap trực tiếp trong lifecycle.
 
-Section chứa conditional quickstart loading, component-scoped rules, kiểm chứng source khi Wiki thiếu/cũ/mâu thuẫn và hướng dẫn selective reading. Khối selective reading nằm trong mẫu Markdown bootstrap, không lặp thành một khối riêng ngoài mẫu. Test `wiki-prompt.test.mts` so sánh bootstrap sinh ra với hai file checked-in.
+Section chứa conditional quickstart loading, component-scoped rules, kiểm chứng source khi Wiki thiếu/cũ/mâu thuẫn và hướng dẫn selective reading. Khối selective reading nằm trong mẫu Markdown bootstrap, không lặp thành một khối riêng ngoài mẫu. Khối goal-driven execution yêu cầu xác định tiêu chí thành công trước khi sửa project, gắn bước làm với cách kiểm chứng, tái hiện bug/so sánh trước-sau khi refactor và báo rõ phần đã/chưa xác minh. Chọn test, build, đo lường hoặc kiểm tra thủ công phù hợp; không bắt buộc thêm test trái quy tắc project hay yêu cầu người dùng. Test `wiki-prompt.test.mts` kiểm tra hướng dẫn này và so sánh bootstrap sinh ra với hai file checked-in.
 
 ## Documentation workflow
 

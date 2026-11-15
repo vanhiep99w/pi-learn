@@ -146,6 +146,22 @@ test("update retains non-Git metadata and handles absent metadata", () => {
   assert.match(withoutMetadata, /No previous Wiki update metadata was found/);
 });
 
+test("init bootstrap defines verifiable goals without mandating new tests", () => {
+  const bootstrap = createWikiAgentInstructions();
+  assert.match(bootstrap, /Goal-driven execution \(project changes\):/);
+  assert.match(bootstrap, /Before editing, define observable success criteria/);
+  assert.match(bootstrap, /brief plan pairing each step with a check/);
+  assert.match(bootstrap, /reproduce the failure before fixing it/);
+  assert.match(bootstrap, /compare relevant checks before and after/);
+  assert.match(bootstrap, /focused tests, builds, measurements or manual checks as appropriate/);
+  assert.match(bootstrap, /respect project rules and user constraints on adding tests/);
+  assert.match(bootstrap, /Iterate until the criteria are met or a blocker is identified/);
+  assert.match(bootstrap, /Report what was verified and what remains unverified/);
+  assert.match(bootstrap, /never claim success from code changes alone/);
+  assert.equal(render("init").split("Goal-driven execution (project changes):").length - 1, 1);
+  assert.doesNotMatch(render("update"), /Goal-driven execution \(project changes\):/);
+});
+
 test("the reusable bootstrap is compact and matches checked-in agent files", () => {
   const bootstrap = createWikiAgentInstructions();
   assert.ok(bootstrap.length < 2000);
