@@ -13,7 +13,7 @@ Luồng trong `wiki-commands.ts`:
 3. `ensureWikiPromptRuleScaffolds()` tạo scaffold thiếu; init kiểm tra lint rules trước run, update được bắt đầu để sửa lint invalid.
 4. Đọc brief/metadata, hash Wiki trước run; lưu `state.active` của extension instance gồm command, cwd và snapshot. Quyền sửa rules phụ thuộc command của active run, không phụ thuộc từ khóa trong message.
 5. `createWikiTaskPrompt()` tạo yêu cầu, `pi.sendUserMessage()` đưa vào agent đang dùng provider/model/tools hiện tại. Status key `wiki` báo generating/updating khi có UI; không UI dùng console.
-6. `agent_end` ghi nhận stopReason aborted/error của assistant cuối, không finalize ngay; lần retry thành công thay thế cờ lỗi trước đó. `agent_settled` lấy và xóa active run, tạo scaffold thiếu, hash lại, kiểm tra links/rules và schema/graph, rồi [finalize metadata](#snapshot-and-metadata). Event aborted cũng chặn complete ngay cả khi không có assistant error message.
+6. `agent_end` ghi nhận stopReason aborted/error của assistant cuối, không finalize ngay; lần retry thành công thay thế cờ lỗi trước đó. `agent_settled` lấy và xóa active run, tạo scaffold thiếu, hash lại, kiểm tra links/rules và schema/graph. Chỉ init hợp lệ, không abort/error mới ghi [bootstrap top-level bằng code](#agent-bootstrap-maintenance), trước khi [finalize metadata](#snapshot-and-metadata). Event aborted cũng chặn complete ngay cả khi không có assistant error message.
 7. `session_shutdown` xóa active run; nếu Wiki đổi thì ghi interrupted để lần sau retry. Status được dọn trong finally.
 
 Cả hai prompt không chứa Git status, commit history, diff hoặc Git fields của metadata. Git vẫn dùng nội bộ cho no-op và ghi `gitHead`; agent có thể tự đọc Git evidence cần thiết. Nếu gửi message lỗi, active run và status bị xóa; lỗi command/finalization được notify/log, không rollback tài liệu.
@@ -27,7 +27,8 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 | `wiki/index.ts` | Entrypoint duy nhất, đăng ký hai commands, sáu read tools và hai metadata tools |
 | `wiki/wiki-commands.ts` | Lifecycle, tool guard, snapshot, no-op và metadata |
 | `wiki/wiki-protection.ts` | Shared path/bash mutation checks, dùng lại trong delegated children mà không cấp Wiki run permit |
-| `wiki/wiki-prompt.ts` | Task contract, phân loại intent/ownership bằng agent, bootstrap AGENTS/CLAUDE |
+| `wiki/wiki-prompt.ts` | Task contract, phân loại intent/ownership bằng agent, mẫu instructions bootstrap dùng lại bởi extension |
+| `wiki/wiki-bootstrap.ts` | Ghi bootstrap top-level deterministic, giữ nội dung khác, kiểm tra target và thay file atomic từng file |
 | `wiki/wiki-rules.js` | Phân loại path, discovery, scaffold, rule lint |
 | `wiki/wiki-links.js` / `wiki/wiki-headings.js` | Internal Markdown links và shared ATX heading/anchor resolver, bỏ frontmatter/fenced code |
 | `wiki/wiki-source-paths.js` | Literal source-scope validation/matching, không đọc source |
@@ -39,7 +40,7 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 | `wiki/wiki-mutation-tools.ts` | `wiki_spec_create`/`wiki_spec_update`, active run permits, session lifecycle và bounded receipts |
 | `wiki/vendor/thinkrail-spec-graph/` | Core/tests ThinkRail được pin commit, Apache-2.0, provenance và patches; không có extension entrypoint riêng |
 
-Tools đọc đã được wire vào entrypoint và task prompts. No-op/finalization đã kiểm thêm schema/graph qua read model; không đổi bootstrap, rules permissions hoặc layout Wiki. Hai metadata tools và generator prompt cho Wiki mới đã có; không migration Wiki cũ hoặc tool xóa. Generator vẫn dùng agent hiện tại, chưa có semantic benchmark bằng model thật; đây chưa phải rollout workflow skills của ThinkRail. Subagents là capability riêng đã nối với shared Wiki guard, xem [contract](subagents.md).
+Tools đọc đã được wire vào entrypoint và task prompts. No-op/finalization kiểm thêm schema/graph qua read model; read tools không cấp quyền sửa rules hoặc đổi layout Wiki. Hai metadata tools và generator prompt cho Wiki mới đã có; không migration Wiki cũ hoặc tool xóa. Generator vẫn dùng agent hiện tại, chưa có semantic benchmark bằng model thật; đây chưa phải rollout workflow skills của ThinkRail. Subagents là capability riêng đã nối với shared Wiki guard, xem [contract](subagents.md).
 
 Thay command cần đồng bộ prompt, README, test và routes; thêm helper giữ trong thư mục Wiki để không thành public entrypoint độc lập.
 
@@ -122,9 +123,11 @@ Prompt yêu cầu sửa tối thiểu, giữ rule không liên quan và ID ổn 
 
 ## Agent bootstrap maintenance
 
-Prompt `/wiki` giao agent đảm bảo mỗi top-level `AGENTS.md`/`CLAUDE.md` hiện có chứa đúng một section `## Project Wiki`; nếu cả hai vắng thì tạo AGENTS. Giữ nội dung khác, không sửa agent instruction file lồng nhau. `/wiki-update` không nhận mẫu bootstrap và chỉ được sửa section Project Wiki của các file này khi người dùng yêu cầu rõ ràng. Không có code rewrite bootstrap trực tiếp trong lifecycle.
+Extension ghi bootstrap deterministic trong `agent_settled`, chỉ sau `/wiki` init có links/rules/schema/graph hợp lệ và không abort/error. Không gửi mẫu `## Project Wiki` trong prompt gen Wiki hoặc giao model chép lại. Mỗi top-level `AGENTS.md`/`CLAUDE.md` hiện có được chuẩn hóa về đúng một section; nếu cả hai vắng thì tạo `AGENTS.md`. Giữ nội dung khác, không sửa file lồng nhau, từ chối target symlink hoặc không phải regular file. Chạy lại không ghi khi nội dung đã đúng. Lỗi bootstrap chặn thông báo hoàn tất và ghi metadata complete; không có transaction toàn run.
 
-Section chứa conditional quickstart loading, component-scoped rules, kiểm chứng source khi Wiki thiếu/cũ/mâu thuẫn và hướng dẫn selective reading. Khối selective reading nằm trong mẫu Markdown bootstrap, không lặp thành một khối riêng ngoài mẫu. Khối goal-driven execution yêu cầu xác định tiêu chí thành công trước khi sửa project, gắn bước làm với cách kiểm chứng, tái hiện bug/so sánh trước-sau khi refactor và báo rõ phần đã/chưa xác minh. Chọn test, build, đo lường hoặc kiểm tra thủ công phù hợp; không bắt buộc thêm test trái quy tắc project hay yêu cầu người dùng. Test `wiki-prompt.test.mts` kiểm tra hướng dẫn này và so sánh bootstrap sinh ra với hai file checked-in.
+Không tự bootstrap khi mở phiên, shutdown hoặc chạy `/wiki-update`. Update chỉ được giao sửa section Project Wiki của các file này khi người dùng yêu cầu rõ ràng. Ghi file không tự nạp lại instructions vào context phiên đang chạy.
+
+Section lấy từ `createWikiAgentInstructions()`: conditional quickstart loading, component-scoped rules, kiểm chứng source khi Wiki thiếu/cũ/mâu thuẫn và selective reading. Khối goal-driven execution yêu cầu xác định tiêu chí thành công trước khi sửa project, gắn bước làm với cách kiểm chứng, tái hiện bug/so sánh trước-sau khi refactor và báo rõ phần đã/chưa xác minh. Chọn test, build, đo lường hoặc kiểm tra thủ công phù hợp; không bắt buộc thêm test trái quy tắc project hay yêu cầu người dùng. Focused tests kiểm tra mẫu và hai file checked-in, preservation/idempotence của writer và điều kiện lifecycle trước khi ghi.
 
 ## Documentation workflow
 
@@ -137,7 +140,7 @@ Section chứa conditional quickstart loading, component-scoped rules, kiểm ch
 - Update task hoàn tất: giữ verified behavior, confirmed rationale và constraints còn hiệu lực tại canonical owner; không chép checklist/history, tự xóa user plans hoặc promote draft. Sửa spec đã có thì giữ ID, kiểm reverse consumers, báo conflict source/spec thay vì tự quyết.
 - Update rule theo intent: agent tự chọn owner, đọc target rules và evidence component liên quan rồi sửa các rules trong scope; không viết lại tài liệu/bootstrap nếu yêu cầu không cần. Guard và validation toàn Wiki của extension vẫn giữ nguyên, prompt tập trung không có nghĩa bỏ kiểm tra finalization.
 
-Generated docs chỉ ở Wiki, ngoại lệ là section bootstrap top-level theo quyền của từng mode. Init compose bootstrap bằng helper setup riêng sau task chính, vẫn gửi template nguyên văn và giữ ownership/top-level/nested-file boundaries; chưa có deterministic bootstrap writer. Safety và validation vẫn là yêu cầu bắt buộc, không bị xóa khi rút prompt.
+Prompt init giới hạn generated docs dưới `wiki/`; phần bootstrap top-level cố định do extension ghi sau khi run hợp lệ, không còn khối Markdown hay ngoại lệ cho model sửa bootstrap trong prompt init. Update chỉ cho model sửa Project Wiki top-level khi người dùng yêu cầu rõ ràng. Safety và validation vẫn là yêu cầu bắt buộc, không bị xóa khi rút prompt.
 
 `wiki/INSTRUCTIONS.md` là brief do người dùng quản lý: scope, ngôn ngữ, ưu tiên, exclusions, audience. Init đọc và chèn brief: `readWikiBrief()` chấp nhận regular file không symlink, tối đa 64 KiB; thiếu file là bình thường, loại file/size sai làm command init báo lỗi. Brief vắng/rỗng được bỏ khỏi prompt hoàn toàn, không chèn thông báo “none found” hoặc separator rỗng. Update không tự đọc/chèn toàn bộ brief qua `createRunContext()`; prompt hướng dẫn agent chỉ đọc khi cần ngôn ngữ/quy ước tài liệu và không dùng ưu tiên rộng để mở scope. Brief không vượt safety boundaries hoặc applicable rules và vẫn được bảo vệ trong active run.
 

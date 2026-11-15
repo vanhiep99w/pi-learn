@@ -119,6 +119,11 @@ test("real Pi loader/TypeBox handle one Wiki entrypoint and headless factory rep
   await emit(replacement, "session_start");
   assert.equal(JSON.parse((await invoke(replacement, "wiki_search", { pattern: "needle" })).content[0].text).data.matches.length, 1);
   assert.equal((await invoke(extension, "wiki_search", { pattern: "needle" })).details.errorCode, "session_inactive");
+  await replacement.commands.get("wiki").handler("Confirm existing Wiki", ctx);
+  assert.doesNotMatch(prompts.at(-1), /Bootstrap setup|## Project Wiki|```markdown/);
+  await emit(replacement, "agent_settled");
+  assert.match(readFileSync(path.join(cwd, "AGENTS.md"), "utf8"), /^## Project Wiki\n/);
+  assert.match(notifications.at(-1), /Wiki init completed/);
   await emit(replacement, "session_shutdown");
   assert.deepEqual(warnings, []);
 });

@@ -17,6 +17,7 @@ import {
   isWikiDomainsPath,
 } from "./wiki-rules.js";
 import { createWikiTaskPrompt } from "./wiki-prompt.js";
+import { ensureWikiAgentBootstrap } from "./wiki-bootstrap.ts";
 import { isProtectedWikiMutationPath, commandMutatesProtectedWikiPath } from "./wiki-protection.ts";
 import { WikiModelError, WikiReadModel, type WikiDiagnostic } from "./wiki-model.ts";
 import { readPolicyConfigText, WikiPolicyError } from "./wiki-policy.js";
@@ -130,6 +131,9 @@ export function registerWikiCommands(pi: ExtensionAPI): WikiWriteAccess {
       const agentInterrupted = event.aborted === true || run.agentInterrupted === true;
       const previousUpdate = await readLastUpdate(run.cwd);
       const clearInterruptedStatus = previousUpdate?.status === "interrupted";
+      if (run.command === "init" && valid && !agentInterrupted) {
+        await ensureWikiAgentBootstrap(run.cwd);
+      }
       if (valid && !agentInterrupted && (wikiChanged || clearInterruptedStatus)) {
         await writeLastUpdateMetadata(run.command, run.cwd, getCurrentPiModelLabel(ctx), "complete");
       } else if (!valid || (agentInterrupted && wikiChanged)) {

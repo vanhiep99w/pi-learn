@@ -41,7 +41,7 @@ for (const mode of modes) {
     assert.match(prompt, /Stop once the task is grounded/);
     if (mode === "init") {
       assert.match(prompt, /task -> system -> page\/heading/);
-      assert.match(prompt, /#anchor is a navigation hint/);
+      assert.doesNotMatch(prompt, /Selective Wiki reading:|## Project Wiki/);
     } else {
       assert.match(prompt, /quickstart\.md only if routing is needed/);
       assert.match(prompt, /Load applicable _rules\.md files immediately before edits/);
@@ -158,7 +158,7 @@ test("init bootstrap defines verifiable goals without mandating new tests", () =
   assert.match(bootstrap, /Iterate until the criteria are met or a blocker is identified/);
   assert.match(bootstrap, /Report what was verified and what remains unverified/);
   assert.match(bootstrap, /never claim success from code changes alone/);
-  assert.equal(render("init").split("Goal-driven execution (project changes):").length - 1, 1);
+  assert.doesNotMatch(render("init"), /Goal-driven execution \(project changes\):/);
   assert.doesNotMatch(render("update"), /Goal-driven execution \(project changes\):/);
 });
 
@@ -167,9 +167,7 @@ test("the reusable bootstrap is compact and matches checked-in agent files", () 
   assert.ok(bootstrap.length < 2000);
   assert.match(bootstrap, /Selective Wiki reading:/);
   assert.match(bootstrap, /Do not preload the entire wiki/);
-  const prompt = render("init");
-  assert.equal(prompt.split("Selective Wiki reading:").length - 1, 1);
-  assert.ok(prompt.includes("```markdown\n" + bootstrap + "\n```"));
+  assert.doesNotMatch(render("init"), /Selective Wiki reading:|```markdown|## Project Wiki/);
   assert.doesNotMatch(render("update"), /Selective Wiki reading:|## Project Wiki/);
   assert.match(bootstrap, /read `wiki\/quickstart\.md` if it has not already been read/);
   assert.match(bootstrap, /For unrelated requests, do not read it/);
@@ -228,7 +226,7 @@ test("init keeps validation and review boundaries without narrating runtime fina
   assert.match(prompt, /New or inferred specs stay draft until user review/);
   assert.match(prompt, /run schema\/graph validation/);
   assert.match(prompt, /Structural checks do not establish semantic correctness/);
-  const finish = prompt.slice(prompt.indexOf("\nFinish:"), prompt.indexOf("Bootstrap setup ("));
+  const finish = prompt.slice(prompt.indexOf("\nFinish:"));
   assert.match(finish, /Report files, checks, corrections and gaps/);
   assert.match(finish, /distinguish confirmed findings, inferences and items needing user review/);
   assert.doesNotMatch(prompt, /extension also validates|after the agent settles|finalizes it|current Pi provider/);
@@ -277,11 +275,10 @@ test("absent or blank init brief adds no empty section or absence announcement",
   assert.match(supplied, /Persistent Wiki brief from wiki\/INSTRUCTIONS\.md/);
 });
 
-test("bootstrap remains a separate init setup step with its original ownership limits", () => {
+test("init leaves fixed bootstrap to code and limits generated docs to Wiki", () => {
   const init = render("init");
-  assert.ok(init.indexOf("Bootstrap setup (") > init.indexOf("Finish:"));
-  assert.equal(init.split("Bootstrap setup (").length - 1, 1);
-  assert.match(init, /if neither exists, create AGENTS\.md/);
-  assert.match(init, /Preserve unrelated content and do not edit nested agent instruction files/);
+  assert.match(init, /Write generated docs only under wiki\/\. Do not create/);
+  assert.doesNotMatch(init, /Bootstrap setup|top-level Project Wiki bootstrap|only exception|```markdown|## Project Wiki/);
+  assert.ok(!init.includes(createWikiAgentInstructions()));
   assert.doesNotMatch(render("update"), /Bootstrap setup \(|```markdown/);
 });

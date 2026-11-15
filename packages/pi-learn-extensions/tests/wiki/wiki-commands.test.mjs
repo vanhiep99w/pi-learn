@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
@@ -345,4 +345,120 @@ test("graph I/O errors cannot silently become complete or no-op", async (t) => {
   await f.emit("agent_settled");
   assert.equal((await readMetadata(f)).status, "interrupted");
   assert.match(f.notices.at(-1), /invalid_utf8/);
+});
+
+const readBootstrap = (f, name = "AGENTS.md") => readFile(path.join(f.cwd, name), "utf8");
+const assertNoBootstrap = (f) => Promise.all(["AGENTS.md", "CLAUDE.md"].map((name) => assert.rejects(readBootstrap(f, name), { code: "ENOENT" })));
+
+test("successful init writes bootstrap at settlement, not agent_end, before completing metadata", async (t) => {
+  const f = await fixture(t);
+  await f.run("wiki");
+  await assertNoBootstrap(f);
+  assert.doesNotMatch(f.messages[0], /Bootstrap setup|## Project Wiki|```markdown/);
+  await writeFile(path.join(f.cwd, "wiki/a.md"), spec("a"));
+  await f.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop" }] });
+  await assertNoBootstrap(f);
+  await assert.rejects(readMetadata(f), { code: "ENOENT" });
+  await f.emit("agent_settled");
+  assert.match(await readBootstrap(f), /^## Project Wiki\n/);
+  assert.equal((await readMetadata(f)).status, "complete");
+  assert.match(f.notices.at(-1), /Wiki init completed/);
+});
+
+test("valid no-change init bootstraps both existing files without changing complete metadata", async (t) => {
+  const f = await fixture(t);
+  await writePrevious(f);
+  const before = await readFile(metadataPath(f), "utf8");
+  for (const name of ["AGENTS.md", "CLAUDE.md"]) await writeFile(path.join(f.cwd, name), `# ${name}\n\n## Project Wiki\nOld\n\n## Keep\nExact\n`);
+  await f.run("wiki");
+  await f.emit("agent_settled");
+  for (const name of ["AGENTS.md", "CLAUDE.md"]) {
+    const content = await readBootstrap(f, name);
+    assert.ok(content.startsWith(`# ${name}\n\n## Project Wiki\n`));
+    assert.match(content, /Selective Wiki reading:/);
+    assert.ok(content.endsWith("\n\n## Keep\nExact\n"));
+  }
+  assert.equal(await readFile(metadataPath(f), "utf8"), before);
+  assert.match(f.notices.at(-1), /completed with no changes/);
+});
+
+for (const failure of ["links", "rules", "graph"]) {
+  test(`init ${failure} validation failure never bootstraps`, async (t) => {
+    const f = await fixture(t);
+    await f.run("wiki");
+    if (failure === "links") await writeFile(path.join(f.cwd, "wiki/a.md"), "# A\n\n[Missing](missing.md)\n");
+    if (failure === "rules") await writeFile(path.join(f.cwd, "wiki/_rules.md"), "# Rules\n\n## DUP-001 — One\n\n## DUP-001 — Two\n");
+    if (failure === "graph") await writeFile(path.join(f.cwd, "wiki/a.md"), spec("a", "depends-on: [missing]\n"));
+    await f.emit("agent_settled");
+    await assertNoBootstrap(f);
+    assert.equal((await readMetadata(f)).status, "interrupted");
+    assert.doesNotMatch(f.notices.at(-1), /completed/);
+  });
+}
+
+for (const failure of ["settled abort", "assistant aborted", "assistant error", "shutdown", "session replacement"]) {
+  test(`init ${failure} never bootstraps`, async (t) => {
+    const f = await fixture(t);
+    await f.run("wiki");
+    await writeFile(path.join(f.cwd, "wiki/a.md"), spec("a"));
+    if (failure === "assistant error" || failure === "assistant aborted") await f.emit("agent_end", { messages: [{ role: "assistant", stopReason: failure === "assistant error" ? "error" : "aborted" }] });
+    if (failure === "shutdown" || failure === "session replacement") await f.emit("session_shutdown");
+    if (failure === "session replacement") await f.emit("session_start");
+    await f.emit("agent_settled", { aborted: failure === "settled abort" });
+    await assertNoBootstrap(f);
+    assert.equal((await readMetadata(f)).status, "interrupted");
+  });
+}
+
+test("failed init attempt followed by successful retry bootstraps only at final settlement", async (t) => {
+  const f = await fixture(t);
+  await f.run("wiki");
+  await f.emit("agent_end", { messages: [{ role: "assistant", stopReason: "error" }] });
+  await assertNoBootstrap(f);
+  await f.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop" }] });
+  await f.emit("agent_settled", { aborted: false });
+  assert.match(await readBootstrap(f), /## Project Wiki/);
+});
+
+test("session start, idle settlement and shutdown never bootstrap without an active init", async (t) => {
+  const f = await fixture(t);
+  await f.emit("session_start");
+  await f.emit("agent_end", { messages: [{ role: "assistant", stopReason: "stop" }] });
+  await f.emit("agent_settled");
+  await f.emit("session_shutdown");
+  await assertNoBootstrap(f);
+  assert.deepEqual(f.notices, []);
+});
+
+test("successful update never creates or repairs bootstrap files", async (t) => {
+  const f = await fixture(t);
+  await f.run("wiki-update", "Refresh docs");
+  await writeFile(path.join(f.cwd, "wiki/a.md"), spec("a"));
+  await f.emit("agent_settled");
+  await assertNoBootstrap(f);
+  assert.equal((await readMetadata(f)).status, "complete");
+  const existing = "## Project Wiki\nStale but user-owned during updates\n";
+  await writeFile(path.join(f.cwd, "AGENTS.md"), existing);
+  await f.run("wiki-update", "Refresh docs");
+  await f.emit("agent_settled");
+  assert.equal(await readBootstrap(f), existing);
+});
+
+test("bootstrap failure preserves both files and metadata, never announces init completion", async (t) => {
+  const f = await fixture(t);
+  await writePrevious(f, { status: "interrupted" });
+  const before = await readFile(metadataPath(f), "utf8");
+  const original = "# Preserve agent bytes\n";
+  await writeFile(path.join(f.cwd, "AGENTS.md"), original);
+  await symlink(path.join(f.cwd, "AGENTS.md"), path.join(f.cwd, "CLAUDE.md"));
+  await f.run("wiki");
+  await writeFile(path.join(f.cwd, "wiki/a.md"), spec("a"));
+  await f.emit("agent_settled");
+  assert.equal(await readBootstrap(f), original);
+  assert.equal(await readFile(metadataPath(f), "utf8"), before);
+  assert.match(f.notices.at(-1), /Wiki finalization failed:.*CLAUDE\.md.*regular file/);
+  assert.doesNotMatch(f.notices.join("\n"), /Wiki init completed/);
+  const count = f.notices.length;
+  await f.emit("agent_settled");
+  assert.equal(f.notices.length, count, "failed finalization still clears the active run");
 });

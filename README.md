@@ -56,7 +56,7 @@ Wiki dùng model/provider hiện tại của Pi, bổ sung tools tra cứu và m
 /wiki-update [ghi chú thêm]
 ```
 
-- `/wiki` khởi tạo tài liệu dưới `wiki/`.
+- `/wiki` khởi tạo tài liệu dưới `wiki/`. Sau init hợp lệ, không hủy/lỗi, extension tự ghi section `Project Wiki` cố định vào top-level `AGENTS.md`/`CLAUDE.md` (cả hai vắng thì tạo `AGENTS.md`), giữ nội dung khác; mẫu không nằm trong prompt gen Wiki.
 - `/wiki-update` cập nhật tài liệu theo source hiện tại và yêu cầu cụ thể; prompt không chứa Git status, lịch sử commit hoặc diff.
 - Trong `/wiki-update`, agent tự phân biệt facts, chính sách lâu dài và chỉ thị một lần, rồi chọn trang Wiki hoặc `_rules.md` thuộc domain phù hợp. Không cần nêu tên file hay từ khóa đặc biệt, ví dụ:
 
