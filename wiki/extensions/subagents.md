@@ -1,10 +1,12 @@
 # Subagents
 
+> **Trạng thái: tạm tắt auto-load để thử Pi Herdsman riêng.** Root/subpackage manifests không nạp `subagents/index.ts`; source/tests/provenance vẫn giữ nguyên. Package không tự đăng ký `Agent`, `get_subagent_result` hoặc `/subagents`. Nội dung bên dưới là contract của runtime khi được nạp tường minh, không phải default đang bật. Nếu có explicit `-e`/settings nạp subagents hoặc cả thư mục extensions, bỏ entry đó trước khi thử Herdsman. Restart hoặc `/reload` phải dùng đúng bản package đã sửa; không tự cập nhật bản Git đã cài từ checkout local.
+
 Subagents cho phép parent giao một task tự chứa cho child có conversation context riêng, chạy foreground hoặc background. Runtime reuse ThinkRail `pi-subagents` + `pi-delegation`, pin commit `883affb98416fddd2d8c4f7f18fba92cc435cb4b`. Child mặc định **dùng chung cwd/worktree/branch**, không phải filesystem sandbox hoặc worktree riêng. Không có workflow router được bật kèm.
 
 ## Dùng và theo dõi
 
-Sau reload đúng source/package, agent có hai tools:
+Khi chủ động nạp `subagents/index.ts`, agent có hai tools:
 
 ```ts
 Agent({ subagent_type: "scout", task: "Tìm caller của hàm X và báo paths/lines" })

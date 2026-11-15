@@ -1,7 +1,7 @@
 {
   "name": "pi-learn-extensions",
   "version": "1.0.1",
-  "description": "Pi Coding Agent extensions: repository Wiki, ThinkRail subagents, ChatGPT usage status, Aurora UI, and Midnight Aurora theme.",
+  "description": "Pi Coding Agent extensions: repository Wiki, ChatGPT usage status, Aurora UI, and Midnight Aurora theme.",
   "type": "module",
   "scripts": {
     "test": "npm run test:wiki && npm run test:subagents && npm run test:aurora && npm run test:theme",
@@ -24,7 +24,9 @@
   "license": "MIT",
   "pi": {
     "extensions": [
-      "./extensions"
+      "./extensions/wiki/index.ts",
+      "./extensions/chatgpt-usage-status/index.ts",
+      "./extensions/aurora-ui.ts"
     ],
     "themes": [
       "./themes"

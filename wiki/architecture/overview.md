@@ -11,7 +11,11 @@ Phạm vi: package boundaries, public entrypoints và ownership tài liệu. Đ�
 ```json
 {
   "pi": {
-    "extensions": ["./packages/pi-learn-extensions/extensions"],
+    "extensions": [
+      "./packages/pi-learn-extensions/extensions/wiki/index.ts",
+      "./packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts",
+      "./packages/pi-learn-extensions/extensions/aurora-ui.ts"
+    ],
     "themes": ["./packages/pi-learn-extensions/themes"]
   }
 }
@@ -21,12 +25,12 @@ Không có workspace declaration, root scripts, application server, database ho�
 
 ### Public extension and theme package
 
-`packages/pi-learn-extensions/package.json` name `pi-learn-extensions`, version 1.0.1, ESM; expose `./extensions`, `./themes`; files allowlist gồm extensions/tests/themes/README. Script `test:wiki` chạy Node test runner trên .mjs/.mts. Root không có files allowlist giống subpackage; kiểm tra packaging thật trước release, không suy ra artifact hai package giống nhau.
+`packages/pi-learn-extensions/package.json` name `pi-learn-extensions`, version 1.0.1, ESM; expose tường minh `./extensions/wiki/index.ts`, `./extensions/chatgpt-usage-status/index.ts`, `./extensions/aurora-ui.ts` và `./themes`; files allowlist gồm extensions/tests/themes/README. Script `test:wiki` chạy Node test runner trên .mjs/.mts. Root không có files allowlist giống subpackage; kiểm tra packaging thật trước release, không suy ra artifact hai package giống nhau.
 
 Public entrypoints:
 
 - `extensions/wiki/index.ts` → đăng ký commands và lifecycle Wiki.
-- `extensions/subagents/index.ts` → ThinkRail Agent/result tools, parent-owned delegation lifecycle và `/subagents` controls; helpers/vendor không là entrypoints riêng.
+- `extensions/subagents/index.ts` → runtime ThinkRail được giữ source nhưng **tạm tắt auto-load ở cả hai manifests** để thử Pi Herdsman; chỉ đăng ký Agent/result tools và `/subagents` nếu được nạp tường minh.
 - `extensions/chatgpt-usage-status/index.ts` → account commands, usage producer.
 - `extensions/aurora-ui.ts` → editor/footer, usage consumer, theme picker, sidebar và `/tree-v2`; helpers nội bộ ở `extensions/aurora/` không có index/manifest nên không auto-load riêng.
 - Theme resource: `themes/midnight-aurora.json`.
@@ -67,7 +71,7 @@ Extension code chạy trong process Pi với quyền OS của user, không sandb
 
 ## Reduced supported surface
 
-Scope hiện hành là Wiki, subagents, ChatGPT usage, Aurora UI và theme. Subagents reuse private ThinkRail packages bằng pinned vendoring, không import ThinkRail server/UI hay runtime sibling bên ngoài package; [contract](../extensions/subagents.md). README và Git commit `5d753dd` ghi retirement session-observability/proposal/eval/apply, image generation và model-prompt tools; manifest/source inventory hiện không expose chúng. Không coi compatibility với subsystem đã bỏ là yêu cầu ngầm. Web tools cài riêng, không bundled.
+Auto-load surface hiện hành là Wiki, ChatGPT usage, Aurora UI và theme. Subagents tạm tắt auto-load để thử Pi Herdsman riêng, không bị xóa source hoặc tự thay engine. Subagents reuse private ThinkRail packages bằng pinned vendoring, không import ThinkRail server/UI hay runtime sibling bên ngoài package; [contract](../extensions/subagents.md). README và Git commit `5d753dd` ghi retirement session-observability/proposal/eval/apply, image generation và model-prompt tools; manifest/source inventory hiện không expose chúng. Không coi compatibility với subsystem đã bỏ là yêu cầu ngầm. Web tools cài riêng, không bundled.
 
 ## Source-of-truth table
 

@@ -1,6 +1,6 @@
 # Pi Learn
 
-Pi Learn là package cho Pi Coding Agent, gồm Wiki repository, subagents dựa trên ThinkRail, giao diện Aurora và tài liệu học Pi bằng tiếng Việt.
+Pi Learn là package cho Pi Coding Agent, gồm Wiki repository, giao diện Aurora và tài liệu học Pi bằng tiếng Việt. Source subagents ThinkRail được giữ lại nhưng tạm tắt auto-load để thử Pi Herdsman riêng.
 
 ## Thành phần
 
@@ -8,7 +8,7 @@ Pi Learn là package cho Pi Coding Agent, gồm Wiki repository, subagents dựa
 packages/pi-learn-extensions/
 ├── extensions/
 │   ├── wiki/                    # /wiki và /wiki-update
-│   ├── subagents/               # Agent + get_subagent_result, /subagents
+│   ├── subagents/               # source giữ lại, tạm tắt auto-load
 │   ├── chatgpt-usage-status/    # trạng thái usage ChatGPT
 │   ├── aurora-ui.ts             # editor/footer/status + sidebar + /tree-v2
 │   └── aurora/                  # helper nội bộ, không auto-load riêng
@@ -77,7 +77,9 @@ Chi tiết và pagination: [`Wiki read tools`](wiki/extensions/wiki-extension.md
 
 ## Subagents
 
-Sau `/reload` đúng bản vừa cài, agent có tools `Agent` và `get_subagent_result`, với roles `scout`, `planner`, `worker`, `reviewer`. Bạn có thể yêu cầu “dùng scout tìm callers của X” hoặc “giao worker sửa module A ở background”. Child có context riêng nhưng **dùng chung cwd/worktree**, không là sandbox; parent cần chia task tránh ghi cùng file.
+**Tạm tắt auto-load để thử Pi Herdsman.** Hai package manifests chỉ nạp Wiki, ChatGPT usage và Aurora; không tự đăng ký `Agent`, `get_subagent_result` hoặc `/subagents`. Source/tests ThinkRail vẫn giữ nguyên. Không tự cài hay tích hợp Herdsman và không đổi cấu hình Pi cá nhân. Nếu đang dùng bản Git đã cài thay vì checkout này, `/reload` không tự lấy thay đổi local; cần nạp đúng bản source đã sửa. Explicit `-e` trỏ thẳng vào subagents hoặc thư mục extensions vẫn có thể bật lại runtime, nên bỏ entry đó khi thử Herdsman.
+
+Phần dưới mô tả runtime khi được nạp tường minh, không phải mặc định package hiện tại. Khi nạp, agent có tools `Agent` và `get_subagent_result`, với roles `scout`, `planner`, `worker`, `reviewer`. Bạn có thể yêu cầu “dùng scout tìm callers của X” hoặc “giao worker sửa module A ở background”. Child có context riêng nhưng **dùng chung cwd/worktree**, không là sandbox; parent cần chia task tránh ghi cùng file.
 
 `/subagents` xem status; `/subagents stop <id>` hoặc `/subagents stop all` yêu cầu dừng. Mặc định kế thừa model/thinking, background tự trả report, không cần polling. Tool set bị giới hạn theo parent + curated SDK/Wiki tools; Wiki policies/brief/metadata vẫn protected. Custom approval hooks/extensions của parent không tự được clone; scout/reviewer có bash nên read-only không phải OS guarantee. Không tự bật workflow router.
 

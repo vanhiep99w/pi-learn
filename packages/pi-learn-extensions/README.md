@@ -17,7 +17,7 @@ Sau khi cài/update, restart Pi hoặc chạy `/reload`.
 ```txt
 extensions/
 ├── wiki/                    # /wiki và /wiki-update
-├── subagents/               # Agent/get_subagent_result + /subagents
+├── subagents/               # source giữ lại, tạm tắt auto-load
 ├── chatgpt-usage-status/    # ChatGPT Plus/Pro usage
 ├── aurora-ui.ts             # custom TUI/editor/footer/status + navigation
 └── aurora/                  # helpers sidebar/tree, không entrypoint riêng
@@ -59,7 +59,9 @@ npm --prefix packages/pi-learn-extensions run test:wiki:host
 
 ## Subagents
 
-Reuse `pi-subagents` + `pi-delegation` của ThinkRail tại commit cố định, không workflow engine/router mới. Tools `Agent({subagent_type, task, model?, run_in_background?})` và `get_subagent_result({session_id})`; builtins scout/planner/worker/reviewer. Foreground chờ report, background tự deliver; `/subagents` xem status, `/subagents stop <id|all>` hủy owned children. Parent abort/reload/shutdown dừng/dispose children.
+**Tạm tắt auto-load để thử Pi Herdsman riêng.** Root/subpackage manifests liệt kê tường minh ba entrypoints Wiki, ChatGPT usage và Aurora, không nạp `subagents/index.ts`. Source, tests và provenance được giữ để có thể bật lại; package không tự cài Herdsman hoặc sửa settings cá nhân. Nếu có explicit `-e`/settings nạp trực tiếp subagents hay cả thư mục extensions, bỏ entry đó để tránh chạy cả hai engines. Restart hoặc `/reload` đúng bản source đã sửa mới áp dụng; reload bản Git đã cài không lấy thay đổi checkout local.
+
+Contract dưới đây áp dụng khi chủ động nạp runtime. Reuse `pi-subagents` + `pi-delegation` của ThinkRail tại commit cố định, không workflow engine/router mới. Tools `Agent({subagent_type, task, model?, run_in_background?})` và `get_subagent_result({session_id})`; builtins scout/planner/worker/reviewer. Foreground chờ report, background tự deliver; `/subagents` xem status, `/subagents stop <id|all>` hủy owned children. Parent abort/reload/shutdown dừng/dispose children.
 
 Context riêng, nhưng cùng cwd/worktree. Child chỉ có giao của requested tools, active parent tools và curated SDK/Wiki tools; không MCP/arbitrary extensions/nested Agent. Shared Wiki guard không cho child kế thừa mutation authority. Custom permission/approval extensions không tự clone, bash không là read-only sandbox. Parent registry xử lý auth qua public streaming bridge, không copy keys; physical models only. Report bounded 32 KiB, tasks 32K chars, 4 concurrent/32 retained children, soft turn cap 24 mặc định/64 tối đa.
 
@@ -133,10 +135,14 @@ Root package expose resources này:
 ```json
 {
   "pi": {
-    "extensions": ["./packages/pi-learn-extensions/extensions"],
+    "extensions": [
+      "./packages/pi-learn-extensions/extensions/wiki/index.ts",
+      "./packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts",
+      "./packages/pi-learn-extensions/extensions/aurora-ui.ts"
+    ],
     "themes": ["./packages/pi-learn-extensions/themes"]
   }
 }
 ```
 
-Pi load file extension trực tiếp và thư mục có `index.ts`; vì vậy `wiki/index.ts` là entrypoint duy nhất cho Wiki. `aurora/` không có index/manifest, chỉ được `aurora-ui.ts` import để không đăng ký sidebar/tree hai lần.
+Manifest dùng file entrypoints tường minh thay vì scan cả thư mục để giữ subagents tạm tắt. `wiki/index.ts` vẫn là entrypoint duy nhất cho Wiki. `aurora/` không có index/manifest, chỉ được `aurora-ui.ts` import để không đăng ký sidebar/tree hai lần.

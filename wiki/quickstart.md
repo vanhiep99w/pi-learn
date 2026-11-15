@@ -1,6 +1,6 @@
 # Pi Learn quickstart
 
-Pi Learn là package Pi Coding Agent và repository học Pi bằng tiếng Việt. Public surface: Wiki repository, ThinkRail subagents, ChatGPT usage UI, Aurora UI và theme `midnight-aurora`. Không còn runtime session-observability/proposal/eval/apply, image-generation hoặc model-prompt tools.
+Pi Learn là package Pi Coding Agent và repository học Pi bằng tiếng Việt. Auto-load surface: Wiki repository, ChatGPT usage UI, Aurora UI và theme `midnight-aurora`. ThinkRail subagents giữ source/tests nhưng tạm tắt auto-load ở cả hai manifests để thử Pi Herdsman riêng; [contract khi nạp tường minh](extensions/subagents.md). Không còn runtime session-observability/proposal/eval/apply, image-generation hoặc model-prompt tools.
 
 ## Khi nào đọc trang này
 
