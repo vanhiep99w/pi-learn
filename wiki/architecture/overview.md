@@ -21,16 +21,15 @@ Phạm vi: package boundaries, public entrypoints và ownership tài liệu. Đ�
 }
 ```
 
-Không có workspace declaration, root scripts, application server, database hoặc frontend build pipeline trong manifest. Không coi thư mục packages là bằng chứng về monorepo services. Host Pi cung cấp `@earendil-works/pi-ai`, `pi-agent-core`, `pi-coding-agent`, `pi-tui` và `typebox` qua optional peers `*`; manifest không pin compatibility range hoặc Node engines. Node built-ins phục vụ filesystem/network/process.
+Không có workspace declaration, application server, database hoặc frontend build pipeline trong manifest. Root có script opt-in `setup:herdsman` trỏ vào subpackage; không auto-run setup như Pi extension. Không coi thư mục packages là bằng chứng về monorepo services. Host Pi cung cấp `@earendil-works/pi-ai`, `pi-coding-agent`, `pi-tui` và `typebox` qua optional peers `*`; manifest không pin compatibility range hoặc Node engines. Node built-ins phục vụ filesystem/network/process.
 
 ### Public extension and theme package
 
-`packages/pi-learn-extensions/package.json` name `pi-learn-extensions`, version 1.0.1, ESM; expose tường minh `./extensions/wiki/index.ts`, `./extensions/chatgpt-usage-status/index.ts`, `./extensions/aurora-ui.ts` và `./themes`; files allowlist gồm extensions/tests/themes/README. Script `test:wiki` chạy Node test runner trên .mjs/.mts. Root không có files allowlist giống subpackage; kiểm tra packaging thật trước release, không suy ra artifact hai package giống nhau.
+`packages/pi-learn-extensions/package.json` name `pi-learn-extensions`, version 1.0.1, ESM; expose tường minh `./extensions/wiki/index.ts`, `./extensions/chatgpt-usage-status/index.ts`, `./extensions/aurora-ui.ts` và `./themes`; files allowlist gồm extensions/tests/themes/profiles/scripts/README. `profiles/herdsman/` và `scripts/setup-herdsman.mjs` là optional config companion cho external Herdsman, không nằm trong Pi resource manifest; xem [setup](../operations/herdsman-setup.md). Script `test:wiki` chạy Node test runner trên .mjs/.mts. Root không có files allowlist giống subpackage; kiểm tra packaging thật trước release, không suy ra artifact hai package giống nhau.
 
 Public entrypoints:
 
 - `extensions/wiki/index.ts` → đăng ký commands và lifecycle Wiki.
-- `extensions/subagents/index.ts` → runtime ThinkRail được giữ source nhưng **tạm tắt auto-load ở cả hai manifests** để thử Pi Herdsman; chỉ đăng ký Agent/result tools và `/subagents` nếu được nạp tường minh.
 - `extensions/chatgpt-usage-status/index.ts` → account commands, usage producer.
 - `extensions/aurora-ui.ts` → editor/footer, usage consumer, theme picker, sidebar và `/tree-v2`; helpers nội bộ ở `extensions/aurora/` không có index/manifest nên không auto-load riêng.
 - Theme resource: `themes/midnight-aurora.json`.
@@ -60,7 +59,7 @@ Luồng chính:
 | Producer / entry | State owner / xử lý | Consumer / output |
 |---|---|---|
 | `/wiki`, `/wiki-update` | commands giữ active run, prompt giao agent sửa docs | Wiki files → validators → extension metadata/status |
-| Agent / background reports | Vendored delegation + adapter giữ child context, model bridge, tool ceiling và cleanup | Child chạy chung worktree → bounded report/status cho parent |
+| External Herdsman setup | Profile + script opt-in trong package; Herdsman cài riêng sở hữu orchestration | Generate global config/agent overlays; không auto-load runtime hoặc tự cấp Wiki guards cho child |
 | Pi session/model/agent events, usage commands | ChatGPT extension giữ OAuth/account stores, cache/pending | Global usage object → Aurora; details widget |
 | Session/tool events, Git porcelain | Aurora session timers/editor/footer | Terminal rails, badges, working messages |
 | Pi theme selection | Host theme registry đọc JSON | Aurora và các renderer host dùng color tokens |
@@ -71,7 +70,7 @@ Extension code chạy trong process Pi với quyền OS của user, không sandb
 
 ## Reduced supported surface
 
-Auto-load surface hiện hành là Wiki, ChatGPT usage, Aurora UI và theme. Subagents tạm tắt auto-load để thử Pi Herdsman riêng, không bị xóa source hoặc tự thay engine. Subagents reuse private ThinkRail packages bằng pinned vendoring, không import ThinkRail server/UI hay runtime sibling bên ngoài package; [contract](../extensions/subagents.md). README và Git commit `5d753dd` ghi retirement session-observability/proposal/eval/apply, image generation và model-prompt tools; manifest/source inventory hiện không expose chúng. Không coi compatibility với subsystem đã bỏ là yêu cầu ngầm. Web tools cài riêng, không bundled.
+Auto-load surface hiện hành là Wiki, ChatGPT usage, Aurora UI và theme. Runtime ThinkRail subagents, vendor/tests riêng và direct peer dependency phục vụ nó đã bị xóa. Subagents dùng external `pi-herdsman`, với [profile/setup companion](../operations/herdsman-setup.md); Wiki Spec Graph tiếp tục giữ ThinkRail core/provenance độc lập. README và Git commit `5d753dd` ghi retirement session-observability/proposal/eval/apply, image generation và model-prompt tools; manifest/source inventory hiện không expose chúng. Không coi compatibility với subsystem đã bỏ là yêu cầu ngầm. Web tools cài riêng, không bundled.
 
 ## Source-of-truth table
 
@@ -80,7 +79,7 @@ Auto-load surface hiện hành là Wiki, ChatGPT usage, Aurora UI và theme. Sub
 | Package resources | hai package.json | Entrypoint discovery, install/reload |
 | Wiki command/prompt | `packages/pi-learn-extensions/extensions/wiki/wiki-commands.ts`, `wiki-prompt.ts` | [Wiki lifecycle](../extensions/wiki-extension.md), prompt tests |
 | Rule/link validators | cùng thư mục Wiki: `wiki-rules.js`, `wiki-links.js` | [Validation](../extensions/wiki-extension.md#link-and-rule-validation), focused tests |
-| Delegation/subagents | `packages/pi-learn-extensions/extensions/subagents/` | [Subagents](../extensions/subagents.md), upstream + adapter + host tests |
+| Herdsman config companion | `packages/pi-learn-extensions/profiles/herdsman/`, `scripts/setup-herdsman.mjs` trong subpackage | [Herdsman setup](../operations/herdsman-setup.md), isolated setup + manifest tests |
 | ChatGPT/Aurora | `packages/pi-learn-extensions/extensions/chatgpt-usage-status/index.ts`, `aurora-ui.ts` | [Catalog](../extensions/catalog.md), manual checks |
 | Theme tokens | `packages/pi-learn-extensions/themes/midnight-aurora.json` | JSON/schema/render checks |
 | Install/update/release | README, manifests, `.github/workflows/ocr-review.yml` | [Operations](../operations/development.md) |

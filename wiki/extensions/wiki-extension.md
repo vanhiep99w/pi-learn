@@ -26,7 +26,7 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 |---|---|
 | `wiki/index.ts` | Entrypoint duy nhất, đăng ký hai commands, sáu read tools và hai metadata tools |
 | `wiki/wiki-commands.ts` | Lifecycle, tool guard, snapshot, no-op và metadata |
-| `wiki/wiki-protection.ts` | Shared path/bash mutation checks, dùng lại trong delegated children mà không cấp Wiki run permit |
+| `wiki/wiki-protection.ts` | Path/bash mutation checks của Wiki command owner, không OS sandbox hoặc tự forward vào external children |
 | `wiki/wiki-prompt.ts` | Task contract, phân loại intent/ownership bằng agent, mẫu instructions bootstrap dùng lại bởi extension |
 | `wiki/wiki-bootstrap.ts` | Ghi bootstrap top-level deterministic, giữ nội dung khác, kiểm tra target và thay file atomic từng file |
 | `wiki/wiki-rules.js` | Phân loại path, discovery, scaffold, rule lint |
@@ -40,7 +40,7 @@ Các đường dẫn sau tương đối với `packages/pi-learn-extensions/exte
 | `wiki/wiki-mutation-tools.ts` | `wiki_spec_create`/`wiki_spec_update`, active run permits, session lifecycle và bounded receipts |
 | `wiki/vendor/thinkrail-spec-graph/` | Core/tests ThinkRail được pin commit, Apache-2.0, provenance và patches; không có extension entrypoint riêng |
 
-Tools đọc đã được wire vào entrypoint và task prompts. No-op/finalization kiểm thêm schema/graph qua read model; read tools không cấp quyền sửa rules hoặc đổi layout Wiki. Hai metadata tools và generator prompt cho Wiki mới đã có; không migration Wiki cũ hoặc tool xóa. Generator vẫn dùng agent hiện tại, chưa có semantic benchmark bằng model thật; đây chưa phải rollout workflow skills của ThinkRail. Subagents là capability riêng đã nối với shared Wiki guard, xem [contract](subagents.md).
+Tools đọc đã được wire vào entrypoint và task prompts. No-op/finalization kiểm thêm schema/graph qua read model; read tools không cấp quyền sửa rules hoặc đổi layout Wiki. Hai metadata tools và generator prompt cho Wiki mới đã có; không migration Wiki cũ hoặc tool xóa. Generator vẫn dùng agent hiện tại, chưa có semantic benchmark bằng model thật; đây chưa phải rollout workflow skills của ThinkRail. Subagents dùng external Herdsman qua [optional profile setup](../operations/herdsman-setup.md); runtime ThinkRail subagents đã bị xóa. Các guards ở đây bảo vệ session nạp Wiki extension, không tự forward vào Herdsman children.
 
 Thay command cần đồng bộ prompt, README, test và routes; thêm helper giữ trong thư mục Wiki để không thành public entrypoint độc lập.
 

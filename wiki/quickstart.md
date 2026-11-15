@@ -1,6 +1,6 @@
 # Pi Learn quickstart
 
-Pi Learn là package Pi Coding Agent và repository học Pi bằng tiếng Việt. Auto-load surface: Wiki repository, ChatGPT usage UI, Aurora UI và theme `midnight-aurora`. ThinkRail subagents giữ source/tests nhưng tạm tắt auto-load ở cả hai manifests để thử Pi Herdsman riêng; [contract khi nạp tường minh](extensions/subagents.md). Không còn runtime session-observability/proposal/eval/apply, image-generation hoặc model-prompt tools.
+Pi Learn là package Pi Coding Agent và repository học Pi bằng tiếng Việt. Auto-load surface: Wiki repository, ChatGPT usage UI, Aurora UI và theme `midnight-aurora`. Subagents dùng external Pi Herdsman với [portable setup](operations/herdsman-setup.md); runtime ThinkRail subagents và tests cũ đã bị xóa, không còn chế độ nạp tường minh. Không còn runtime session-observability/proposal/eval/apply, image-generation hoặc model-prompt tools.
 
 ## Khi nào đọc trang này
 
@@ -17,6 +17,8 @@ pi -e git:github.com/vanhiep99w/pi-learn@main
 ```
 
 Sau install/update/source change: restart Pi hoặc `/reload`. Chọn theme `midnight-aurora` trong settings nếu muốn dùng palette đi kèm. [Install/update và release](operations/development.md#install-and-reload) phân biệt bản Git đã cài với checkout local.
+
+Để đồng bộ cấu hình Herdsman đã chọn sang máy mới: [Herdsman setup](operations/herdsman-setup.md). `npm run setup:herdsman -- --dry-run` rồi `npm run setup:herdsman` là explicit opt-in, không tự chạy khi extension load.
 
 ## Bản đồ project
 
@@ -62,7 +64,7 @@ Dùng bounded grep tìm heading, rồi ranged read. `#anchor` chỉ navigation h
 | Package/manifest/entrypoint | [Package boundaries](architecture/overview.md#package-boundaries) | Resource discovery/install/compatibility đổi |
 | Wiki commands/prompt/selective reading | [Wiki lifecycle](extensions/wiki-extension.md#commands-and-run-lifecycle) | Tool guard, metadata hoặc validation đổi |
 | Rules/snapshot/links | [Wiki validation](extensions/wiki-extension.md#link-and-rule-validation) | Rule permissions, no-op hoặc settlement bị ảnh hưởng |
-| Subagent dispatch/model/tools/background/stop | [Subagents](extensions/subagents.md) | Parent lifecycle, curated child guards, upstream provenance/SDK compatibility |
+| Herdsman profiles/setup, child tools và Lead prompt | [Herdsman setup](operations/herdsman-setup.md) | External Herdsman schema, global/project overrides, paths và config preservation |
 | ChatGPT usage/OAuth/accounts | [Usage](extensions/catalog.md#chatgpt-usage-status) | Credential adapters hoặc shared object đổi |
 | Usage badge consumer | [Shared contract](extensions/catalog.md#contract-dùng-chung-với-aurora) | Producer, stale handling hoặc lifecycle đổi |
 | Aurora editor/footer/Git/theme | [Aurora](extensions/catalog.md#aurora-ui) | Host layout/API, cleanup hoặc tokens đổi |

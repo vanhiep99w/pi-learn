@@ -8,7 +8,7 @@ Root không có test script. Chạy từ root:
 
 ```bash
 npm --prefix packages/pi-learn-extensions test
-# Focused: run test:wiki, run test:aurora, run test:theme
+# Focused: run test:wiki, run test:aurora, run test:theme, run test:setup
 node -e 'JSON.parse(require("node:fs").readFileSync("packages/pi-learn-extensions/themes/midnight-aurora.json", "utf8")); console.log("Theme JSON OK")'
 ```
 
@@ -29,7 +29,7 @@ Suite Wiki có 148 test pass trên Node v26.9.0 sau khi thêm read model và rea
 
 Tests core ThinkRail nguyên bản được giữ trong `extensions/wiki/vendor/thinkrail-spec-graph/core/core.test.ts`. Chạy riêng bằng `npm --prefix packages/pi-learn-extensions run test:wiki:upstream` (cần Bun); tại Bun v1.3.14 có 55 pass và 2 skips cho Windows/case-folding không có trên host này. Node suite không tự chạy Bun. `npm --prefix packages/pi-learn-extensions run test:wiki:host` là 1 smoke test riêng dùng Pi v1.5.0 loader + TypeBox thật trên fixture cwd/agentDir, kiểm discovery một entrypoint, schemas, headless tools, command handler/finalization (transport giả lập), create/update qua real Pi file queue và factory replacement. Dùng `PI_TEST_BIN` khi Pi không trên PATH; `PI_TEST_WIKI_EXTENSION` có thể trỏ tới entrypoint trong artifact cài tạm. Không tạo LLM/provider/session hoặc đọc user auth/settings. Chưa kiểm TUI `/reload` thật, model behavior, mọi host version hoặc migration. Graph/schema đã được nối vào no-op/finalization; full snapshot/Git failure/concurrency cases vẫn chưa được kiểm hết.
 
-Subagents: `test:subagents` chạy 13 Node adapter/provenance tests không cần peers; `test:subagents:upstream` copy vendor sang temp và chạy 186 tests gốc qua Bun + host peers, isolated agent dir/offline; `test:subagents:host` có 3 smoke cases trên Pi v1.5.2/TypeBox/Faux, in-memory credentials và fixtures. Kiểm foreground, runtime-only auth bridge, context/tool separation, protected Wiki write và single background delivery/collection. Không gọi model thật hoặc đọc user auth/raw session logs. `PI_TEST_BIN` chọn Pi CLI, `PI_TEST_SUBAGENTS_EXTENSION` chọn installed artifact entrypoint. Child context không cô lập filesystem; chưa kiểm TUI abort/reload, các custom approval extensions hoặc network providers thật. [Contract](../extensions/subagents.md).
+Herdsman setup: `test:setup` kiểm profile/script bằng isolated temporary agent/package fixtures: additive tools/extensions, depth, prompt preservation, paths, dry-run/idempotency, policy conflicts, unsafe targets và concurrent changes. Manifest regression kiểm active resources/theme, runtime subagents đã vắng và peer/lock consistency. Không gọi provider/network hoặc đọc user auth/settings/session logs; không phải TUI integration. Runtime/tests/vendor ThinkRail subagents cũ đã bị xóa; [setup contract](herdsman-setup.md).
 
 Ngoài Wiki, `tests/aurora/aurora-ui.test.mjs` kiểm banner/theme changes/width/cleanup, headless picker và editor tokens bằng host giả lập; `tests/theme/midnight-aurora.test.mjs` kiểm variable resolution, dark appearance, WCAG ≥4.5:1 cho các cặp chữ/nền khai báo và phân cấp dim/muted/text. Contrast audit chỉ áp dụng màu sRGB cụ thể, với `vars.bg` là nền terminal dự kiến; không bảo đảm nền terminal khác hoặc 256 màu.
 

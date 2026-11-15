@@ -19,6 +19,10 @@ README có đầy đủ global/project install và remove. `docs/PI_PACKAGES_GUI
 
 Nếu không thấy command/theme, kiểm tra `pi list`, resource selection bằng `pi config`, install scope và manifest paths; sau đó reload. Phiên không UI không thể kiểm chứng editor/dialog. Theme cần chọn trong settings hoặc picker, banner không tự bật theme.
 
+## Optional Herdsman setup
+
+`npm run setup:herdsman` ở root/subpackage áp dụng profile opt-in đã check-in, không cài external packages hoặc chạy khi Pi load. Bắt đầu bằng `--dry-run`; xem [Herdsman profile setup](herdsman-setup.md). Thay config portable ở `packages/pi-learn-extensions/profiles/herdsman/` rồi chạy setup lại. `npm --prefix packages/pi-learn-extensions run test:setup` kiểm script bằng isolated fixtures; không chạm user auth hoặc gọi provider.
+
 ## Package manifests and versions
 
 Hai manifests version hiện 1.0.1, cùng expose resources nhưng path relative khác nhau. Xem [package boundaries](../architecture/overview.md#package-boundaries) trước sửa. Giữ versions đồng bộ khi chủ động release; host packages là optional peers `*`, không bundled runtime dependencies.

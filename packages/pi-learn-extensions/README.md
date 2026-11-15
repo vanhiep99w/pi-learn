@@ -17,7 +17,6 @@ Sau khi cài/update, restart Pi hoặc chạy `/reload`.
 ```txt
 extensions/
 ├── wiki/                    # /wiki và /wiki-update
-├── subagents/               # source giữ lại, tạm tắt auto-load
 ├── chatgpt-usage-status/    # ChatGPT Plus/Pro usage
 ├── aurora-ui.ts             # custom TUI/editor/footer/status + navigation
 └── aurora/                  # helpers sidebar/tree, không entrypoint riêng
@@ -57,22 +56,11 @@ npm --prefix packages/pi-learn-extensions run test:wiki:upstream
 npm --prefix packages/pi-learn-extensions run test:wiki:host
 ```
 
-## Subagents
+## Herdsman profile setup
 
-**Tạm tắt auto-load để thử Pi Herdsman riêng.** Root/subpackage manifests liệt kê tường minh ba entrypoints Wiki, ChatGPT usage và Aurora, không nạp `subagents/index.ts`. Source, tests và provenance được giữ để có thể bật lại; package không tự cài Herdsman hoặc sửa settings cá nhân. Nếu có explicit `-e`/settings nạp trực tiếp subagents hay cả thư mục extensions, bỏ entry đó để tránh chạy cả hai engines. Restart hoặc `/reload` đúng bản source đã sửa mới áp dụng; reload bản Git đã cài không lấy thay đổi checkout local.
+Subagents dùng external `pi-herdsman`; runtime ThinkRail, tests và `/subagents` cũ đã bị xóa. Wiki Spec Graph vẫn giữ vendored ThinkRail core riêng. Không tự cài Herdsman khi load Pi Learn.
 
-Contract dưới đây áp dụng khi chủ động nạp runtime. Reuse `pi-subagents` + `pi-delegation` của ThinkRail tại commit cố định, không workflow engine/router mới. Tools `Agent({subagent_type, task, model?, run_in_background?})` và `get_subagent_result({session_id})`; builtins scout/planner/worker/reviewer. Foreground chờ report, background tự deliver; `/subagents` xem status, `/subagents stop <id|all>` hủy owned children. Parent abort/reload/shutdown dừng/dispose children.
-
-Context riêng, nhưng cùng cwd/worktree. Child chỉ có giao của requested tools, active parent tools và curated SDK/Wiki tools; không MCP/arbitrary extensions/nested Agent. Shared Wiki guard không cho child kế thừa mutation authority. Custom permission/approval extensions không tự clone, bash không là read-only sandbox. Parent registry xử lý auth qua public streaming bridge, không copy keys; physical models only. Report bounded 32 KiB, tasks 32K chars, 4 concurrent/32 retained children, soft turn cap 24 mặc định/64 tối đa.
-
-Custom definitions trong user agent dir hoặc trusted `.pi/agents/` / `.agents/agents/`; upstream first-name-wins precedence giữ nguyên, builtins không bị project override. [Contract đầy đủ](../../wiki/extensions/subagents.md), [provenance/patches](extensions/subagents/vendor/thinkrail/README.md).
-
-```bash
-npm --prefix packages/pi-learn-extensions run test:subagents
-# Cần Pi; upstream thêm Bun; fixtures/Faux, không model/auth thật:
-npm --prefix packages/pi-learn-extensions run test:subagents:upstream
-npm --prefix packages/pi-learn-extensions run test:subagents:host
-```
+Profile portable tại [`profiles/herdsman/`](profiles/herdsman/README.md) lưu `maxAgentDepth: 1`, Flexible Lead reference-first prompt, display/web extensions và web tools cho sáu bundled agents. Sau khi cài external packages và Herdr Pi integration, chạy `npm run setup:herdsman -- --dry-run`, rồi `npm run setup:herdsman` từ root hoặc subpackage. Script được đóng gói nhưng không auto-run/discover như Pi extension; không install, không đọc/sửa auth hoặc Pi settings. Paths được resolve theo máy; custom `--agent-dir`/`--packages-dir` được hỗ trợ. Giữ unrelated settings/model/prompts; schema/deny conflicts được báo lỗi. Chạy lại sau khi thay profile; reload parent và spawn child mới để áp dụng. Chi tiết safety/limitations và setup máy mới ở README profile.
 
 ## ChatGPT usage status
 
@@ -145,4 +133,4 @@ Root package expose resources này:
 }
 ```
 
-Manifest dùng file entrypoints tường minh thay vì scan cả thư mục để giữ subagents tạm tắt. `wiki/index.ts` vẫn là entrypoint duy nhất cho Wiki. `aurora/` không có index/manifest, chỉ được `aurora-ui.ts` import để không đăng ký sidebar/tree hai lần.
+Manifest dùng file entrypoints tường minh thay vì scan cả thư mục; runtime subagents ThinkRail đã bị xóa, không còn entrypoint để bật lại. `wiki/index.ts` vẫn là entrypoint duy nhất cho Wiki. `aurora/` không có index/manifest, chỉ được `aurora-ui.ts` import để không đăng ký sidebar/tree hai lần.

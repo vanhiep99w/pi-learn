@@ -1,6 +1,6 @@
 # Pi Learn
 
-Pi Learn là package cho Pi Coding Agent, gồm Wiki repository, giao diện Aurora và tài liệu học Pi bằng tiếng Việt. Source subagents ThinkRail được giữ lại nhưng tạm tắt auto-load để thử Pi Herdsman riêng.
+Pi Learn là package cho Pi Coding Agent, gồm Wiki repository, giao diện Aurora và tài liệu học Pi bằng tiếng Việt. Subagents dùng Pi Herdsman cài riêng, với profile setup portable đi kèm; không còn runtime subagents ThinkRail trong repo.
 
 ## Thành phần
 
@@ -8,7 +8,6 @@ Pi Learn là package cho Pi Coding Agent, gồm Wiki repository, giao diện Aur
 packages/pi-learn-extensions/
 ├── extensions/
 │   ├── wiki/                    # /wiki và /wiki-update
-│   ├── subagents/               # source giữ lại, tạm tắt auto-load
 │   ├── chatgpt-usage-status/    # trạng thái usage ChatGPT
 │   ├── aurora-ui.ts             # editor/footer/status + sidebar + /tree-v2
 │   └── aurora/                  # helper nội bộ, không auto-load riêng
@@ -75,15 +74,20 @@ Agent có sáu tools đọc: `wiki_search` (specs + guides), `wiki_get` (metadat
 
 Chi tiết và pagination: [`Wiki read tools`](wiki/extensions/wiki-extension.md#read-only-wiki-tools).
 
-## Subagents
+## Subagents với Pi Herdsman
 
-**Tạm tắt auto-load để thử Pi Herdsman.** Hai package manifests chỉ nạp Wiki, ChatGPT usage và Aurora; không tự đăng ký `Agent`, `get_subagent_result` hoặc `/subagents`. Source/tests ThinkRail vẫn giữ nguyên. Không tự cài hay tích hợp Herdsman và không đổi cấu hình Pi cá nhân. Nếu đang dùng bản Git đã cài thay vì checkout này, `/reload` không tự lấy thay đổi local; cần nạp đúng bản source đã sửa. Explicit `-e` trỏ thẳng vào subagents hoặc thư mục extensions vẫn có thể bật lại runtime, nên bỏ entry đó khi thử Herdsman.
+Pi Learn không còn runtime, tools `Agent`/`get_subagent_result` hoặc command `/subagents` của ThinkRail. Dùng external `pi-herdsman` trong Herdr TUI; `/herdsman` quản lý agents. Hai manifests Pi Learn vẫn chỉ auto-load Wiki, ChatGPT usage và Aurora. Nếu settings/CLI cũ có entry trỏ trực tiếp vào runtime đã xóa, bỏ entry đó; không sửa cấu hình cá nhân tự động.
 
-Phần dưới mô tả runtime khi được nạp tường minh, không phải mặc định package hiện tại. Khi nạp, agent có tools `Agent` và `get_subagent_result`, với roles `scout`, `planner`, `worker`, `reviewer`. Bạn có thể yêu cầu “dùng scout tìm callers của X” hoặc “giao worker sửa module A ở background”. Child có context riêng nhưng **dùng chung cwd/worktree**, không là sandbox; parent cần chia task tránh ghi cùng file.
+**Portable Herdsman setup:** configs đã chọn được lưu ở [`profiles/herdsman/`](packages/pi-learn-extensions/profiles/herdsman/README.md): depth 1, Flexible Lead reference-first prompt và display/web cho sáu agents. Sau khi cài Herdsman, tool-display, web-access và Herdr integration, chạy từ checkout Pi Learn:
 
-`/subagents` xem status; `/subagents stop <id>` hoặc `/subagents stop all` yêu cầu dừng. Mặc định kế thừa model/thinking, background tự trả report, không cần polling. Tool set bị giới hạn theo parent + curated SDK/Wiki tools; Wiki policies/brief/metadata vẫn protected. Custom approval hooks/extensions của parent không tự được clone; scout/reviewer có bash nên read-only không phải OS guarantee. Không tự bật workflow router.
+```bash
+npm run setup:herdsman -- --dry-run
+npm run setup:herdsman
+```
 
-[Definitions, giới hạn và model/auth](wiki/extensions/subagents.md). Runtime vendor hai packages ThinkRail cùng commit, giữ Apache-2.0/provenance; không đọc user auth/transcripts để kiểm thử.
+Script opt-in, không chạy khi load extension; resolve paths trên từng máy, giữ unrelated config/prompts. Cấu hình tiếp theo của profile này nên sửa trong repo trước rồi setup lại, không copy generated config/credentials giữa các máy.
+
+Herdsman có lifecycle, definitions, model/auth và tools riêng; không tự kế thừa guard/tool ceiling của runtime ThinkRail đã bỏ. Wiki Spec Graph vẫn reuse ThinkRail core độc lập, không bị ảnh hưởng.
 
 ## ChatGPT usage status
 
@@ -145,14 +149,14 @@ pi install git:github.com/nicobailon/pi-web-access
 
 ## Kiểm thử và bảo trì
 
-Chạy toàn bộ tests từ source (Wiki, subagents adapter, Aurora UI và theme); cài dependency runtime `yaml`, không cài bản sao Pi peers:
+Chạy toàn bộ tests từ source (Wiki, Aurora UI, theme và Herdsman setup); cài dependency runtime `yaml`, không cài bản sao Pi peers:
 
 ```bash
 npm install --ignore-scripts --omit=peer
 npm --prefix packages/pi-learn-extensions test
 ```
 
-Chạy riêng bằng `run test:wiki`, `run test:aurora` hoặc `run test:theme`. Tests Aurora dùng host giả lập; contrast tests kiểm màu sRGB đã khai báo, không thay kiểm tra trực quan trong terminal.
+Chạy riêng bằng `run test:wiki`, `run test:aurora`, `run test:theme` hoặc `run test:setup`. Tests Aurora dùng host giả lập; contrast tests kiểm màu sRGB đã khai báo, không thay kiểm tra trực quan trong terminal.
 
 Kiểm thêm sidebar/tree trên Pi đã cài (PTY cần Python `pexpect`):
 

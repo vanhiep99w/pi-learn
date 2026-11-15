@@ -1,4 +1,4 @@
-// Shared by the Wiki owner and delegated children; these guards are not an OS sandbox.
+// Wiki command path/bash mutation checks; these guards are not an OS sandbox.
 import { relativeProjectPath, isWikiPolicyPath, isWikiMetadataPath, isWikiInstructionsPath } from "./wiki-rules.js";
 
 export type ProtectionOptions = { protectRules: boolean; protectWikiBrief: boolean };

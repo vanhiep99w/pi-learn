@@ -6,7 +6,7 @@ const packageRoot = new URL("../../", import.meta.url);
 const repoRoot = new URL("../../", packageRoot);
 const manifest = (root) => JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
 
-test("both package manifests disable subagents auto-load while retaining other resources", () => {
+test("both package manifests retain active resources without the retired subagents runtime", () => {
   const extensionPackage = manifest(packageRoot);
   const repositoryPackage = manifest(repoRoot);
   const expected = [
@@ -27,5 +27,12 @@ test("both package manifests disable subagents auto-load while retaining other r
   );
   assert.deepEqual(repositoryPackage.pi.themes, ["./packages/pi-learn-extensions/themes"]);
   assert.deepEqual(extensionPackage.pi.themes, ["./themes"]);
-  assert.equal(existsSync(new URL("extensions/subagents/index.ts", packageRoot)), true, "runtime remains available for explicit loading");
+  assert.equal(existsSync(new URL("extensions/subagents/", packageRoot)), false, "retired runtime must not ship");
+  for (const manifest of [repositoryPackage, extensionPackage]) {
+    assert.equal(manifest.peerDependencies?.["@earendil-works/pi-agent-core"], undefined);
+    assert.equal(Object.keys(manifest.scripts ?? {}).some((name) => name.startsWith("test:subagents")), false);
+  }
+  const lock = JSON.parse(readFileSync(new URL("package-lock.json", repoRoot), "utf8"));
+  assert.deepEqual(lock.packages[""].peerDependencies, repositoryPackage.peerDependencies);
+  assert.deepEqual(lock.packages[""].peerDependenciesMeta, repositoryPackage.peerDependenciesMeta);
 });

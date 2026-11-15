@@ -1,0 +1,9 @@
+{
+  "agents": ["scout", "researcher", "implementer", "reviewer", "validator", "generalist"],
+  "config": { "maxAgentDepth": 1 },
+  "extensions": [
+    "pi-tool-display/index.ts",
+    "pi-web-access/dist/index.js"
+  ],
+  "tools": ["web_enable", "web_search", "fetch_content", "get_search_content", "source_check"]
+}
