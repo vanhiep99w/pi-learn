@@ -10,7 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMap, parseDocument, visit } from "yaml";
 
-const PROFILE_DIR = new URL("../profiles/herdsman/", import.meta.url);
+const PACKAGE_DIR = new URL("../", import.meta.url);
+const PROFILE_DIR = new URL("profiles/herdsman/", PACKAGE_DIR);
 const BEGIN = "<!-- pi-learn:local-source-delegation:start -->";
 const END = "<!-- pi-learn:local-source-delegation:end -->";
 const MAX_BYTES = 1024 * 1024;
@@ -165,8 +166,12 @@ export function planSetup({ agentDir, packagesDir } = {}) {
   const prompt = readFileSync(new URL("flexible-lead.md", PROFILE_DIR), "utf8");
   const herdRoot = packageRoot("pi-herdsman", agentDir, packagesDir);
   const extensions = profile.extensions.map((resource) => {
+    // ./ resources belong to this Pi Learn package, not the external npm lookup.
+    // Anchor to the script so checkout and Git-installed copies resolve identically.
     const [name, ...relative] = resource.split("/");
-    const entry = path.join(packageRoot(name, agentDir, packagesDir), ...relative);
+    const entry = resource.startsWith("./")
+      ? path.join(realpathSync(fileURLToPath(PACKAGE_DIR)), resource)
+      : path.join(packageRoot(name, agentDir, packagesDir), ...relative);
     if (!info(entry)?.isFile()) throw new Error(`Missing extension entry: ${entry}`);
     return entry;
   });

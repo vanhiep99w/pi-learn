@@ -92,7 +92,7 @@ Kết quả tách rõ:
 
 Batches union/deduplicate targets. `task` vẫn bắt buộc là lowercase name hợp lệ để mô tả công việc, không có task selectors. Rule paths canonical `wiki/**/_rules.md`, tối đa 1024 ký tự/64 segments, không hidden/assets/build paths. Resolver không đọc prose, không ghi hoặc scaffold, không xác định xung đột ngữ nghĩa hay cấp quyền thay đổi chính sách.
 
-Đã bỏ hoàn toàn `_domains.json`: không parser/schema/selectors, config routing, config-driven discovery/scaffold/lint hay snapshot riêng. File cũ nếu còn là tài nguyên không được dùng; không ảnh hưởng tra rules hoặc tính hợp lệ của Wiki. Không tự xóa file cũ ở repo người dùng. Discovery/lint/scaffolding áp dụng root + final documentation sections; scaffold trống không tự tạo chính sách.
+Đã bỏ hoàn toàn `_domains.json`: không parser/schema/selectors, config routing, config-driven discovery/scaffold/lint hay snapshot riêng. File cũ nếu còn là tài nguyên không được dùng; không ảnh hưởng tra rules hoặc tính hợp lệ của Wiki. Không tự xóa file cũ ở repo người dùng. Discovery/lint/scaffolding áp dụng root + final documentation sections. File `_rules.md` còn thiếu được tạo với **0 byte**, không tiêu đề, hướng dẫn chung hay câu placeholder; chỉ có nội dung khi có quy tắc thực. Hướng dẫn đọc/routing chung thuộc AGENTS/quickstart, không lặp trong scaffold. Chỉ tạo độc quyền file mới; giữ nguyên mọi file hiện có, kể cả placeholder cũ, không tự xóa hoặc migrate.
 
 ## Conditional project reading
 
@@ -167,7 +167,7 @@ Lifecycle bổ sung `WikiReadModel.validate()` cho schema/graph, reuse legacy li
 
 Parser không phải Markdown AST: inline link regex chưa hỗ trợ đầy đủ reference links/code-fence semantics. Shared heading resolver nhận ATX headings, bỏ frontmatter/fenced code và tránh anchor collisions; chưa hỗ trợ Setext/HTML headings. Không dùng link Markdown ra source ngoài Wiki; ghi source path bằng inline code.
 
-`discoverWikiPromptRules()` yêu cầu root real directory và root rule; cần `_rules.md` ở mỗi thư mục chứa trang Markdown cuối cùng. Bỏ hidden/underscore directories, assets và _tmp. Không yêu cầu rule cho từng source file. File rule tối đa 64 KiB, UTF-8, không NUL. Heading được nhận dạng có dạng `## ID — tiêu đề` hoặc `## ID - tiêu đề`, ID uppercase chữ/số/hyphen, 3–64 ký tự. ID trùng trong file là error; trùng khác file là warning. Dòng `Origin proposal:` nếu có phải dùng ID `P-` và ít nhất bốn chữ số; không hàm ý runtime proposal còn tồn tại. Scaffold không cần có substantive rules; lint không xác minh đúng nghĩa của nội dung.
+`discoverWikiPromptRules()` yêu cầu root real directory và root rule; cần `_rules.md` ở mỗi thư mục chứa trang Markdown cuối cùng. Bỏ hidden/underscore directories, assets và _tmp. Không yêu cầu rule cho từng source file. File rule tối đa 64 KiB, UTF-8, không NUL. Heading được nhận dạng có dạng `## ID — tiêu đề` hoặc `## ID - tiêu đề`, ID uppercase chữ/số/hyphen, 3–64 ký tự. ID trùng trong file là error; trùng khác file là warning. Dòng `Origin proposal:` nếu có phải dùng ID `P-` và ít nhất bốn chữ số; không hàm ý runtime proposal còn tồn tại. File 0 byte hợp lệ, chỉ có warning `empty_rule_file`, không chặn command hoặc clean-Git no-op khi các điều kiện khác thỏa mãn; lint không xác minh đúng nghĩa của nội dung.
 
 Command rule lint chỉ chấp nhận symlink nếu resolve tới file trong project; resolver, mutation guard và public safe rule lint từ chối symlinks. Link target symlink luôn bị từ chối. Xem [path safety](../operations/testing-and-safety.md#wiki-path-safety).
 

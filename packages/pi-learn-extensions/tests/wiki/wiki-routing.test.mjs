@@ -231,6 +231,31 @@ test("missing Wiki/root still yields a service target and no nonexistent read pa
   assert.equal(fs.existsSync(path.join(f.root, "wiki")), false);
 });
 
+test("zero-byte scaffolds remain lookup-visible, reserved and valid with warnings only", (t) => {
+  const f = fixture(t);
+  fs.unlinkSync(path.join(f.root, "wiki/_rules.md"));
+  f.put("order/file", "source");
+  f.put("wiki/extensions/guide.md", "# Guide\n");
+  f.put("wiki/modules/index.md", "# Modules\n");
+  f.put("wiki/modules/order/SPEC.md", spec("order"));
+  const { created } = ensureWikiPromptRuleScaffolds({ projectRoot: f.root });
+  assert.deepEqual(created, ["wiki/_rules.md", "wiki/extensions/_rules.md", "wiki/modules/_rules.md", "wiki/modules/order/_rules.md"]);
+  const result = resolveWikiRules(f.root, { paths: ["order/file"], task: "code" });
+  assert.deepEqual(result.rulePaths, ["wiki/_rules.md", "wiki/modules/_rules.md", "wiki/modules/order/_rules.md"]);
+  assert.deepEqual(result.suggestedRulePaths, []);
+  assert.equal(result.matches[0].exists, true);
+  const report = validateWikiReadOnly(f.model, "all");
+  assert.equal(report.valid, true);
+  assert.equal(report.groups.rules.valid, true);
+  assert.deepEqual(report.diagnostics.map(({ path, code, severity }) => ({ path, code, severity })),
+    created.map((path) => ({ path, code: "empty_rule_file", severity: "warning" })));
+  for (const file of created) {
+    assert.equal(fs.statSync(path.join(f.root, file)).size, 0);
+    assert.throws(() => f.model.get({ path: file.slice(5) }), code("reserved_path"));
+  }
+  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: f.root }).created, []);
+});
+
 test("stale domain files never influence routing, discovery, scaffolding or rule validation", (t) => {
   const f = fixture(t); f.put("order/file", "source"); f.put("wiki/guide/page.md", "# Page\n");
   const query = { paths: ["order/"], task: "code" };

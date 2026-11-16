@@ -107,115 +107,144 @@ type AuthEventCompat =
   | { type: "info"; message: string; links?: ReadonlyArray<{ url: string; label?: string }> }
   | { type: "progress"; message: string };
 
-let cache: UsageState = { kind: "idle", fetchedAt: 0 };
-let pending: Promise<UsageState> | undefined;
-let timer: ReturnType<typeof setInterval> | undefined;
-let activeIsChatGptProvider = false;
+// One lifetime per extension factory, never reactivated by a later session_start.
+// Every async continuation checks this lifetime before touching its command ctx.
+class UsageSession {
+  readonly lifetime = new AbortController();
+  usage = new AbortController();
+  cache: UsageState = { kind: "idle", fetchedAt: 0 };
+  pending: Promise<UsageState | undefined> | undefined;
+  timer: ReturnType<typeof setInterval> | undefined;
+  readonly widgetTimers = new Set<ReturnType<typeof setTimeout>>();
+  activeIsChatGptProvider = false;
+
+  check() {
+    this.lifetime.signal.throwIfAborted();
+  }
+
+  // This catches cancellation while work settles, not between this promise's
+  // resolution and its caller resuming. Callers must check() in that continuation
+  // before accessing ctx, publishing usage, or starting another side effect.
+  async wait<T>(work: Promise<T>): Promise<T> {
+    try {
+      return await work;
+    } finally {
+      this.check();
+    }
+  }
+
+  async run(work: () => Promise<void>) {
+    if (this.lifetime.signal.aborted) return;
+    try {
+      await work();
+    } catch (error) {
+      if (!this.lifetime.signal.aborted) throw error;
+    }
+  }
+
+  resetUsage() {
+    this.usage.abort();
+    this.usage = new AbortController();
+    this.cache = { kind: "idle", fetchedAt: 0 };
+    this.pending = undefined;
+  }
+}
 
 export default function (pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
-    if (!ctx.hasUI) return;
-    await updateVisibility(ctx);
-    ensureTimer();
-  });
+  const session = new UsageSession();
+  const whenActive = (work: (ctx: any) => Promise<void>) => async (_args: unknown, ctx: any) => {
+    await session.run(async () => {
+      if (!ctx.hasUI) return;
+      await work(ctx);
+    });
+  };
 
-  pi.on("model_select", async (_event, ctx) => {
-    if (!ctx.hasUI) return;
-    await updateVisibility(ctx, true);
-  });
+  pi.on("session_start", whenActive(async (ctx) => {
+    await session.wait(updateVisibility(session, ctx));
+    session.check();
+    if (session.timer) return;
+    session.timer = setInterval(() => {
+      if (session.activeIsChatGptProvider) void session.run(() => refreshGlobalUsage(session, false));
+    }, CACHE_MS);
+  }));
 
-  pi.on("agent_end", async (_event, ctx) => {
-    if (!ctx.hasUI) return;
+  pi.on("model_select", whenActive(async (ctx) => {
+    await updateVisibility(session, ctx, true);
+  }));
+
+  pi.on("agent_end", whenActive(async (ctx) => {
     const isChatGpt = isChatGptProvider(ctx);
-    activeIsChatGptProvider = isChatGpt;
-    if (!isChatGpt) return;
-    await updateStatus(ctx, true, isChatGpt);
-  });
+    session.activeIsChatGptProvider = isChatGpt;
+    if (isChatGpt) await updateStatus(session, ctx, true, isChatGpt);
+  }));
 
   pi.on("session_shutdown", async (_event, ctx) => {
-    activeIsChatGptProvider = false;
+    if (session.lifetime.signal.aborted) return;
+    session.lifetime.abort();
+    session.resetUsage();
+    session.activeIsChatGptProvider = false;
+    if (session.timer) clearInterval(session.timer);
+    session.timer = undefined;
+    for (const timeout of session.widgetTimers) clearTimeout(timeout);
+    session.widgetTimers.clear();
+    clearGlobalUsage();
+    if (!ctx.hasUI) return;
     ctx.ui?.setStatus(STATUS_ID, undefined);
     ctx.ui?.setWidget(STATUS_ID, undefined);
-    if (timer) clearInterval(timer);
-    timer = undefined;
   });
 
   pi.registerCommand("chatgpt-usage", {
     description: "Hiển thị ChatGPT Plus/Pro usage hiện tại",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
+    handler: whenActive(async (ctx) => {
       if (!isChatGptProvider(ctx)) {
         ctx.ui.notify("ChatGPT usage chỉ hiện khi model provider là openai-codex/chatgpt.", "info");
         return;
       }
-      await showDetails(ctx, false);
-    },
+      await showDetails(session, ctx, false);
+    }),
   });
 
   pi.registerCommand("chatgpt-usage-refresh", {
     description: "Refresh ChatGPT Plus/Pro usage",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
+    handler: whenActive(async (ctx) => {
       if (!isChatGptProvider(ctx)) {
         ctx.ui.notify("Không refresh: provider hiện tại không phải ChatGPT subscription.", "info");
         return;
       }
-      await showDetails(ctx, true);
-    },
+      await showDetails(session, ctx, true);
+    }),
   });
 
   pi.registerCommand("chatgpt-login", {
     description: "Login thêm một tài khoản ChatGPT Plus/Pro và lưu vào danh sách",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
-      await loginChatGptAccount(pi, ctx);
-    },
+    handler: whenActive((ctx) => loginChatGptAccount(session, pi, ctx)),
   });
 
   pi.registerCommand("chatgpt-switch", {
     description: "Chuyển sang tài khoản ChatGPT tiếp theo đã lưu",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
-      await switchChatGptAccount(ctx);
-    },
+    handler: whenActive((ctx) => switchChatGptAccount(session, ctx)),
   });
 
   pi.registerCommand("chatgpt-accounts", {
     description: "Liệt kê các tài khoản ChatGPT đã lưu",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
-      await showChatGptAccounts(ctx);
-    },
+    handler: whenActive((ctx) => showChatGptAccounts(session, ctx)),
   });
 
   pi.registerCommand("chatgpt-delete", {
     description: "Xoá một hoặc tất cả tài khoản ChatGPT đã lưu",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
-      await deleteChatGptAccount(ctx);
-    },
+    handler: whenActive((ctx) => deleteChatGptAccount(session, ctx)),
   });
 
   pi.registerCommand("chatgpt-logout", {
     description: "Alias của /chatgpt-delete",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
-      await deleteChatGptAccount(ctx);
-    },
+    handler: whenActive((ctx) => deleteChatGptAccount(session, ctx)),
   });
-
-  function ensureTimer() {
-    if (timer) return;
-    timer = setInterval(() => {
-      if (activeIsChatGptProvider) void refreshGlobalUsage(false);
-    }, CACHE_MS);
-  }
 }
 
-async function updateVisibility(ctx: any, force = false) {
+async function updateVisibility(session: UsageSession, ctx: any, force = false) {
   const ui = ctx.ui;
   const isChatGpt = isChatGptProvider(ctx);
-  activeIsChatGptProvider = isChatGpt;
+  session.activeIsChatGptProvider = isChatGpt;
 
   if (!isChatGpt) {
     clearGlobalUsage();
@@ -223,10 +252,11 @@ async function updateVisibility(ctx: any, force = false) {
     ui?.setWidget(STATUS_ID, undefined);
     return;
   }
-  await updateStatus(ctx, force, isChatGpt, ui);
+  await session.wait(updateStatus(session, ctx, force, isChatGpt, ui));
+  session.check();
 }
 
-async function updateStatus(ctx: any, force = false, isChatGpt = isChatGptProvider(ctx), ui = ctx.ui) {
+async function updateStatus(session: UsageSession, ctx: any, force = false, isChatGpt = isChatGptProvider(ctx), ui = ctx.ui) {
   if (!isChatGpt) {
     clearGlobalUsage();
     ui?.setStatus(STATUS_ID, undefined);
@@ -234,8 +264,11 @@ async function updateStatus(ctx: any, force = false, isChatGpt = isChatGptProvid
     return;
   }
 
-  const state = await fetchUsage(force);
-  if (!activeIsChatGptProvider) {
+  const usageSignal = session.usage.signal;
+  const state = await session.wait(fetchUsage(session, force));
+  session.check();
+  if (!state || usageSignal.aborted) return;
+  if (!session.activeIsChatGptProvider) {
     clearGlobalUsage();
     return;
   }
@@ -247,9 +280,11 @@ async function updateStatus(ctx: any, force = false, isChatGpt = isChatGptProvid
   ui?.setWidget(STATUS_ID, undefined);
 }
 
-async function refreshGlobalUsage(force = false) {
-  const state = await fetchUsage(force);
-  if (activeIsChatGptProvider) applyUsageState(state);
+async function refreshGlobalUsage(session: UsageSession, force = false) {
+  const usageSignal = session.usage.signal;
+  const state = await session.wait(fetchUsage(session, force));
+  session.check();
+  if (state && !usageSignal.aborted && session.activeIsChatGptProvider) applyUsageState(state);
 }
 
 function applyUsageState(state: UsageState) {
@@ -258,21 +293,27 @@ function applyUsageState(state: UsageState) {
   else clearGlobalUsage();
 }
 
-async function showDetails(ctx: any, force: boolean) {
+async function showDetails(session: UsageSession, ctx: any, force: boolean) {
   const ui = ctx.ui;
   const theme = ui.theme;
   ui.setWidget(STATUS_ID, [theme.fg("dim", "Đang lấy ChatGPT usage…")], { placement: "belowEditor" });
-  const state = await fetchUsage(force);
+  const usageSignal = session.usage.signal;
+  const state = await session.wait(fetchUsage(session, force));
+  session.check();
+  if (!state || usageSignal.aborted) return;
   applyUsageState(state);
   ui.setStatus(STATUS_ID, undefined);
   ui.setWidget(STATUS_ID, renderDetails(theme, state), { placement: "belowEditor" });
-  setTimeout(() => {
-    try {
-      ui.setWidget(STATUS_ID, undefined);
-    } catch {
-      // UI may have been torn down by a session replacement/reload.
-    }
+  hideWidgetLater(session, ui);
+}
+
+function hideWidgetLater(session: UsageSession, ui: any) {
+  session.check();
+  const timeout = setTimeout(() => {
+    session.widgetTimers.delete(timeout);
+    if (!session.lifetime.signal.aborted) ui.setWidget(STATUS_ID, undefined);
   }, 12_000);
+  session.widgetTimers.add(timeout);
 }
 
 function isChatGptProvider(ctx: any) {
@@ -284,28 +325,36 @@ function isChatGptProvider(ctx: any) {
   }
 }
 
-async function fetchUsage(force = false): Promise<UsageState> {
-  if (pending) return pending;
-  if (!force && cache.kind === "ready" && Date.now() - cache.fetchedAt < CACHE_MS) return cache;
+async function fetchUsage(session: UsageSession, force = false): Promise<UsageState | undefined> {
+  if (session.pending) return session.pending;
+  if (!force && session.cache.kind === "ready" && Date.now() - session.cache.fetchedAt < CACHE_MS) return session.cache;
 
-  pending = readUsage()
+  const signal = AbortSignal.any([session.lifetime.signal, session.usage.signal]);
+  const request = readUsage(signal)
     .catch((error) => {
+      if (signal.aborted) return undefined;
       const message = errorMessage(error);
-      if (cache.kind === "ready") {
-        return { kind: "error", fetchedAt: Date.now(), message, snapshot: cache.snapshot } satisfies UsageState;
+      if (session.cache.kind === "ready") {
+        return { kind: "error", fetchedAt: Date.now(), message, snapshot: session.cache.snapshot } satisfies UsageState;
       }
       return { kind: "error", fetchedAt: Date.now(), message } satisfies UsageState;
     })
+    .then((state) => {
+      // An adapter may finish even after abort. This also guards deduplicated callers.
+      if (signal.aborted || !state) return undefined;
+      session.cache = state;
+      return state;
+    })
     .finally(() => {
-      pending = undefined;
+      if (session.pending === request) session.pending = undefined;
     });
-
-  cache = await pending;
-  return cache;
+  session.pending = request;
+  return request;
 }
 
-async function readUsage(): Promise<UsageState> {
+async function readUsage(signal: AbortSignal): Promise<UsageState> {
   const loaded = await loadChatGptOauth();
+  signal.throwIfAborted();
   if (!loaded) {
     return {
       kind: "disabled",
@@ -317,10 +366,12 @@ async function readUsage(): Promise<UsageState> {
   const headers = new Headers({ authorization: `Bearer ${loaded.auth.access}` });
   if (loaded.auth.accountId) headers.set("ChatGPT-Account-Id", loaded.auth.accountId);
 
-  const response = await fetch(USAGE_URL, { method: "GET", headers });
+  const response = await fetch(USAGE_URL, { method: "GET", headers, signal });
+  signal.throwIfAborted();
   if (!response.ok) throw new Error(`usage request failed: ${response.status}`);
 
   const payload = (await response.json()) as RawUsagePayload;
+  signal.throwIfAborted();
   const snapshot = normalizeUsage(payload);
   if (!snapshot) throw new Error("ChatGPT usage windows were not returned");
 
@@ -331,32 +382,39 @@ async function readUsage(): Promise<UsageState> {
   };
 }
 
-async function loginChatGptAccount(pi: ExtensionAPI, ctx: any) {
+async function loginChatGptAccount(session: UsageSession, pi: ExtensionAPI, ctx: any) {
   ctx.ui.notify("Đang mở trình duyệt để login ChatGPT. Nếu muốn thêm account khác, hãy chọn đúng account trong browser hoặc logout ChatGPT trước.", "info");
 
   const manualInputController = new AbortController();
+  const abortLogin = () => manualInputController.abort();
+  session.lifetime.signal.addEventListener("abort", abortLogin, { once: true });
 
   try {
-    const credential = await loginProviderOauth(pi, ctx, "openai-codex", manualInputController);
+    const credential = await session.wait(loginProviderOauth(session, pi, ctx, "openai-codex", manualInputController));
+    session.check();
     const account = accountFromCredential(credential);
     if (!account) {
       ctx.ui.notify("Login xong nhưng không đọc được credential openai-codex.", "error");
       return;
     }
 
-    await upsertStoredAccount(account, true);
-    cache = { kind: "idle", fetchedAt: 0 };
-    await updateStatus(ctx, true);
+    await session.wait(upsertStoredAccount(account, true));
+    session.check();
+    session.resetUsage();
+    await session.wait(updateStatus(session, ctx, true));
+    session.check();
     ctx.ui.notify(`✓ Đã lưu và chuyển sang ChatGPT account: ${account.username || account.accountId}`, "info");
   } catch (error) {
-    ctx.ui.notify(`Login ChatGPT lỗi: ${errorMessage(error)}`, "error");
+    if (!session.lifetime.signal.aborted) ctx.ui.notify(`Login ChatGPT lỗi: ${errorMessage(error)}`, "error");
   } finally {
+    session.lifetime.signal.removeEventListener("abort", abortLogin);
     manualInputController.abort();
-    ctx.ui?.setWidget(STATUS_ID, undefined);
+    if (!session.lifetime.signal.aborted) ctx.ui?.setWidget(STATUS_ID, undefined);
   }
 }
 
 async function loginProviderOauth(
+  session: UsageSession,
   pi: ExtensionAPI,
   ctx: any,
   provider: string,
@@ -364,35 +422,42 @@ async function loginProviderOauth(
 ): Promise<Partial<AuthRecord> | undefined> {
   const legacyStorage = ctx.modelRegistry?.authStorage;
   if (typeof legacyStorage?.login === "function") {
-    await legacyStorage.login(provider, {
+    await session.wait(legacyStorage.login(provider, {
       onAuth: (info: { url: string; instructions?: string }) => {
-        showAuthUrl(pi, ctx, info.url, info.instructions);
+        if (!controller.signal.aborted) showAuthUrl(pi, ctx, info.url, info.instructions);
       },
       onDeviceCode: (info: { userCode: string; verificationUri: string }) => {
-        showDeviceCode(pi, ctx, info.userCode, info.verificationUri);
+        if (!controller.signal.aborted) showDeviceCode(pi, ctx, info.userCode, info.verificationUri);
       },
       onPrompt: async (prompt: { message: string; placeholder?: string }) => {
-        return (
-          (await ctx.ui.input(prompt.message, prompt.placeholder, { signal: controller.signal })) ?? ""
-        );
+        controller.signal.throwIfAborted();
+        const value = await session.wait(ctx.ui.input(prompt.message, prompt.placeholder, { signal: controller.signal }));
+        controller.signal.throwIfAborted();
+        return value ?? "";
       },
       onManualCodeInput: async () => {
-        return (
-          (await ctx.ui.input(
-            "Paste redirect URL nếu browser callback không tự hoàn tất:",
-            "http://localhost:1455/auth/callback?code=...&state=...",
-            { signal: controller.signal },
-          )) ?? ""
-        );
+        controller.signal.throwIfAborted();
+        const value = await session.wait(ctx.ui.input(
+          "Paste redirect URL nếu browser callback không tự hoàn tất:",
+          "http://localhost:1455/auth/callback?code=...&state=...",
+          { signal: controller.signal },
+        ));
+        controller.signal.throwIfAborted();
+        return value ?? "";
       },
       onSelect: async (prompt: { message: string; options: Array<{ id: string; label: string }> }) => {
+        controller.signal.throwIfAborted();
         const labels = prompt.options.map((option) => option.label);
-        const selected = await ctx.ui.select(prompt.message, labels, { signal: controller.signal });
+        const selected = await session.wait(ctx.ui.select(prompt.message, labels, { signal: controller.signal }));
+        controller.signal.throwIfAborted();
         return prompt.options.find((option) => option.label === selected)?.id;
       },
-      onProgress: (message: string) => ctx.ui.notify(message, "info"),
+      onProgress: (message: string) => {
+        if (!controller.signal.aborted) ctx.ui.notify(message, "info");
+      },
       signal: controller.signal,
-    });
+    }));
+    session.check();
     return readProviderCredential(ctx, provider);
   }
 
@@ -404,23 +469,27 @@ async function loginProviderOauth(
   return runtime.login(provider, "oauth", {
     signal: controller.signal,
     prompt: async (prompt: AuthPromptCompat) => {
-      const signal = prompt.signal ?? controller.signal;
+      controller.signal.throwIfAborted();
+      const signal = prompt.signal ? AbortSignal.any([prompt.signal, controller.signal]) : controller.signal;
       if (prompt.type === "select") {
         const options = prompt.options ?? [];
         const labels = options.map((option) => option.description
           ? `${option.label} — ${option.description}`
           : option.label);
-        const selected = await ctx.ui.select(prompt.message, labels, { signal });
+        const selected = await session.wait(ctx.ui.select(prompt.message, labels, { signal }));
+        signal.throwIfAborted();
         const index = selected === undefined ? -1 : labels.indexOf(selected);
         if (index < 0) throw new Error("Đã huỷ đăng nhập ChatGPT.");
         return options[index].id;
       }
 
-      const value = await ctx.ui.input(prompt.message, prompt.placeholder, { signal });
+      const value = await session.wait(ctx.ui.input(prompt.message, prompt.placeholder, { signal }));
+      signal.throwIfAborted();
       if (value === undefined) throw new Error("Đã huỷ đăng nhập ChatGPT.");
       return value;
     },
     notify: (event: AuthEventCompat) => {
+      if (controller.signal.aborted) return;
       if (event.type === "auth_url") {
         showAuthUrl(pi, ctx, event.url, event.instructions);
       } else if (event.type === "device_code") {
@@ -476,10 +545,11 @@ async function readProviderCredential(ctx: any, provider: string): Promise<Parti
   return (await readJson(piAuthPath()))[provider] as Partial<AuthRecord> | undefined;
 }
 
-async function writeProviderCredential(ctx: any, provider: string, credential: AuthRecord) {
+async function writeProviderCredential(session: UsageSession, ctx: any, provider: string, credential: AuthRecord) {
   const legacyStorage = ctx.modelRegistry?.authStorage;
   if (typeof legacyStorage?.set === "function") {
-    await legacyStorage.set(provider, credential);
+    await session.wait(legacyStorage.set(provider, credential));
+    session.check();
     return;
   }
 
@@ -488,14 +558,17 @@ async function writeProviderCredential(ctx: any, provider: string, credential: A
     throw new Error("Phiên bản Pi hiện tại không cung cấp API đổi ChatGPT account tương thích.");
   }
 
-  await runtime.credentials.modify(provider, async () => credential);
-  if (typeof runtime.refresh === "function") await runtime.refresh({ allowNetwork: false });
+  await session.wait(runtime.credentials.modify(provider, async () => credential));
+  session.check();
+  if (typeof runtime.refresh === "function") await session.wait(runtime.refresh({ allowNetwork: false }));
 }
 
-async function switchChatGptAccount(ctx: any) {
-  await importCurrentAuthIntoAccounts(ctx);
+async function switchChatGptAccount(session: UsageSession, ctx: any) {
+  await session.wait(importCurrentAuthIntoAccounts(session, ctx));
+  session.check();
 
-  const store = await loadAccountsStore();
+  const store = await session.wait(loadAccountsStore());
+  session.check();
   if (store.accounts.length === 0) {
     ctx.ui.notify("Chưa có account nào. Dùng /chatgpt-login để thêm account.", "info");
     return;
@@ -505,19 +578,24 @@ async function switchChatGptAccount(ctx: any) {
     return;
   }
 
-  const current = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
+  const current = accountFromCredential(await session.wait(readProviderCredential(ctx, "openai-codex")));
+  session.check();
   const currentId = current?.accountId || store.activeAccountId;
   const currentIndex = Math.max(0, store.accounts.findIndex((account) => account.accountId === currentId));
   const next = store.accounts[(currentIndex + 1) % store.accounts.length];
 
-  await activateStoredAccount(ctx, next);
+  await session.wait(activateStoredAccount(session, ctx, next));
+  session.check();
   ctx.ui.notify(`↻ ChatGPT account: ${accountDisplayName(next)} (${currentIndex + 2 > store.accounts.length ? 1 : currentIndex + 2}/${store.accounts.length})`, "info");
 }
 
-async function showChatGptAccounts(ctx: any) {
-  await importCurrentAuthIntoAccounts(ctx);
-  const store = await loadAccountsStore();
-  const active = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
+async function showChatGptAccounts(session: UsageSession, ctx: any) {
+  await session.wait(importCurrentAuthIntoAccounts(session, ctx));
+  session.check();
+  const store = await session.wait(loadAccountsStore());
+  session.check();
+  const active = accountFromCredential(await session.wait(readProviderCredential(ctx, "openai-codex")));
+  session.check();
   const activeId = active?.accountId || store.activeAccountId;
 
   if (store.accounts.length === 0) {
@@ -533,19 +611,16 @@ async function showChatGptAccounts(ctx: any) {
   lines.push(ctx.ui.theme.fg("dim", "Dùng /chatgpt-switch để chuyển account, /chatgpt-delete để xoá account."));
   const ui = ctx.ui;
   ui.setWidget(STATUS_ID, lines, { placement: "belowEditor" });
-  setTimeout(() => {
-    try {
-      ui.setWidget(STATUS_ID, undefined);
-    } catch {
-      // UI may have been torn down by a session replacement/reload.
-    }
-  }, 12_000);
+  hideWidgetLater(session, ui);
 }
 
-async function deleteChatGptAccount(ctx: any) {
-  await importCurrentAuthIntoAccounts(ctx);
-  const store = await loadAccountsStore();
-  const active = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
+async function deleteChatGptAccount(session: UsageSession, ctx: any) {
+  await session.wait(importCurrentAuthIntoAccounts(session, ctx));
+  session.check();
+  const store = await session.wait(loadAccountsStore());
+  session.check();
+  const active = accountFromCredential(await session.wait(readProviderCredential(ctx, "openai-codex")));
+  session.check();
   const activeId = active?.accountId || store.activeAccountId;
 
   if (store.accounts.length === 0) {
@@ -562,20 +637,26 @@ async function deleteChatGptAccount(ctx: any) {
     allChoice,
   ];
 
-  const chosen = await ctx.ui.select("Chọn ChatGPT account cần xoá:", choices);
+  const chosen = await session.wait(ctx.ui.select("Chọn ChatGPT account cần xoá:", choices, { signal: session.lifetime.signal }));
+  session.check();
   if (!chosen) return;
 
-  const confirm = await ctx.ui.select(
+  const confirm = await session.wait(ctx.ui.select(
     chosen === allChoice ? "Xác nhận xoá tất cả ChatGPT accounts đã lưu?" : `Xác nhận xoá ${chosen}?`,
     ["Không", "Có"],
-  );
+    { signal: session.lifetime.signal },
+  ));
+  session.check();
   if (confirm !== "Có") return;
 
   if (chosen === allChoice) {
-    await clearStoredAccounts();
-    await removeProviderCredential(ctx, "openai-codex");
-    await removeProviderCredential(ctx, "chatgpt");
-    cache = { kind: "idle", fetchedAt: 0 };
+    await session.wait(clearStoredAccounts());
+    session.check();
+    await session.wait(removeProviderCredential(session, ctx, "openai-codex"));
+    session.check();
+    await session.wait(removeProviderCredential(session, ctx, "chatgpt"));
+    session.check();
+    session.resetUsage();
     clearGlobalUsage();
     ctx.ui?.setStatus(STATUS_ID, undefined);
     ctx.ui?.setWidget(STATUS_ID, undefined);
@@ -588,40 +669,48 @@ async function deleteChatGptAccount(ctx: any) {
   if (!selected) return;
 
   const deletedWasActive = selected.accountId === activeId;
-  const remaining = await removeStoredAccount(selected.accountId);
+  const remaining = await session.wait(removeStoredAccount(selected.accountId));
+  session.check();
 
   if (deletedWasActive) {
     const next = remaining.accounts[0];
     if (next) {
-      await activateStoredAccount(ctx, next);
+      await session.wait(activateStoredAccount(session, ctx, next));
+      session.check();
       ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}. Active account mới: ${accountDisplayName(next)}.`, "info");
     } else {
-      await removeProviderCredential(ctx, "openai-codex");
-      await removeProviderCredential(ctx, "chatgpt");
-      cache = { kind: "idle", fetchedAt: 0 };
+      await session.wait(removeProviderCredential(session, ctx, "openai-codex"));
+      session.check();
+      await session.wait(removeProviderCredential(session, ctx, "chatgpt"));
+      session.check();
+      session.resetUsage();
       clearGlobalUsage();
       ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}. Không còn ChatGPT account nào đã lưu.`, "info");
     }
   } else {
-    cache = { kind: "idle", fetchedAt: 0 };
+    session.resetUsage();
     ctx.ui.notify(`✓ Đã xoá ${accountDisplayName(selected)}.`, "info");
   }
 }
 
-async function activateStoredAccount(ctx: any, account: StoredChatGptAccount) {
-  const fresh = await ensureFreshStoredAccount(account);
-  await writeProviderCredential(ctx, "openai-codex", {
+async function activateStoredAccount(session: UsageSession, ctx: any, account: StoredChatGptAccount) {
+  const fresh = await session.wait(ensureFreshStoredAccount(account));
+  session.check();
+  await session.wait(writeProviderCredential(session, ctx, "openai-codex", {
     type: "oauth",
     access: fresh.access,
     refresh: fresh.refresh,
     expires: fresh.expires,
     accountId: fresh.accountId,
     username: fresh.username,
-  });
+  }));
+  session.check();
 
-  await markActiveAccount(fresh.accountId);
-  cache = { kind: "idle", fetchedAt: 0 };
-  await updateStatus(ctx, true);
+  await session.wait(markActiveAccount(fresh.accountId));
+  session.check();
+  session.resetUsage();
+  await session.wait(updateStatus(session, ctx, true));
+  session.check();
 }
 
 async function loadChatGptOauth(): Promise<LoadedAuth | undefined> {
@@ -716,9 +805,10 @@ function toStoredAccount(auth: AuthRecord): StoredChatGptAccount {
   };
 }
 
-async function importCurrentAuthIntoAccounts(ctx: any) {
-  const current = accountFromCredential(await readProviderCredential(ctx, "openai-codex"));
-  if (current) await upsertStoredAccount(current, true);
+async function importCurrentAuthIntoAccounts(session: UsageSession, ctx: any) {
+  const current = accountFromCredential(await session.wait(readProviderCredential(ctx, "openai-codex")));
+  session.check();
+  if (current) await session.wait(upsertStoredAccount(current, true));
 }
 
 async function upsertStoredAccount(account: StoredChatGptAccount, makeActive: boolean) {
@@ -766,18 +856,19 @@ async function clearStoredAccounts() {
   });
 }
 
-async function removeProviderCredential(ctx: any, provider: string) {
+async function removeProviderCredential(session: UsageSession, ctx: any, provider: string) {
   const legacyStorage = ctx.modelRegistry?.authStorage;
   if (legacyStorage) {
-    if (typeof legacyStorage.remove === "function") await legacyStorage.remove(provider);
-    else if (typeof legacyStorage.logout === "function") await legacyStorage.logout(provider);
+    if (typeof legacyStorage.remove === "function") await session.wait(legacyStorage.remove(provider));
+    else if (typeof legacyStorage.logout === "function") await session.wait(legacyStorage.logout(provider));
     return;
   }
 
   const runtime = getModelRuntime(ctx);
   if (typeof runtime?.credentials?.delete !== "function") return;
-  await runtime.credentials.delete(provider);
-  if (typeof runtime.refresh === "function") await runtime.refresh({ allowNetwork: false });
+  await session.wait(runtime.credentials.delete(provider));
+  session.check();
+  if (typeof runtime.refresh === "function") await session.wait(runtime.refresh({ allowNetwork: false }));
 }
 
 async function ensureFreshStoredAccount(account: StoredChatGptAccount): Promise<StoredChatGptAccount> {

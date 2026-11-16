@@ -13,6 +13,7 @@ import {
   isWikiTemporaryPath,
   lintWikiPromptRuleFile,
   relativeProjectPath,
+  renderPromptRuleScaffold,
 } from "../../extensions/wiki/wiki-rules.js";
 
 test("Wiki path classification keeps prompt rules separate from documentation", () => {
@@ -108,22 +109,101 @@ test("discoverWikiPromptRules warns when a rule ID appears in sibling sections",
   assert.equal(report.warnings.some((item) => item.code === "duplicate_project_rule_id"), true);
 });
 
-test("ensureWikiPromptRuleScaffolds creates root and final section scaffolds only once", () => {
+test("renderPromptRuleScaffold contains zero bytes for root, domain and nested service sections", () => {
+  for (const section of ["wiki", "wiki/extensions", "wiki/modules/order"]) {
+    assert.equal(renderPromptRuleScaffold(section), "", section);
+  }
+});
+
+test("ensureWikiPromptRuleScaffolds creates zero-byte root and final section files only once", (t) => {
   const root = createWikiFixture();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  write(root, "wiki/modules/order/SPEC.md", "# Order\n");
+  write(root, "wiki/assets/logo.md", "asset\n");
+  write(root, "wiki/_tmp/scratch.md", "temporary\n");
 
   const first = ensureWikiPromptRuleScaffolds({ projectRoot: root });
-  const second = ensureWikiPromptRuleScaffolds({ projectRoot: root });
-
   assert.deepEqual(first.created, [
     "wiki/_rules.md",
     "wiki/architecture/_rules.md",
     "wiki/extensions/_rules.md",
+    "wiki/modules/order/_rules.md",
   ]);
-  assert.deepEqual(second.created, []);
-  assert.equal(fs.existsSync(path.join(root, "wiki", "assets", "_rules.md")), false);
-  const rootScaffold = fs.readFileSync(path.join(root, "wiki", "_rules.md"), "utf8");
-  assert.match(rootScaffold, /only before editing a governed repository component/);
-  assert.match(rootScaffold, /Do not load rules for read-only questions/);
+  const before = first.created.map((file) => fs.statSync(path.join(root, file)));
+  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: root }).created, []);
+  for (const [index, file] of first.created.entries()) {
+    const absolute = path.join(root, file);
+    const after = fs.statSync(absolute);
+    assert.equal(after.size, 0, file);
+    assert.deepEqual(fs.readFileSync(absolute), Buffer.alloc(0), file);
+    assert.equal(after.ino, before[index].ino);
+    assert.equal(after.mtimeMs, before[index].mtimeMs);
+    const lint = lintWikiPromptRuleFile({ projectRoot: root, rulePath: file });
+    assert.deepEqual(lint.errors, []);
+    assert.deepEqual(lint.ruleIds, []);
+    assert.deepEqual(lint.warnings.map((issue) => issue.code), ["empty_rule_file"]);
+  }
+  for (const section of ["assets", "_tmp", "modules"]) {
+    assert.equal(fs.existsSync(path.join(root, "wiki", section, "_rules.md")), false);
+  }
+  const report = discoverWikiPromptRules({ projectRoot: root });
+  assert.equal(report.valid, true);
+  assert.deepEqual(report.files, first.created);
+  assert.deepEqual(report.missingRuleSections, []);
+});
+
+test("scaffolding preserves existing rules, legacy placeholders and empty files byte-for-byte", (t) => {
+  const root = createWikiFixture();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const existing = {
+    "wiki/_rules.md": Buffer.from(validRules("GLOBAL-KEEP-001")),
+    "wiki/architecture/_rules.md": Buffer.from("# Architecture rules\n\nLoad these rules only before editing components governed by the `wiki/architecture/` domain.\n\nNo domain-specific rules have been added yet.\n"),
+    "wiki/extensions/_rules.md": Buffer.alloc(0),
+  };
+  for (const [file, bytes] of Object.entries(existing)) write(root, file, bytes);
+  const before = Object.keys(existing).map((file) => fs.statSync(path.join(root, file)));
+  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: root }).created, []);
+  for (const [index, [file, bytes]] of Object.entries(existing).entries()) {
+    assert.deepEqual(fs.readFileSync(path.join(root, file)), bytes);
+    const after = fs.statSync(path.join(root, file));
+    assert.equal(after.ino, before[index].ino);
+    assert.equal(after.mtimeMs, before[index].mtimeMs);
+  }
+});
+
+test("scaffolding uses exclusive creation and preserves a concurrent writer's content", (t) => {
+  const root = createWikiFixture();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const target = path.join(root, "wiki/_rules.md");
+  const original = fs.writeFileSync;
+  const content = validRules("CONCURRENT-KEEP-001");
+  let raced = false;
+  t.mock.method(fs, "writeFileSync", (file, data, options) => {
+    if (file === target && !raced) {
+      raced = true;
+      assert.equal(options.flag, "wx");
+      original(file, content);
+    }
+    return original(file, data, options);
+  });
+  const result = ensureWikiPromptRuleScaffolds({ projectRoot: root });
+  assert.equal(raced, true);
+  assert.deepEqual(result.created, ["wiki/architecture/_rules.md", "wiki/extensions/_rules.md"]);
+  assert.equal(fs.readFileSync(target, "utf8"), content);
+});
+
+test("scaffolding rejects a symlink Wiki root and never follows section directories", { skip: process.platform === "win32" }, (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "wiki-scaffold-safety-"));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "wiki-scaffold-outside-"));
+  t.after(() => { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(outside, { recursive: true, force: true }); });
+  write(outside, "page.md", "# Outside\n");
+  fs.symlinkSync(outside, path.join(root, "wiki"), "dir");
+  assert.throws(() => ensureWikiPromptRuleScaffolds({ projectRoot: root }), (error) => error.code === "unsafe_policy_path");
+  fs.unlinkSync(path.join(root, "wiki"));
+  fs.mkdirSync(path.join(root, "wiki"));
+  fs.symlinkSync(outside, path.join(root, "wiki/domain"), "dir");
+  assert.deepEqual(ensureWikiPromptRuleScaffolds({ projectRoot: root }).created, ["wiki/_rules.md"]);
+  assert.equal(fs.existsSync(path.join(outside, "_rules.md")), false);
 });
 
 test("lintWikiPromptRuleFile rejects a symlink that escapes project root", { skip: process.platform === "win32" }, () => {

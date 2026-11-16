@@ -11,6 +11,7 @@ npm install --ignore-scripts --omit=peer
 npm --prefix packages/pi-learn-extensions test
 npm --prefix packages/pi-learn-extensions run test:navigation
 # Focused: run test:wiki, run test:aurora, run test:theme, run test:setup
+node --test packages/pi-learn-extensions/tests/chatgpt-usage/lifecycle.test.mjs
 node -e 'JSON.parse(require("node:fs").readFileSync("packages/pi-learn-extensions/themes/midnight-aurora.json", "utf8")); console.log("Theme JSON OK")'
 ```
 
@@ -34,6 +35,8 @@ Tests core ThinkRail nguyên bản được giữ trong `extensions/wiki/vendor/
 Herdsman setup: `test:setup` kiểm profile/script bằng isolated temporary agent/package fixtures: additive tools/extensions, depth, prompt preservation, paths, dry-run/idempotency, policy conflicts, unsafe targets và concurrent changes. Manifest regression kiểm active resources/theme, runtime subagents đã vắng và peer/lock consistency. Không gọi provider/network hoặc đọc user auth/settings/session logs; không phải TUI integration. Runtime/tests/vendor ThinkRail subagents cũ đã bị xóa; [setup contract](herdsman-setup.md).
 
 Ngoài Wiki, `tests/aurora/aurora-ui.test.mjs` kiểm banner/theme changes/width/cleanup, headless picker và editor tokens bằng host giả lập; `tests/theme/midnight-aurora.test.mjs` kiểm variable resolution, dark appearance, WCAG ≥4.5:1 cho các cặp chữ/nền khai báo và phân cấp dim/muted/text. Contrast audit chỉ áp dụng màu sRGB cụ thể, với `vars.bg` là nền terminal dự kiến; không bảo đảm nền terminal khác hoặc 256 màu.
+
+ChatGPT lifecycle chạy riêng bằng command ở trên, không nằm trong `npm test`: 42 tests trên Node v24.21.0 kiểm delete/alias, cancel, active/inactive/last/all accounts, switch/login qua legacy/runtime doubles, shutdown tại picker/confirm/credential/OAuth awaits, callback muộn, pending usage, cache/error và widget/interval cleanup. Regression microtask kiểm shutdown giữa lúc promise helper resolve và caller tiếp tục: không cài timer, mở dialog, refresh credential hay publish usage/UI sau khi lifetime kết thúc. Filesystem/network hoàn toàn giả lập, không đọc user auth/settings/session logs. Một test dùng guard `ExtensionRunner` thật của Pi v1.5.2 và quét 12 vị trí microtask cho mỗi delete/alias ngoài deferred case; nếu host package không resolve được từ CLI thì skip test này. Với CLI wrapper, đặt `PI_TEST_BIN` tới JavaScript CLI entrypoint thật (`…/pi-coding-agent/dist/cli.js`) để chạy guard check. Không instantiate session hoặc chạy OAuth/TUI `/reload` thật; thao tác file/credential đã bắt đầu không có rollback.
 
 Navigation chạy riêng qua `npm --prefix packages/pi-learn-extensions run test:navigation`: `tests/navigation/sidebar.test.mjs` và `tree.test.mjs` dùng installed Pi TUI với synthetic data. `npm --prefix packages/pi-learn-extensions run test:navigation:pty` chạy hai Python smoke scripts, cần Pi và `pexpect`, dùng HOME/fixtures tạm offline. Lượt kiểm tra này chỉ chạy Node navigation suite, không chạy PTY. `npm test` không bao gồm hai commands navigation này; không coi default suite là toàn bộ integration checks.
 
@@ -87,7 +90,7 @@ Chỉ hai command Wiki được register. Kiểm tra guards bằng fixtures tron
 - Aurora: startup banner tự ẩn, ít nhất ba dòng editor, autocomplete còn nguyên, footer statuses không trùng usage; thử terminal hẹp/rộng và fullscreen/non-fullscreen.
 - Git: repo sạch/modified/untracked/conflict và non-repo; Git lỗi phải mất badge thay vì crash.
 - Theme picker/shortcut/cancel và theme đang active; JSON/schema/render. Banner phải phản ánh tên/màu mới ngay cả khi đổi theme trong 5 giây đầu. Thử `system` trên nền sáng/tối và `midnight-aurora` trên nền tối; extension không tự đổi lựa chọn.
-- Shutdown/reload/session replacement: timers/subscriptions/status/widget cleanup; kiểm tra global/cache/pending và timeout details còn sống như [lifecycle gaps](../extensions/catalog.md#contract-dùng-chung-với-aurora).
+- Shutdown/reload/session replacement: timers/subscriptions/status/widget cleanup; kiểm tra global/cache/pending và callback/timeout muộn không đụng ctx cũ theo [lifecycle contract](../extensions/catalog.md#contract-dùng-chung-với-aurora).
 - Print/JSON/headless không crash vì UI thiếu. Theme command/shortcut có hasUI guard và regression tests với host giả lập; vẫn cần kiểm tra các mode trên host thật.
 
 ## Security and privacy

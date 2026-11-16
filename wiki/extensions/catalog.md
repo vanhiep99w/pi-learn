@@ -36,7 +36,7 @@ Mọi command của extension này yêu cầu `ctx.hasUI`. Usage chỉ chạy kh
 
 `normalizeUsage()` nhận `rate_limit.primary_window`/`secondary_window`, map sang `fiveHour`/`weekly`; tên hiển thị dựa `limit_window_seconds`, không giả định API luôn trả 5 giờ/7 ngày. Phải có ít nhất một window có used_percent dạng number. Phần trăm round/clamp 0–100; remaining = 100 − used; reset_at là epoch giây, fetchedAt là epoch mili giây.
 
-State module-level: idle, disabled (không OAuth), ready(snapshot), error(message, optional snapshot). Một promise `pending` gộp fetch đồng thời kể cả force; chỉ ready cache trẻ hơn 60 giây được reuse. Lỗi ngay sau ready giữ snapshot và đánh stale; lỗi liên tiếp khi cache đã error không tiếp tục giữ snapshot cũ. Fetch không có timeout/retry/abort riêng trong source; phiên request đang chạy không bị cancel bởi shutdown.
+State riêng cho mỗi extension instance: idle, disabled (không OAuth), ready(snapshot), error(message, optional snapshot). Một promise `pending` gộp fetch đồng thời kể cả force; chỉ ready cache trẻ hơn 60 giây được reuse. Lỗi ngay sau ready giữ snapshot và đánh stale; lỗi liên tiếp khi cache đã error không tiếp tục giữ snapshot cũ. Reset cache sau login/switch/delete hoặc shutdown sẽ hủy usage GET đang chạy và bỏ kết quả muộn, kể cả adapter không tuân abort; fetch chưa có timeout/retry riêng.
 
 Details widget dưới editor tự ẩn sau 12 giây. Normal usage không tạo status/footer line trùng: cập nhật global state cho Aurora, xóa status/widget. Nếu không dùng Aurora, xem details bằng command.
 
@@ -69,13 +69,13 @@ Producer `setGlobalUsage()` ghi `globalThis.__piChatGptUsageStatus`:
 
 Consumer trong repository là `getChatGptUsageBadge()` ở Aurora. Consumer không dùng `updatedAt` để tự hết hạn dữ liệu; stale do producer quyết định. Không có evidence về consumer ngoài repo. Contract là object in-process, không schema version/export package/event bus; khi đổi field phải kiểm tra cả producer lẫn consumer.
 
-Shutdown dừng interval, bỏ status/widget và active flag; source không xóa global/cache/pending ở hook này. Global được xóa khi đổi sang non-ChatGPT hoặc explicit delete path. Các timeout details/list accounts có catch stale UI nhưng không được tracking để cancel. Đây là giới hạn lifecycle cần kiểm tra sau reload/session replacement.
+Shutdown kết thúc lifetime của instance, hủy OAuth/dialog signal và usage GET, dừng interval cùng timeout details/list accounts, xóa status/widget/global/cache/pending và active flag. Các continuation account/usage kiểm lifetime ngay trong caller sau `await`, trước khi dùng lại ctx hoặc bắt đầu side effect; kiểm trong promise helper không đủ vì shutdown có thể chen giữa hai microtask. Usage còn kiểm generation tại lúc publish; callback OAuth muộn không dùng ctx/pi cũ. Instance mới có state riêng, không kích hoạt lại command đã nghỉ. Flow account không gọi `newSession`/`reload`; không cần tạo session mới để đổi/xóa account. Thao tác credential/file đã bắt đầu vẫn có thể hoàn tất sau shutdown; đây không phải rollback hay cross-file transaction, và token refresh đang chạy vẫn giữ luồng persist credential.
 
 ### Lỗi và thay đổi an toàn
 
 Không OAuth: hướng dẫn login. HTTP usage/token lỗi, response thiếu window/token hoặc lock timeout: báo lỗi; details có thể hiện cached snapshot theo quy tắc trên. Không có bảo đảm remote endpoint ổn định hoặc tương thích mọi host version. Không log token/body OAuth; response token-refresh lỗi hiện có thể được đưa vào error message, nên không chia sẻ nguyên notification chưa rà soát.
 
-Khi sửa auth adapter, kiểm tra legacy/runtime path và account switch thật trong môi trường riêng được người dùng cho phép. Chưa có focused automated tests cho component này; checklist ở [manual verification](../operations/testing-and-safety.md#chatgpt-usage-and-aurora).
+Khi sửa auth adapter, kiểm tra legacy/runtime path và account switch thật trong môi trường riêng được người dùng cho phép. `tests/chatgpt-usage/lifecycle.test.mjs` kiểm shutdown races, delete/alias/switch/login, pending usage và legacy/runtime adapters bằng dữ liệu giả; có thêm check invalidation với installed Pi runner. Không thay OAuth/network hoặc TUI reload thật; checklist ở [manual verification](../operations/testing-and-safety.md#chatgpt-usage-and-aurora).
 
 ## Aurora UI
 

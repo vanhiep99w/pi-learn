@@ -277,6 +277,49 @@ test("agent_end is not finalization; successful retry may complete", async (t) =
   assert.equal((await readMetadata(f)).status, "complete");
 });
 
+for (const command of ["wiki", "wiki-update"]) {
+  test(`${command} creates zero-byte scaffolds at startup and settlement`, async (t) => {
+    const f = await fixture(t);
+    await rm(path.join(f.cwd, "wiki/_rules.md"));
+    await mkdir(path.join(f.cwd, "wiki/domain"));
+    await writeFile(path.join(f.cwd, "wiki/domain/guide.md"), "# Guide\n");
+    await f.run(command);
+    assert.equal(f.messages.length, 1, "empty scaffolds must not prevent command startup");
+    for (const file of ["wiki/_rules.md", "wiki/domain/_rules.md"]) {
+      assert.equal((await readFile(path.join(f.cwd, file))).length, 0);
+    }
+    await mkdir(path.join(f.cwd, "wiki/modules/order"), { recursive: true });
+    await writeFile(path.join(f.cwd, "wiki/modules/order/SPEC.md"), spec("order"));
+    await f.emit("agent_settled");
+    assert.equal((await readFile(path.join(f.cwd, "wiki/modules/order/_rules.md"))).length, 0);
+    assert.equal((await readMetadata(f)).status, "complete");
+    assert.match(f.notices.at(-1), /Created prompt-rule scaffold\(s\): wiki\/modules\/order\/_rules\.md/);
+  });
+}
+
+test("zero-byte scaffolds allow clean Git no-op and preserve no-change metadata", async (t) => {
+  const f = await fixture(t);
+  await rm(path.join(f.cwd, "wiki/_rules.md"));
+  await mkdir(path.join(f.cwd, "wiki/domain"));
+  await writeFile(path.join(f.cwd, "wiki/domain/guide.md"), "# Guide\n");
+  await f.run("wiki-update", "Create missing scaffolds");
+  await f.emit("agent_settled");
+  await cleanRepository(f);
+  const before = await readFile(metadataPath(f), "utf8");
+  const count = f.messages.length;
+  await f.run("wiki-update");
+  assert.equal(f.messages.length, count);
+  assert.match(f.notices.at(-1), /No meaningful repository changes.*skipping/i);
+  await f.run("wiki-update", "Check only");
+  assert.equal(f.messages.length, count + 1);
+  await f.emit("agent_settled");
+  assert.match(f.notices.at(-1), /completed with no changes/);
+  assert.equal(await readFile(metadataPath(f), "utf8"), before);
+  for (const file of ["wiki/_rules.md", "wiki/domain/_rules.md"]) {
+    assert.equal((await readFile(path.join(f.cwd, file))).length, 0);
+  }
+});
+
 test("clean Git/legacy guides may no-op while metadata is untracked or modified", async (t) => {
   const f = await fixture(t);
   await cleanRepository(f, { "wiki/guide.md": "# Guide\n" });

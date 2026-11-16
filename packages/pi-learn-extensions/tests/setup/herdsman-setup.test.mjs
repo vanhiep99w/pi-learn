@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -12,6 +13,7 @@ const names = ["scout", "researcher", "implementer", "reviewer", "validator", "g
 const tools = ["web_enable", "web_search", "fetch_content", "get_search_content", "source_check"];
 const script = fileURLToPath(new URL("../../scripts/setup-herdsman.mjs", import.meta.url));
 const profileRoot = new URL("../../profiles/herdsman/", import.meta.url);
+const aurora = fileURLToPath(new URL("../../extensions/aurora-ui.ts", import.meta.url));
 const read = (file) => fs.readFileSync(file, "utf8");
 const metadata = (text) => parse(text.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/)[1]);
 
@@ -29,6 +31,17 @@ function fixture(t) {
   return { root, agentDir, packagesDir, put, target, plan: () => planSetup({ agentDir }) };
 }
 
+function relocatedPackage(f, relativeRoot) {
+  const root = path.join(f.root, relativeRoot, "packages", "pi-learn-extensions");
+  const relocatedScript = f.put(path.join(root, "scripts/setup-herdsman.mjs"), read(script));
+  fs.cpSync(fileURLToPath(profileRoot), path.join(root, "profiles/herdsman"), { recursive: true });
+  const entry = f.put(path.join(root, "extensions/aurora-ui.ts"), "// fixture Aurora, never executed\n");
+  // Copy the already-installed parser only; no install/network or host config access.
+  const yamlRoot = path.dirname(createRequire(import.meta.url).resolve("yaml/package.json"));
+  fs.cpSync(yamlRoot, path.join(root, "node_modules/yaml"), { recursive: true });
+  return { script: relocatedScript, entry };
+}
+
 test("fresh setup creates eight files with machine-resolved additive overrides and no prompt copies", (t) => {
   const f = fixture(t);
   const setup = f.plan();
@@ -39,7 +52,7 @@ test("fresh setup creates eight files with machine-resolved additive overrides a
     const text = read(f.target(`agents/${name}.md`));
     const doc = metadata(text);
     assert.equal(doc.name, name);
-    assert.deepEqual(doc.extensions, ["+" + path.join(f.packagesDir, "pi-tool-display/index.ts"), "+" + path.join(f.packagesDir, "pi-web-access/dist/index.js")]);
+    assert.deepEqual(doc.extensions, ["+" + path.join(f.packagesDir, "pi-tool-display/index.ts"), "+" + path.join(f.packagesDir, "pi-web-access/dist/index.js"), "+" + aurora]);
     if (name !== "researcher") assert.deepEqual(doc.tools, tools.map((tool) => "+" + tool));
     assert.equal(doc.model, undefined);
     assert.equal(doc.thinking, undefined);
@@ -262,6 +275,77 @@ test("explicit extension removals conflicting with the profile are not silently 
   const entry = path.join(f.packagesDir, "pi-tool-display/index.ts");
   f.put(f.target("agents/scout.md"), `---\nname: scout\nextensions: [${JSON.stringify("-" + entry)}]\n---\n`);
   assert.throws(() => f.plan(), /extensions removal conflicts/);
+  assert.equal(fs.existsSync(f.target("pi-herdsman/config.json")), false);
+});
+
+test("Aurora removal on the last agent fails before any writes", (t) => {
+  const f = fixture(t);
+  const file = f.put(f.target("agents/generalist.md"), `---\nname: generalist\nextensions: [${JSON.stringify("-" + aurora)}]\n---\n`);
+  const before = read(file);
+  assert.throws(() => f.plan(), /extensions removal conflicts/);
+  assert.equal(read(file), before);
+  assert.equal(fs.existsSync(f.target("pi-herdsman/config.json")), false);
+  assert.equal(fs.existsSync(f.target("agents/scout.md")), false);
+});
+
+test("existing six-agent overlays gain only Aurora while keeping noExtensions and custom resources", (t) => {
+  const f = fixture(t);
+  const existing = ["+" + path.join(f.packagesDir, "pi-tool-display/index.ts"), "+" + path.join(f.packagesDir, "pi-web-access/dist/index.js"), "+/custom/extension.ts"];
+  for (const name of names) {
+    f.put(f.target(`agents/${name}.md`), `---\nname: ${name}\nnoExtensions: true\nextensions: ${JSON.stringify(existing)}\ntools: ${JSON.stringify(tools.map((tool) => "+" + tool))}\nskills: ["+/custom/SKILL.md"]\n---\nCUSTOM_BODY\n`);
+  }
+  applySetup(f.plan());
+  for (const name of names) {
+    const text = read(f.target(`agents/${name}.md`));
+    const doc = metadata(text);
+    assert.deepEqual(doc.extensions, [...existing, "+" + aurora]);
+    assert.equal(doc.noExtensions, true);
+    assert.deepEqual(doc.tools, tools.map((tool) => "+" + tool));
+    assert.deepEqual(doc.skills, ["+/custom/SKILL.md"]);
+    assert.ok(text.endsWith("CUSTOM_BODY\n"));
+  }
+  assert.deepEqual(applySetup(f.plan()), []);
+});
+
+test("relocated checkout and Git package use their own Aurora, independent of cwd and npm lookup", (t) => {
+  for (const layout of ["source checkout", "agent/git/github.com/example/pi-learn"]) {
+    const f = fixture(t);
+    const local = relocatedPackage(f, layout);
+    // Neither npm package is the resource owner, even if a misleading copy exists.
+    for (const name of ["pi-learn", "pi-learn-extensions"]) {
+      f.put(path.join(f.packagesDir, name, "package.json"), JSON.stringify({ name }));
+      f.put(path.join(f.packagesDir, name, "extensions/aurora-ui.ts"), "// wrong copy\n");
+    }
+    const agentDir = path.join(f.root, "isolated output");
+    const args = [local.script, "--agent-dir", pathToFileURL(agentDir).href, "--packages-dir", f.packagesDir];
+    const run = (...extra) => spawnSync(process.execPath, [...args, ...extra], { cwd: f.root, encoding: "utf8" });
+    const dry = run("--dry-run");
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.match(dry.stdout, /Planned 8 file/);
+    assert.equal(fs.existsSync(agentDir), false);
+    const applied = run();
+    assert.equal(applied.status, 0, applied.stderr);
+    for (const name of names) {
+      const doc = metadata(read(path.join(agentDir, "agents", `${name}.md`)));
+      assert.deepEqual(doc.extensions, ["+" + path.join(f.packagesDir, "pi-tool-display/index.ts"), "+" + path.join(f.packagesDir, "pi-web-access/dist/index.js"), "+" + local.entry]);
+      assert.ok(path.isAbsolute(doc.extensions[2].slice(1)));
+    }
+    const again = run();
+    assert.equal(again.status, 0, again.stderr);
+    assert.match(again.stdout, /no writes/);
+  }
+});
+
+test("missing package-local Aurora fails preflight without falling back to npm or writing targets", (t) => {
+  const f = fixture(t);
+  const local = relocatedPackage(f, "Git package");
+  fs.unlinkSync(local.entry);
+  f.put(path.join(f.packagesDir, "pi-learn-extensions/extensions/aurora-ui.ts"), "// wrong copy\n");
+  const result = spawnSync(process.execPath, [local.script, "--agent-dir", f.agentDir, "--packages-dir", f.packagesDir], { cwd: f.root, encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Missing extension entry:/);
+  assert.ok(result.stderr.includes(local.entry));
+  assert.equal(fs.existsSync(f.target("agents")), false);
   assert.equal(fs.existsSync(f.target("pi-herdsman/config.json")), false);
 });
 

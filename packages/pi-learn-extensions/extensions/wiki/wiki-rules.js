@@ -282,30 +282,9 @@ export function discoverWikiSectionPaths({ projectRoot }) {
   return [...sections].sort(compareRulePaths);
 }
 
-export function renderPromptRuleScaffold(sectionPath) {
-  if (sectionPath === WIKI_DIR) {
-    return [
-      "# Global Wiki rules",
-      "",
-      "Load these rules only before editing a governed repository component. Do not load rules for read-only questions or unrelated work.",
-      "",
-      "Use `wiki/quickstart.md` to identify only the section rule files applicable to the edit. If applicable rules conflict, stop and report the conflict.",
-      "",
-      "No global rules have been added yet.",
-      "",
-    ].join("\n");
-  }
-
-  const section = sectionPath.slice(`${WIKI_DIR}/`.length);
-  const title = section.split("/").at(-1).replace(/[-_]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
-  return [
-    `# ${title} rules`,
-    "",
-    `Load these rules only before editing components governed by the \`${sectionPath}/\` domain.`,
-    "",
-    "No domain-specific rules have been added yet.",
-    "",
-  ].join("\n");
+export function renderPromptRuleScaffold(_sectionPath) {
+  // Missing rule files stay zero-byte until real rules are authored.
+  return "";
 }
 
 function walkWikiDirectory({ root, absoluteDir, relativeDir, sectionPaths, report, includePath }) {
